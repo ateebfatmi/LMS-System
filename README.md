@@ -8,7 +8,7 @@ An independent, multi-tenant LMS for schools and coaching institutes. This repos
 - Multi-tenant domain contracts in `@prepzii/contracts`
 - Framework-independent grading in `@prepzii/assessment-core`
 - Shared React primitives in `@prepzii/ui`
-- A Supabase/Postgres baseline with tenant-scoped RLS
+- An additive Supabase migration for Prepzii's existing backend with tenant-scoped RLS
 - Architecture and package-sharing decisions under `docs/`
 
 ## Start locally
@@ -19,7 +19,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-The dashboard uses representative data until authentication and database credentials are configured.
+The dashboard uses representative data until the existing Prepzii Clerk and Supabase credentials are configured. This app must point to the same backend as consumer Prepzii.
 
 ## Repository layout
 
@@ -34,5 +34,4 @@ docs                         Architecture and extraction notes
 
 ## Non-negotiable tenant rule
 
-Every institution-owned row carries an `organization_id`. Database RLS is the final enforcement layer; UI filtering is never treated as authorization.
-
+Every new institution-owned row carries an `organization_id`, which references the existing `institutes.id`. Existing Prepzii tables retain their current `institute_id` columns for compatibility. Database RLS and server-side membership checks are the final enforcement layers; UI filtering is never treated as authorization.

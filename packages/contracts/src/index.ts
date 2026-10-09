@@ -1,9 +1,9 @@
 export const organizationRoles = [
-  "owner",
-  "admin",
-  "teacher",
-  "student",
-  "parent",
+  "OWNER",
+  "COACHING_ADMIN",
+  "TEACHER",
+  "STUDENT",
+  "PARENT",
 ] as const;
 
 export type OrganizationRole = (typeof organizationRoles)[number];
@@ -12,6 +12,7 @@ export type OrganizationId = string;
 export type UserId = string;
 
 export interface TenantContext {
+  /** Existing Prepzii institutes.id value. */
   organizationId: OrganizationId;
   userId: UserId;
   role: OrganizationRole;
@@ -40,4 +41,3 @@ export interface GradedAnswer {
   status: "correct" | "incorrect" | "unanswered";
   score: number;
 }
-

@@ -17,5 +17,4 @@ During local development these are npm workspaces. For real sharing, publish the
 3. Move low-level brand primitives into `@prepzii/ui`; keep dashboards and feature components product-owned.
 4. Publish a prerelease, migrate consumer Prepzii, then promote a stable version.
 
-No consumer source was copied into this repository. This avoids carrying over application-specific authentication, payment, community, or student-state assumptions.
-
+No consumer source was copied into this repository. Authentication and persistence are shared through the same Clerk and Supabase services, while source sharing happens only through versioned packages.
