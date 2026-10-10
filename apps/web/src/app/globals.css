@@ -11,7 +11,7 @@
   --brand-hover: #eab308;
   --brand-light: #fef9c3;
   --brand-navy: #1e2a44;
-  --brand-navy-dark: #0b132b;
+  --brand-navy-dark: #0f172a;
   --blue: #2563eb;
   --blue-soft: #eff6ff;
   --green: #10b981;
@@ -132,7 +132,7 @@ button {
   letter-spacing: 0.04em;
 }
 
-/* --- Segmented Role Switcher Control --- */
+/* --- Floating Segmented Role Switcher Control --- */
 .role-switcher-pill {
   display: flex;
   align-items: center;
@@ -175,21 +175,31 @@ button {
   box-shadow: 0 2px 8px rgba(250, 204, 21, 0.35);
 }
 
-/* --- Landing Page Styling --- */
+/* --- Landing Page Floating Navigation Bar --- */
 .landing {
   min-height: 100vh;
   background: linear-gradient(180deg, #fffdf2 0%, #f8fafc 40%, #ffffff 100%);
+  padding-top: 40px;
 }
 
 .landing-nav {
-  height: 84px;
-  max-width: 1200px;
-  margin: auto;
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 1080px;
+  width: calc(100% - 40px);
+  height: 68px;
   display: flex;
   align-items: center;
   gap: 18px;
-  padding: 0 28px;
-  border-bottom: 1px solid rgba(241, 231, 190, 0.6);
+  padding: 0 24px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(241, 231, 190, 0.8);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.1), 0 0 20px rgba(250, 204, 21, 0.1);
+  z-index: 100;
 }
 
 .product-chip {
@@ -459,31 +469,35 @@ button {
   font-size: 14px;
 }
 
-/* --- App Shell & Sidebar --- */
+/* --- App Shell & FLOATING SIDEBAR NAVIGATION DOCK --- */
 .app-shell {
   display: grid;
-  grid-template-columns: 268px 1fr;
+  grid-template-columns: 280px 1fr;
   min-height: 100vh;
   background: var(--paper);
 }
 
 .sidebar {
   position: sticky;
-  top: 0;
-  height: 100vh;
-  padding: 26px 20px;
+  top: 16px;
+  height: calc(100vh - 32px);
+  margin: 16px 0 16px 16px;
+  padding: 24px 18px;
   display: flex;
   flex-direction: column;
   color: #cbd5e1;
-  background: var(--brand-navy-dark);
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, #0f172a 0%, #080d1a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.25), 0 0 30px rgba(250, 204, 21, 0.05);
+  z-index: 40;
 }
 
 .brand-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 0 4px 22px;
+  padding: 0 4px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
@@ -501,14 +515,14 @@ button {
 }
 
 .org-switcher {
-  margin: 20px 0 16px;
+  margin: 18px 0 14px;
   padding: 12px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  border-radius: 16px;
   transition: all 0.15s ease;
 }
 
@@ -540,20 +554,20 @@ button {
 .org-avatar {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   color: #0f172a;
   background: var(--brand);
   border-radius: 10px;
   font-family: var(--font-display);
   font-size: 12px;
   font-weight: 800;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(250, 204, 21, 0.3);
 }
 
 .side-nav {
   display: grid;
-  gap: 4px;
+  gap: 5px;
   margin-top: 8px;
 }
 
@@ -561,35 +575,43 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
+  padding: 11px 14px;
+  border-radius: 14px;
   color: #94a3b8;
   font-size: 13px;
   font-weight: 500;
-  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  transition: all 0.18s ease;
 }
 
 .side-nav a span {
   color: #64748b;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 2px 7px;
+  border-radius: 6px;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
+  transition: all 0.18s;
 }
 
 .side-nav a:hover {
   color: #f8fafc;
   background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .side-nav a.active {
   color: #ffffff;
-  background: rgba(255, 255, 255, 0.09);
-  border-left: 3px solid var(--brand);
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.22) 0%, rgba(250, 204, 21, 0.06) 100%);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  box-shadow: 0 4px 16px rgba(250, 204, 21, 0.12);
   font-weight: 600;
 }
 
 .side-nav a.active span {
-  color: var(--brand);
+  color: #0f172a;
+  background: var(--brand);
 }
 
 .sidebar-bottom {
@@ -604,7 +626,7 @@ button {
   padding: 8px 12px;
   color: #94a3b8;
   font-size: 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   transition: all 0.15s;
 }
 
@@ -614,19 +636,29 @@ button {
 }
 
 .workspace {
-  padding: 32px clamp(24px, 4vw, 56px);
+  padding: 24px clamp(20px, 3.5vw, 48px);
   overflow: hidden;
 }
 
+/* --- FLOATING WORKSPACE TOP HEADER BAR --- */
 .workspace-header {
+  position: sticky;
+  top: 16px;
+  z-index: 50;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
+  padding: 16px 24px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.06);
 }
 
 .header-subtitle {
-  margin: 0 0 4px;
+  margin: 0 0 3px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
@@ -636,7 +668,7 @@ button {
   margin: 0;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 28px;
+  font-size: 26px;
   letter-spacing: -0.02em;
   color: var(--ink);
 }
