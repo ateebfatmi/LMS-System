@@ -27,17 +27,15 @@ export const metadata: Metadata = {
     "The structured way to crack JEE & NEET. Practice PYQs, take mock tests, revise formula handbooks, detect weak chapters, and analyze student performance.",
   icons: {
     icon: [
-      { url: "/images/branding/favicon-96x96.png", sizes: "96x96", type: "image/png" },
-      { url: "/images/branding/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/favicon.ico" },
+      { url: "/images/branding/prepzii-official-logo.png", type: "image/png" },
     ],
-    apple: "/images/branding/favicon-192x192.png",
+    apple: "/images/branding/prepzii-official-logo.png",
   },
   openGraph: {
     title: "PrepZii for Institutions | JEE & NEET Learning Management System",
     description:
       "A calm, focused workspace for coaching institutes and schools to manage batches, faculty, tests, and student analytics.",
-    images: ["/images/branding/prepzii-logo-dark.png"],
+    images: ["/images/branding/prepzii-official-logo.png"],
   },
 };
 
@@ -50,7 +48,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <ClerkProvider>
         <html lang="en" className={fontClasses}>
           <head>
-            <link rel="icon" href="/images/branding/favicon-96x96.png" sizes="96x96" type="image/png" />
+            <link rel="icon" href="/images/branding/prepzii-official-logo.png" type="image/png" />
           </head>
           <body>{children}</body>
         </html>
@@ -61,7 +59,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={fontClasses}>
       <head>
-        <link rel="icon" href="/images/branding/favicon-96x96.png" sizes="96x96" type="image/png" />
+        <link rel="icon" href="/images/branding/prepzii-official-logo.png" type="image/png" />
       </head>
       <body>{children}</body>
     </html>

@@ -2,61 +2,43 @@
 
 import type { ButtonHTMLAttributes, InputHTMLAttributes, PropsWithChildren, ReactNode } from "react";
 
-
-export function PrepziiLogoIcon({ className = "w-7 h-7" }: { className?: string }) {
+export function PrepziiLogoIcon({ className = "w-8 h-8" }: { className?: string }) {
   return (
-    <svg
+    <img
+      src="/images/branding/prepzii-official-logo.png"
+      alt="PrepZii Logo"
       className={className}
-      viewBox="0 0 40 40"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <rect width="40" height="40" rx="10" fill="#FACC15" />
-      <path
-        d="M11 10H24C27.866 10 31 13.134 31 17C31 20.866 27.866 24 24 24H18V30H11V10Z"
-        fill="#0F172A"
-      />
-      <circle cx="23.5" cy="17" r="3.5" fill="#FACC15" />
-    </svg>
+      style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "contain" }}
+    />
   );
 }
 
 export function PrepziiMark({
   compact = false,
   theme = "dark",
-  useImage = true,
 }: {
   compact?: boolean;
   theme?: "dark" | "light";
-  useImage?: boolean;
 }) {
-  if (useImage) {
-    // In dark headers/sidebars, use light logo; in light backgrounds, use dark logo
-    const logoSrc =
-      theme === "dark"
-        ? "/images/branding/prepzii-logo-light.png"
-        : "/images/branding/prepzii-logo-dark.png";
-    return (
-      <span className={`pz-mark pz-mark-${theme} pz-mark-img`} aria-label="PrepZii">
-        {/* eslint-disable-next-html-element-for-img */}
-        <img
-          src={logoSrc}
-          alt="PrepZii"
-          style={{ height: compact ? "26px" : "32px", width: "auto", objectFit: "contain" }}
-        />
-      </span>
-    );
-  }
-
   return (
     <span className={`pz-mark pz-mark-${theme}`} aria-label="PrepZii">
-      <span className="pz-mark-symbol">
-        <PrepziiLogoIcon className="pz-mark-svg" />
+      <span className="pz-mark-symbol" style={{ display: "flex", alignItems: "center" }}>
+        {/* eslint-disable-next-html-element-for-img */}
+        <img
+          src="/images/branding/prepzii-official-logo.png"
+          alt="PrepZii Logo"
+          style={{
+            height: compact ? "30px" : "36px",
+            width: compact ? "30px" : "36px",
+            borderRadius: "50%",
+            objectFit: "cover",
+            boxShadow: theme === "dark" ? "0 2px 8px rgba(250, 204, 21, 0.25)" : "0 2px 8px rgba(0, 0, 0, 0.1)",
+          }}
+        />
       </span>
       {!compact && (
-        <span className="pz-mark-word font-prepzii-display">
-          PREP<span className="pz-accent-yellow">ZII</span>
+        <span className="pz-mark-word font-prepzii-display" style={{ fontWeight: 800, fontSize: "22px", letterSpacing: "0.06em" }}>
+          PREP<span className="pz-accent-yellow" style={{ color: "#FACC15" }}>ZII</span>
         </span>
       )}
     </span>
@@ -82,7 +64,6 @@ export function ZiAssistantBadge({
     </button>
   );
 }
-
 
 export function Button({
   className = "",
