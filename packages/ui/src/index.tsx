@@ -8,7 +8,15 @@ export function PrepziiLogoIcon({ className = "w-8 h-8" }: { className?: string 
       src="/images/branding/prepzii-official-logo.png"
       alt="PrepZii Logo"
       className={className}
-      style={{ width: "34px", height: "34px", borderRadius: "50%", objectFit: "contain" }}
+      style={{
+        width: "36px",
+        height: "36px",
+        borderRadius: "50%",
+        objectFit: "contain",
+        backgroundColor: "#ffffff",
+        padding: "1px",
+        boxShadow: "0 2px 6px rgba(0, 0, 0, 0.15)",
+      }}
     />
   );
 }
@@ -31,7 +39,9 @@ export function PrepziiMark({
             height: compact ? "30px" : "36px",
             width: compact ? "30px" : "36px",
             borderRadius: "50%",
-            objectFit: "cover",
+            objectFit: "contain",
+            backgroundColor: "#ffffff",
+            padding: "1px",
             boxShadow: theme === "dark" ? "0 2px 8px rgba(250, 204, 21, 0.25)" : "0 2px 8px rgba(0, 0, 0, 0.1)",
           }}
         />

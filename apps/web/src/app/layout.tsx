@@ -46,7 +46,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   if (hasClerk) {
     return (
       <ClerkProvider>
-        <html lang="en" className={fontClasses}>
+        <html lang="en" className={fontClasses} data-scroll-behavior="smooth">
           <head>
             <link rel="icon" href="/images/branding/prepzii-official-logo.png" type="image/png" />
           </head>
@@ -57,7 +57,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   }
 
   return (
-    <html lang="en" className={fontClasses}>
+    <html lang="en" className={fontClasses} data-scroll-behavior="smooth">
       <head>
         <link rel="icon" href="/images/branding/prepzii-official-logo.png" type="image/png" />
       </head>

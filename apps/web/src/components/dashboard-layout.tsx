@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type PropsWithChildren, useState, Suspense } from "react";
-import { PrepziiMark } from "@prepzii/ui";
+import { PrepziiMark, ZiAssistantBadge } from "@prepzii/ui";
 
 export type AppRole = "DIRECTOR" | "FACULTY" | "STUDENT" | "PARENT";
 
@@ -88,11 +88,11 @@ function LayoutContent({
           <Link href="/">
             <PrepziiMark theme="dark" />
           </Link>
-          <span>Institutions</span>
+          <span className="inst-pill">INSTITUTIONS</span>
         </div>
 
-        {/* Role Switcher Pill */}
-        <div className="org-switcher" style={{ background: "rgba(250, 204, 21, 0.08)", borderColor: "rgba(250, 204, 21, 0.25)" }}>
+        {/* Profile Card Switcher */}
+        <div className="org-switcher">
           <span className="org-avatar" style={{ background: currentProfile.color, color: "#0f172a" }}>
             {currentProfile.avatar}
           </span>
@@ -128,13 +128,6 @@ function LayoutContent({
         <div className="sidebar-bottom">
           <a href="#settings">Institute Settings</a>
           <a href="#support">Help & Support</a>
-          <div className="profile-mini">
-            <span>{currentProfile.avatar}</span>
-            <p>
-              <strong>{currentProfile.name}</strong>
-              <small>{currentProfile.title}</small>
-            </p>
-          </div>
         </div>
       </aside>
 
@@ -144,77 +137,41 @@ function LayoutContent({
             <span className="mobile-brand">
               <PrepziiMark compact theme="light" />
             </span>
-            <p>{subtitle || "Saturday, 10 October 2026"}</p>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <h1>{title || "Institute Overview"}</h1>
-            </div>
+            <p className="header-subtitle">{subtitle || "Saturday, 10 October 2026"}</p>
+            <h1>{title || "Institute Overview"}</h1>
           </div>
 
-          <div className="header-actions" style={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
-            {/* Role Switcher Bar */}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", background: "#ffffff", border: "1px solid var(--line)", padding: "4px 6px", borderRadius: "12px" }}>
-              <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--muted)", paddingLeft: "6px" }}>View as:</span>
+          <div className="header-actions">
+            {/* Segmented Control Role Switcher */}
+            <div className="role-switcher-pill">
+              <span className="view-as-label">View as:</span>
               <button
                 onClick={() => handleRoleSelect("DIRECTOR")}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: "8px",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  background: activeRole === "DIRECTOR" ? "var(--brand)" : "transparent",
-                  color: activeRole === "DIRECTOR" ? "#0f172a" : "var(--muted)",
-                }}
+                className={`role-tab ${activeRole === "DIRECTOR" ? "active" : ""}`}
               >
-                🏢 Director
+                💳 Director
               </button>
               <button
                 onClick={() => handleRoleSelect("FACULTY")}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: "8px",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  background: activeRole === "FACULTY" ? "var(--brand)" : "transparent",
-                  color: activeRole === "FACULTY" ? "#0f172a" : "var(--muted)",
-                }}
+                className={`role-tab ${activeRole === "FACULTY" ? "active" : ""}`}
               >
                 👨‍🏫 Faculty
               </button>
               <button
                 onClick={() => handleRoleSelect("STUDENT")}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: "8px",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  background: activeRole === "STUDENT" ? "var(--brand)" : "transparent",
-                  color: activeRole === "STUDENT" ? "#0f172a" : "var(--muted)",
-                }}
+                className={`role-tab ${activeRole === "STUDENT" ? "active" : ""}`}
               >
-                👨‍🎓 Student
+                🎓 Student
               </button>
               <button
                 onClick={() => handleRoleSelect("PARENT")}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: "8px",
-                  fontSize: "11px",
-                  fontWeight: 600,
-                  border: "none",
-                  cursor: "pointer",
-                  background: activeRole === "PARENT" ? "var(--brand)" : "transparent",
-                  color: activeRole === "PARENT" ? "#0f172a" : "var(--muted)",
-                }}
+                className={`role-tab ${activeRole === "PARENT" ? "active" : ""}`}
               >
                 👨‍👩‍👧 Parent
               </button>
             </div>
+
+            <ZiAssistantBadge text="Ask Zi AI" />
 
             {action || (
               <Link href="/dashboard/assessments" className="create-button pz-button pz-button-primary">
@@ -242,7 +199,7 @@ export function DashboardLayout(props: PropsWithChildren<{
   onRoleChange?: (role: AppRole) => void;
 }>) {
   return (
-    <Suspense fallback={<div style={{ padding: "40px", textAlign: "center" }}>Loading workspace...</div>}>
+    <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "var(--muted)" }}>Loading workspace...</div>}>
       <LayoutContent {...props} />
     </Suspense>
   );
