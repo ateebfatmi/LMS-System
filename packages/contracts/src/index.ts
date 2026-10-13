@@ -237,7 +237,94 @@ export interface Announcement {
   content: string;
   targetAudience: "ALL" | "BATCH" | "FACULTY" | "PARENTS";
   batchId?: string;
+  batchName?: string;
   priority: "NORMAL" | "HIGH" | "URGENT";
+  category?: "ACADEMIC" | "EXAM" | "HOLIDAY" | "FEE" | "GENERAL";
+  broadcastChannels?: ("PORTAL" | "WHATSAPP" | "SMS")[];
   createdAt: string;
 }
+
+// ==========================================
+// Fee & Financial Contracts
+// ==========================================
+
+export type FeeInstallmentStatus = "PAID" | "PENDING" | "OVERDUE" | "PARTIAL";
+
+export interface FeeInstallment {
+  id: string;
+  title: string;
+  amount: number;
+  dueDate: string;
+  status: FeeInstallmentStatus;
+  paidAmount: number;
+  paidAt?: string;
+  receiptNumber?: string;
+}
+
+export type FeePaymentMethod = "UPI" | "NET_BANKING" | "CARD" | "CHEQUE" | "CASH" | "DD";
+
+export interface StudentFeeRecord {
+  id: string;
+  organizationId: OrganizationId;
+  studentId: UserId;
+  studentName: string;
+  rollNumber: string;
+  batchId: string;
+  batchName: string;
+  targetExam: TargetExam;
+  totalCourseFee: number;
+  concessionAmount: number;
+  concessionReason?: string;
+  netPayable: number;
+  totalPaid: number;
+  totalDue: number;
+  status: "PAID" | "PARTIAL" | "OVERDUE" | "UNPAID";
+  installments: FeeInstallment[];
+  updatedAt: string;
+}
+
+export interface FeeTransaction {
+  id: string;
+  organizationId: OrganizationId;
+  studentId: UserId;
+  studentName: string;
+  rollNumber: string;
+  batchName: string;
+  amount: number;
+  method: FeePaymentMethod;
+  referenceNumber: string;
+  installmentTitle: string;
+  receiptNumber: string;
+  recordedBy: string;
+  createdAt: string;
+}
+
+// ==========================================
+// Campus & Smart Room Contracts
+// ==========================================
+
+export type RoomFacility = "SMART_BOARD" | "PROJECTOR" | "AC" | "LAB_BENCHES" | "CCTV" | "AUDIO_MIC";
+
+export interface CampusRoom {
+  id: string;
+  organizationId: OrganizationId;
+  campusId: string;
+  campusName: string;
+  name: string;
+  capacity: number;
+  currentBatch?: string;
+  facilities: RoomFacility[];
+  status: "IN_USE" | "AVAILABLE" | "MAINTENANCE";
+}
+
+export interface RoomSchedule {
+  id: string;
+  roomId: string;
+  roomName: string;
+  timeSlot: string;
+  batchName: string;
+  facultyName: string;
+  subject: string;
+}
+
 

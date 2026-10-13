@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { mockStudents } from "@/lib/mock-data";
+import { WhatsAppDispatcherModal } from "@/components/whatsapp-dispatcher-modal";
 
 export interface ParentNotificationLog {
   id: string;
@@ -514,6 +515,27 @@ export default function AttendancePage() {
           </div>
         </div>
       )}
+
+      {/* Interactive WhatsApp / SMS Alert Dispatcher */}
+      <WhatsAppDispatcherModal
+        isOpen={showNotifyModal}
+        onClose={() => setShowNotifyModal(false)}
+        recipients={batchStudents
+          .filter((s) => studentStatus[s.id] === "ABSENT" || studentStatus[s.id] === "LATE")
+          .map((s) => ({
+            studentId: s.id,
+            studentName: s.name,
+            parentPhone: s.parentPhone,
+            batchName: s.batchName,
+            scoreOrDetail: `Status: ${studentStatus[s.id]} on ${attendanceDate}`,
+          }))}
+        defaultTemplate="ABSENT_ALERT"
+        onAlertsSent={(newLogs) => {
+          setLogs([...newLogs, ...logs]);
+          setIsSubmitted(true);
+          setTimeout(() => setIsSubmitted(false), 4000);
+        }}
+      />
     </DashboardLayout>
   );
 }
