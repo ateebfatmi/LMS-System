@@ -8,6 +8,7 @@ import { mockBatches } from "@/lib/mock-data";
 
 export default function BatchesPage() {
   const [selectedFilter, setSelectedFilter] = useState<string>("ALL");
+  const [searchTerm, setSearchTerm] = useState("");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [batchList, setBatchList] = useState(mockBatches);
 
@@ -18,10 +19,14 @@ export default function BatchesPage() {
   const [newRoom, setNewRoom] = useState("Hall 101");
   const [newFaculty, setNewFaculty] = useState("Er. Vivek Gupta");
 
-  const filteredBatches =
-    selectedFilter === "ALL"
-      ? batchList
-      : batchList.filter((b) => b.targetExam === selectedFilter);
+  const filteredBatches = batchList.filter((b) => {
+    const matchesFilter = selectedFilter === "ALL" || b.targetExam === selectedFilter;
+    const matchesSearch =
+      b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.facultyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (b.roomNumber && b.roomNumber.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesFilter && matchesSearch;
+  });
 
   const handleCreateBatch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +84,9 @@ export default function BatchesPage() {
         </div>
         <input
           type="text"
-          placeholder="Filter batches by name or faculty..."
+          placeholder="Filter batches by name, room, or faculty..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className="search-input"
         />
       </div>

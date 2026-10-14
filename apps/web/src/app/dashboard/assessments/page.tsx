@@ -9,6 +9,8 @@ export default function AssessmentsPage() {
   const [tests, setTests] = useState(mockTests);
   const [selectedTest, setSelectedTest] = useState(mockTests[0]);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // New Test Form State
   const [newTitle, setNewTitle] = useState("");
@@ -18,29 +20,84 @@ export default function AssessmentsPage() {
   const [newDuration, setNewDuration] = useState(180);
   const [newBatch, setNewBatch] = useState("JEE 12A - Titans");
 
-  const handleCreateTest = (e: React.FormEvent) => {
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleExportMarksCSV = () => {
+    const headers = "Rank,Student Name,Batch,Score,Total Marks,Percentile,Accuracy\n";
+    const rows = mockLeaderboard
+      .map(
+        (r) =>
+          `${r.rank},"${r.studentName}","${r.batchName}",${r.score},${r.totalMarks},${r.percentile}%,${Math.round(
+            (r.correctCount / (r.correctCount + r.incorrectCount)) * 100
+          )}%`
+      )
+      .join("\n");
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `${selectedTest.title.replace(/\s+/g, "_")}_Marks_Sheet.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast("✓ Marks Sheet CSV downloaded successfully!");
+  };
+
+  const handleOpenEdit = () => {
+    setIsEditing(true);
+    setNewTitle(selectedTest.title);
+    setNewPattern(selectedTest.pattern);
+    setNewSubject(selectedTest.subject || "Full Syllabus");
+    setNewTotalMarks(selectedTest.totalMarks);
+    setNewDuration(selectedTest.durationMinutes);
+    setNewBatch(selectedTest.scheduledBatches[0] || "JEE 12A - Titans");
+    setShowCreateModal(true);
+  };
+
+  const handleCreateOrUpdateTest = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const created = {
-      id: `tst-${Date.now()}`,
-      organizationId: "org-1",
-      title: newTitle,
-      pattern: newPattern,
-      subject: newSubject,
-      totalMarks: Number(newTotalMarks),
-      durationMinutes: Number(newDuration),
-      status: "PUBLISHED" as const,
-      questionCount: newPattern === "NEET" ? 90 : 54,
-      scheduledBatches: [newBatch],
-      totalSubmissions: 0,
-      avgScorePercent: 0,
-      createdAt: new Date().toISOString(),
-    };
+    if (isEditing) {
+      const updated = {
+        ...selectedTest,
+        title: newTitle,
+        pattern: newPattern,
+        subject: newSubject,
+        totalMarks: Number(newTotalMarks),
+        durationMinutes: Number(newDuration),
+        scheduledBatches: [newBatch],
+      };
+      setTests((prev) => prev.map((t) => (t.id === selectedTest.id ? updated : t)));
+      setSelectedTest(updated);
+      showToast("✓ Assessment details updated!");
+    } else {
+      const created = {
+        id: `tst-${Date.now()}`,
+        organizationId: "org-1",
+        title: newTitle,
+        pattern: newPattern,
+        subject: newSubject,
+        totalMarks: Number(newTotalMarks),
+        durationMinutes: Number(newDuration),
+        status: "PUBLISHED" as const,
+        questionCount: newPattern === "NEET" ? 90 : 54,
+        scheduledBatches: [newBatch],
+        totalSubmissions: 0,
+        avgScorePercent: 0,
+        createdAt: new Date().toISOString(),
+      };
 
-    setTests([created, ...tests]);
-    setSelectedTest(created);
+      setTests([created, ...tests]);
+      setSelectedTest(created);
+      showToast("✓ New test published for batch!");
+    }
+
     setShowCreateModal(false);
+    setIsEditing(false);
     setNewTitle("");
   };
 
@@ -105,8 +162,12 @@ export default function AssessmentsPage() {
             subtitle={`Pattern: ${selectedTest.pattern.replace("_", " ")} · ${selectedTest.durationMinutes} Mins · ${selectedTest.totalMarks} Total Marks`}
             action={
               <div style={{ display: "flex", gap: "8px" }}>
-                <Button variant="outline" style={{ fontSize: "12px" }}>Export Marks Sheet</Button>
-                <Button variant="secondary" style={{ fontSize: "12px" }}>Edit Test</Button>
+                <Button variant="outline" style={{ fontSize: "12px" }} onClick={handleExportMarksCSV}>
+                  📥 Export Marks Sheet
+                </Button>
+                <Button variant="secondary" style={{ fontSize: "12px" }} onClick={handleOpenEdit}>
+                  ✏️ Edit Test
+                </Button>
               </div>
             }
           >
@@ -218,17 +279,20 @@ export default function AssessmentsPage() {
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h2 style={{ margin: 0, fontSize: "18px", fontFamily: "var(--font-display)" }}>
-                Create New Coaching Assessment
+                {isEditing ? "Edit Assessment Parameters" : "Create New Coaching Assessment"}
               </h2>
               <button
-                onClick={() => setShowCreateModal(false)}
-                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer" }}
+                onClick={() => {
+                  setShowCreateModal(false);
+                  setIsEditing(false);
+                }}
+                style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--muted)" }}
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateTest} style={{ display: "grid", gap: "14px" }}>
+            <form onSubmit={handleCreateOrUpdateTest} style={{ display: "grid", gap: "14px" }}>
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
                   Test Title (e.g. All India JEE Mock 05)
@@ -322,15 +386,46 @@ export default function AssessmentsPage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "14px" }}>
-                <Button type="button" variant="secondary" onClick={() => setShowCreateModal(false)}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowCreateModal(false);
+                    setIsEditing(false);
+                  }}
+                >
                   Cancel
                 </Button>
-                <Button type="submit" variant="primary">
-                  Publish Test
+                <Button type="submit" variant="brand">
+                  {isEditing ? "Save Changes" : "Publish Test"}
                 </Button>
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {toastMessage && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: "24px",
+            right: "24px",
+            padding: "12px 20px",
+            background: "#0f172a",
+            color: "#facc15",
+            borderRadius: "12px",
+            boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
+            fontWeight: 700,
+            fontSize: "13px",
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            animation: "fadeIn 0.2s ease-in-out",
+          }}
+        >
+          {toastMessage}
         </div>
       )}
     </DashboardLayout>

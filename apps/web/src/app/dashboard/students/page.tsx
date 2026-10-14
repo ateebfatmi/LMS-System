@@ -185,22 +185,143 @@ APX-2026-1212,Yashvardhan Shukla,JEE 11B - Nucleus,JEE Main,+91 98765 34567,+91 
                   </Badge>
                 </td>
                 <td>
-                  <Button
-                    variant="outline"
-                    className="btn-xs"
-                    onClick={() => {
-                      setSelectedStudent(student);
-                      setShowWhatsAppModal(true);
-                    }}
-                  >
-                    💬 Message Parent
-                  </Button>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <Button
+                      variant="secondary"
+                      className="btn-xs"
+                      onClick={() => setSelectedStudent(student)}
+                    >
+                      👤 View Profile
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="btn-xs"
+                      onClick={() => {
+                        setSelectedStudent(student);
+                        setShowWhatsAppModal(true);
+                      }}
+                    >
+                      💬 Message
+                    </Button>
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {/* Student Profile & Progress Drawer */}
+      {selectedStudent && !showWhatsAppModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            justifyContent: "flex-end",
+            zIndex: 100,
+          }}
+        >
+          <div
+            style={{
+              background: "white",
+              width: "100%",
+              maxWidth: "540px",
+              height: "100%",
+              padding: "32px",
+              overflowY: "auto",
+              boxShadow: "-10px 0 30px rgba(0,0,0,0.15)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "20px",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <Badge variant="brand" size="sm">{selectedStudent.rollNumber}</Badge>
+                <h2 style={{ margin: "8px 0 4px", fontSize: "22px", fontFamily: "var(--font-display)" }}>
+                  {selectedStudent.name}
+                </h2>
+                <p style={{ margin: 0, color: "var(--muted)", fontSize: "13px" }}>
+                  {selectedStudent.batchName} · {selectedStudent.targetExam}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedStudent(null)}
+                style={{ background: "none", border: "none", fontSize: "22px", cursor: "pointer", color: "var(--muted)" }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div style={{ padding: "14px", background: "#f8fafc", border: "1px solid var(--line)", borderRadius: "10px" }}>
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>Attendance Rate</span>
+                <strong style={{ display: "block", fontSize: "20px", color: "#10b981", marginTop: "4px" }}>
+                  {selectedStudent.attendancePercentage}%
+                </strong>
+              </div>
+              <div style={{ padding: "14px", background: "#f8fafc", border: "1px solid var(--line)", borderRadius: "10px" }}>
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>PrepZii Test Average</span>
+                <strong style={{ display: "block", fontSize: "20px", color: "#2563eb", marginTop: "4px" }}>
+                  {selectedStudent.averageScore}%
+                </strong>
+              </div>
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: "14px", marginBottom: "10px" }}>Recent Assessment Performance</h3>
+              <div style={{ display: "grid", gap: "8px" }}>
+                <div style={{ padding: "12px", border: "1px solid var(--line)", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <strong style={{ fontSize: "13px" }}>All India PrepZii Mock 04</strong>
+                    <div style={{ fontSize: "11px", color: "var(--muted)" }}>JEE Advanced Paper 1</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <strong style={{ color: "#2563eb" }}>156 / 180</strong>
+                    <div style={{ fontSize: "11px", color: "#10b981" }}>Rank #2 (98.5%ile)</div>
+                  </div>
+                </div>
+
+                <div style={{ padding: "12px", border: "1px solid var(--line)", borderRadius: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <strong style={{ fontSize: "13px" }}>Chapter Test: Rotational Dynamics</strong>
+                    <div style={{ fontSize: "11px", color: "var(--muted)" }}>Physics Advanced</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <strong style={{ color: "#2563eb" }}>84 / 100</strong>
+                    <div style={{ fontSize: "11px", color: "#10b981" }}>Rank #3 (96.2%ile)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 style={{ fontSize: "14px", marginBottom: "10px" }}>Guardian & Communication</h3>
+              <div style={{ padding: "14px", border: "1px solid var(--line)", borderRadius: "10px", display: "grid", gap: "8px", fontSize: "13px" }}>
+                <div><strong>Parent WhatsApp:</strong> {selectedStudent.parentPhone}</div>
+                <div><strong>Student Mobile:</strong> {selectedStudent.phone}</div>
+                <div><strong>Enrollment Status:</strong> <Badge variant="success" size="sm">ACTIVE</Badge></div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: "auto", display: "flex", gap: "10px" }}>
+              <Button variant="secondary" style={{ flex: 1 }} onClick={() => setSelectedStudent(null)}>
+                Close
+              </Button>
+              <Button
+                variant="brand"
+                style={{ flex: 1 }}
+                onClick={() => setShowWhatsAppModal(true)}
+              >
+                💬 Send WhatsApp Alert
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manual Enroll Modal */}
       {showEnrollModal && (

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { type PropsWithChildren, useState, Suspense } from "react";
 import { PrepziiMark, ZiAssistantBadge } from "@prepzii/ui";
 
@@ -9,46 +9,46 @@ export type AppRole = "DIRECTOR" | "FACULTY" | "STUDENT" | "PARENT";
 
 const roleNavItems: Record<AppRole, { href: string; label: string; icon: string }[]> = {
   DIRECTOR: [
-    { href: "/dashboard", label: "Overview", icon: "01" },
-    { href: "/dashboard/crm", label: "Admissions CRM", icon: "02" },
-    { href: "/dashboard/batches", label: "Batches", icon: "03" },
-    { href: "/dashboard/students", label: "Students", icon: "04" },
-    { href: "/dashboard/teachers", label: "Faculty", icon: "05" },
-    { href: "/dashboard/courses", label: "Courses & DPPs", icon: "06" },
-    { href: "/dashboard/assessments", label: "Assessments & PYQs", icon: "07" },
-    { href: "/dashboard/attendance", label: "Attendance", icon: "08" },
-    { href: "/dashboard/fees", label: "Fee Management", icon: "09" },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: "10" },
-    { href: "/dashboard/campuses", label: "Campus Rooms", icon: "11" },
-    { href: "/dashboard/reports", label: "Reports & Analytics", icon: "12" },
-    { href: "/dashboard/billing", label: "Subscription & Billing", icon: "13" },
+    { href: "/dashboard", label: "Executive Overview", icon: "❖" },
+    { href: "/dashboard/crm", label: "Admissions CRM", icon: "◎" },
+    { href: "/dashboard/batches", label: "Batches & Classrooms", icon: "⊞" },
+    { href: "/dashboard/students", label: "Student Directory", icon: "⚑" },
+    { href: "/dashboard/teachers", label: "Faculty Directory", icon: "◈" },
+    { href: "/dashboard/courses", label: "Courses & DPPs", icon: "▤" },
+    { href: "/dashboard/assessments", label: "Assessments & PYQs", icon: "⏱" },
+    { href: "/dashboard/attendance", label: "Daily Attendance", icon: "✓" },
+    { href: "/dashboard/fees", label: "Fee Management", icon: "₹" },
+    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
+    { href: "/dashboard/campuses", label: "Campus Rooms", icon: "🏛" },
+    { href: "/dashboard/reports", label: "Reports & Analytics", icon: "📈" },
+    { href: "/dashboard/billing", label: "Plan & Quotas", icon: "💎" },
   ],
   FACULTY: [
-    { href: "/dashboard?role=FACULTY", label: "My Classes & Schedule", icon: "01" },
-    { href: "/dashboard/batches", label: "My Batches", icon: "02" },
-    { href: "/dashboard/attendance", label: "Mark Attendance", icon: "03" },
-    { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: "04" },
-    { href: "/dashboard/assessments", label: "Create & Evaluate Tests", icon: "05" },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: "06" },
-    { href: "/dashboard/campuses", label: "Room Allocations", icon: "07" },
-    { href: "/dashboard/reports", label: "Batch Performance", icon: "08" },
+    { href: "/dashboard?role=FACULTY", label: "My Classes & Schedule", icon: "❖" },
+    { href: "/dashboard/batches", label: "My Batches", icon: "⊞" },
+    { href: "/dashboard/attendance", label: "Mark Attendance", icon: "✓" },
+    { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: "▤" },
+    { href: "/dashboard/assessments", label: "Create & Evaluate Tests", icon: "⏱" },
+    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
+    { href: "/dashboard/campuses", label: "Room Allocations", icon: "🏛" },
+    { href: "/dashboard/reports", label: "Batch Performance", icon: "📈" },
   ],
   STUDENT: [
-    { href: "/dashboard?role=STUDENT", label: "My Learning Dashboard", icon: "01" },
-    { href: "/dashboard/assessments", label: "CBT Mock Tests & PYQs", icon: "02" },
-    { href: "/dashboard/courses", label: "My Courses & DPPs", icon: "03" },
-    { href: "/dashboard/fees?role=STUDENT", label: "My Fee Installments", icon: "04" },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: "05" },
-    { href: "/dashboard/reports", label: "Weak Chapter Analytics", icon: "06" },
-    { href: "/dashboard/attendance", label: "My Attendance Log", icon: "07" },
+    { href: "/dashboard?role=STUDENT", label: "My Learning Dashboard", icon: "❖" },
+    { href: "/dashboard/assessments", label: "CBT Mock Tests & PYQs", icon: "⏱" },
+    { href: "/dashboard/courses", label: "My Courses & DPPs", icon: "▤" },
+    { href: "/dashboard/fees?role=STUDENT", label: "My Fee Installments", icon: "₹" },
+    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
+    { href: "/dashboard/reports", label: "Weak Chapter Analytics", icon: "📈" },
+    { href: "/dashboard/attendance", label: "My Attendance Log", icon: "✓" },
   ],
   PARENT: [
-    { href: "/dashboard?role=PARENT", label: "Child Progress Overview", icon: "01" },
-    { href: "/dashboard/fees?role=PARENT", label: "Fee Dues & Receipts", icon: "02" },
-    { href: "/dashboard/announcements", label: "Circulars & Notices", icon: "03" },
-    { href: "/dashboard/reports", label: "Test Rank Cards", icon: "04" },
-    { href: "/dashboard/attendance", label: "Attendance Calendar", icon: "05" },
-    { href: "/dashboard/teachers", label: "Connect with Teachers", icon: "06" },
+    { href: "/dashboard?role=PARENT", label: "Child Progress Overview", icon: "❖" },
+    { href: "/dashboard/fees?role=PARENT", label: "Fee Dues & Receipts", icon: "₹" },
+    { href: "/dashboard/announcements", label: "Circulars & Notices", icon: "🔔" },
+    { href: "/dashboard/reports", label: "Test Rank Cards", icon: "📈" },
+    { href: "/dashboard/attendance", label: "Attendance Calendar", icon: "✓" },
+    { href: "/dashboard/teachers", label: "Connect with Teachers", icon: "◈" },
   ],
 };
 
@@ -65,7 +65,6 @@ function LayoutContent({
   subtitle,
   action,
   currentRole: propRole,
-  onRoleChange,
 }: PropsWithChildren<{
   title?: string;
   subtitle?: string;
@@ -74,20 +73,11 @@ function LayoutContent({
   onRoleChange?: (role: AppRole) => void;
 }>) {
   const pathname = usePathname();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const urlRole = (searchParams?.get("role") as AppRole) || undefined;
   const activeRole: AppRole = propRole || urlRole || "DIRECTOR";
-
-  const handleRoleSelect = (role: AppRole) => {
-    if (onRoleChange) {
-      onRoleChange(role);
-    } else {
-      router.push(`/dashboard?role=${role}`);
-    }
-  };
 
   const navItems = roleNavItems[activeRole] || roleNavItems.DIRECTOR;
   const currentProfile = roleInfo[activeRole];
@@ -102,7 +92,7 @@ function LayoutContent({
           <span className="inst-pill">INSTITUTIONS</span>
         </div>
 
-        {/* Profile Card Switcher */}
+        {/* Profile Card */}
         <div className="org-switcher">
           <span className="org-avatar" style={{ background: currentProfile.color, color: "#0f172a" }}>
             {currentProfile.avatar}
@@ -153,35 +143,8 @@ function LayoutContent({
           </div>
 
           <div className="header-actions">
-            {/* Segmented Control Role Switcher */}
-            <div className="role-switcher-pill">
-              <span className="view-as-label">View as:</span>
-              <button
-                onClick={() => handleRoleSelect("DIRECTOR")}
-                className={`role-tab ${activeRole === "DIRECTOR" ? "active" : ""}`}
-              >
-                💳 Director
-              </button>
-              <button
-                onClick={() => handleRoleSelect("FACULTY")}
-                className={`role-tab ${activeRole === "FACULTY" ? "active" : ""}`}
-              >
-                👨‍🏫 Faculty
-              </button>
-              <button
-                onClick={() => handleRoleSelect("STUDENT")}
-                className={`role-tab ${activeRole === "STUDENT" ? "active" : ""}`}
-              >
-                🎓 Student
-              </button>
-              <button
-                onClick={() => handleRoleSelect("PARENT")}
-                className={`role-tab ${activeRole === "PARENT" ? "active" : ""}`}
-              >
-                👨‍👩‍👧 Parent
-              </button>
-            </div>
-
+            <button aria-label="Search" title="Quick Search">⌕</button>
+            <button aria-label="Notifications" title="Announcements">◉</button>
             <ZiAssistantBadge text="Ask Zi AI" />
 
             {action || (
@@ -195,7 +158,7 @@ function LayoutContent({
         {children}
 
         <footer className="workspace-footer">
-          PrepZii JEE & NEET Coaching LMS · Role View: <strong>{activeRole}</strong> · Multi-Tenant Platform
+          PrepZii JEE & NEET Coaching LMS · Multi-Tenant Platform
         </footer>
       </section>
     </main>
