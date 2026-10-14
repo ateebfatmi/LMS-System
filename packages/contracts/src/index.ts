@@ -327,4 +327,112 @@ export interface RoomSchedule {
   subject: string;
 }
 
+// ==========================================
+// Admissions CRM Contracts
+// ==========================================
 
+export type LeadStage =
+  | "NEW"
+  | "CONTACTED"
+  | "COUNSELLING_SCHEDULED"
+  | "TRIAL_ATTENDED"
+  | "CONVERTED"
+  | "LOST";
+
+export type LeadSource =
+  | "WALK_IN"
+  | "WEBSITE"
+  | "REFERRAL"
+  | "SOCIAL_MEDIA"
+  | "NEWSPAPER"
+  | "CAMPAIGN"
+  | "OTHER";
+
+export interface Lead {
+  id: string;
+  organizationId: OrganizationId;
+  name: string;
+  email?: string;
+  phone: string;
+  guardianName?: string;
+  guardianPhone?: string;
+  targetExam: TargetExam;
+  targetBatchId?: string;
+  targetBatchName?: string;
+  source: LeadSource;
+  assignedCounsellorId?: string;
+  assignedCounsellorName?: string;
+  stage: LeadStage;
+  followUpDate?: string;
+  estimatedFee?: number;
+  notes?: string;
+  convertedStudentId?: string;
+  convertedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==========================================
+// Subscriptions & Platform Billing Contracts
+// ==========================================
+
+export type SubscriptionTier = "basic" | "growth" | "scale";
+export type SubscriptionStatus = "TRIAL" | "ACTIVE" | "PAST_DUE" | "CANCELLED" | "SUSPENDED";
+
+export interface SubscriptionPlan {
+  id: SubscriptionTier;
+  name: string;
+  priceInr: number;
+  billingInterval: "monthly" | "yearly";
+  studentLimit: number;
+  branchLimit: number;
+  storageGb: number;
+  aiCreditsPerMonth: number;
+  features: string[];
+  isActive: boolean;
+}
+
+export interface OrganizationSubscription {
+  id: string;
+  organizationId: OrganizationId;
+  planId: SubscriptionTier;
+  planName: string;
+  status: SubscriptionStatus;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEndsAt?: string;
+  studentLimit: number;
+  activeStudentCount: number;
+  cancelAtPeriodEnd: boolean;
+}
+
+// ==========================================
+// Platform Super-Admin & Public Lead Contracts
+// ==========================================
+
+export interface PlatformInstituteSummary {
+  id: string;
+  name: string;
+  slug: string;
+  ownerName: string;
+  ownerEmail: string;
+  status: "ACTIVE" | "SUSPENDED" | "PENDING";
+  planId: SubscriptionTier;
+  activeStudents: number;
+  activeBatches: number;
+  createdAt: string;
+}
+
+export interface DemoRequest {
+  id?: string;
+  fullName: string;
+  instituteName: string;
+  email: string;
+  phone: string;
+  city: string;
+  studentCount: string;
+  interestedPlan?: string;
+  notes?: string;
+  status?: "PENDING" | "CONTACTED" | "DEMO_GIVEN" | "ONBOARDED" | "REJECTED";
+  createdAt?: string;
+}

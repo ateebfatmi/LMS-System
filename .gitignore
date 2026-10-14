@@ -9,3 +9,8 @@ coverage/
 .DS_Store
 *.log
 *.tsbuildinfo
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+.pytest_cache/

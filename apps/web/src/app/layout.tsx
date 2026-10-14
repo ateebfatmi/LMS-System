@@ -22,9 +22,10 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PrepZii for Institutions | JEE & NEET Coaching LMS",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://institutes.prepzii.com"),
+  title: "PrepZii for Institutes | Coaching Institute Management System & LMS",
   description:
-    "The structured way to crack JEE & NEET. Practice PYQs, take mock tests, revise formula handbooks, detect weak chapters, and analyze student performance.",
+    "The all-in-one multi-tenant coaching management software for JEE, NEET, UPSC & State exam institutes across India. CBT mock simulator, admissions CRM, fee ledgers, and attendance.",
   icons: {
     icon: [
       { url: "/images/branding/prepzii-official-logo.png", type: "image/png" },
