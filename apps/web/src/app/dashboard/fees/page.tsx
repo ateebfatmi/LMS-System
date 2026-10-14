@@ -347,7 +347,7 @@ function FeesContent() {
                     </label>
                     <select
                       value={selectedStatusFilter}
-                      onChange={(e) => setSelectedStatusFilter(e.target.value as any)}
+                      onChange={(e) => setSelectedStatusFilter(e.target.value as "ALL" | "OVERDUE" | "PARTIAL" | "PAID")}
                       className="select-input"
                       style={{ minWidth: "160px" }}
                     >
@@ -667,7 +667,7 @@ function FeesContent() {
                   </label>
                   <select
                     value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
+                    onChange={(e) => setPaymentMethod(e.target.value as "UPI" | "NET_BANKING" | "CHEQUE" | "CARD" | "CASH")}
                     className="select-input"
                     style={{ width: "100%" }}
                   >

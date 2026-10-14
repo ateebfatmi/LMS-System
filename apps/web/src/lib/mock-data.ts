@@ -3,7 +3,6 @@ import type {
   Course,
   InstituteTest,
   TestResultSummary,
-  AttendanceSession,
   StudentFeeRecord,
   FeeTransaction,
   Announcement,

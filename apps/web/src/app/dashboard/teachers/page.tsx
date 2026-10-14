@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { mockTeachers } from "@/lib/mock-data";
 

@@ -1,12 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextFetchEvent, NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
   "/api/organizations(.*)",
 ]);
 
-export default function proxy(req: any, ev: any) {
+export default function proxy(req: NextRequest, ev: NextFetchEvent) {
   // If Clerk publishable key is not configured, permit demo mode locally
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
     return NextResponse.next();

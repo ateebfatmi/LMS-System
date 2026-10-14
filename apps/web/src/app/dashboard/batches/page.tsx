@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
+import { Badge, Button, MetricCard, ProgressBar } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { mockBatches } from "@/lib/mock-data";
+import type { TargetExam } from "@prepzii/contracts";
 
 export default function BatchesPage() {
   const [selectedFilter, setSelectedFilter] = useState<string>("ALL");
@@ -14,7 +15,7 @@ export default function BatchesPage() {
 
   // New batch form state
   const [newBatchName, setNewBatchName] = useState("");
-  const [newTargetExam, setNewTargetExam] = useState("JEE_ADVANCED");
+  const [newTargetExam, setNewTargetExam] = useState<TargetExam>("JEE_ADVANCED");
   const [newGradeLevel, setNewGradeLevel] = useState("Class 12");
   const [newRoom, setNewRoom] = useState("Hall 101");
   const [newFaculty, setNewFaculty] = useState("Er. Vivek Gupta");
@@ -36,7 +37,7 @@ export default function BatchesPage() {
       id: `batch-${Date.now()}`,
       organizationId: "org-1",
       name: newBatchName,
-      targetExam: newTargetExam as any,
+      targetExam: newTargetExam,
       gradeLevel: newGradeLevel,
       roomNumber: newRoom,
       studentCount: 0,
@@ -206,7 +207,7 @@ export default function BatchesPage() {
                   </label>
                   <select
                     value={newTargetExam}
-                    onChange={(e) => setNewTargetExam(e.target.value)}
+                    onChange={(e) => setNewTargetExam(e.target.value as TargetExam)}
                     className="select-input"
                     style={{ width: "100%" }}
                   >

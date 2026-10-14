@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { PrepziiMark, Badge, Button } from "@prepzii/ui";
+import { PrepziiMark, Badge } from "@prepzii/ui";
 
 export default function Home() {
   // Demo Request Form state
@@ -375,7 +375,7 @@ export default function Home() {
               Book a Personalized 1-on-1 Walkthrough
             </h2>
             <p style={{ fontSize: "14px", color: "var(--muted)", margin: 0 }}>
-              See how PrepZii can digitize your coaching center. We'll set up a tailored demo with your actual exam syllabus.
+              See how PrepZii can digitize your coaching center. We&apos;ll set up a tailored demo with your actual exam syllabus.
             </p>
           </div>
 

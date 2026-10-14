@@ -118,7 +118,8 @@ export default function CRMPage() {
 
   const startConversion = (lead: Lead) => {
     setConvertingLead(lead);
-    setConversionRoll(`APX-2026-${Math.floor(1250 + Math.random() * 500)}`);
+    const deterministicRollNumber = `APX-2026-${1300 + (parseInt(lead.id.replace(/\D/g, "") || "1", 10) % 700)}`;
+    setConversionRoll(deterministicRollNumber);
     setConversionBatch(lead.targetBatchId || mockBatches[0]?.id || "");
     setConversionSuccessMsg("");
   };
@@ -383,7 +384,7 @@ export default function CRMPage() {
                             lineHeight: "1.4",
                           }}
                         >
-                          "{lead.notes}"
+                          &quot;{lead.notes}&quot;
                         </div>
                       )}
 

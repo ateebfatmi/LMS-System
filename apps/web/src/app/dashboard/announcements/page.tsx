@@ -653,7 +653,7 @@ function AnnouncementsContent() {
                   </label>
                   <select
                     value={newCategory}
-                    onChange={(e) => setNewCategory(e.target.value as any)}
+                    onChange={(e) => setNewCategory(e.target.value as "ACADEMIC" | "EXAM" | "HOLIDAY" | "FEE" | "GENERAL")}
                     className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-brand"
                   >
                     <option value="ACADEMIC">Academic</option>
@@ -669,7 +669,7 @@ function AnnouncementsContent() {
                   </label>
                   <select
                     value={newPriority}
-                    onChange={(e) => setNewPriority(e.target.value as any)}
+                    onChange={(e) => setNewPriority(e.target.value as "NORMAL" | "HIGH" | "URGENT")}
                     className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-brand"
                   >
                     <option value="NORMAL">Normal Priority</option>
@@ -686,7 +686,7 @@ function AnnouncementsContent() {
                   </label>
                   <select
                     value={newAudience}
-                    onChange={(e) => setNewAudience(e.target.value as any)}
+                    onChange={(e) => setNewAudience(e.target.value as "ALL" | "BATCH" | "FACULTY" | "PARENTS")}
                     className="w-full bg-background border border-border rounded-xl px-3 py-2 text-sm text-foreground focus:outline-none focus:border-brand"
                   >
                     <option value="ALL">All Institute (Everyone)</option>

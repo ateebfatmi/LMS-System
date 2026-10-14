@@ -281,7 +281,7 @@ export default function AttendancePage() {
                 </label>
                 <select
                   value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value as any)}
+                  onChange={(e) => setSelectedTemplate(e.target.value as "ABSENT" | "LATE" | "PTM" | "NOTICE")}
                   className="select-input"
                   style={{ width: "100%" }}
                 >
@@ -325,22 +325,22 @@ export default function AttendancePage() {
                 <div style={{ padding: "14px", background: "#f8fafc", border: "1px solid var(--line)", borderRadius: "10px", fontSize: "13px", lineHeight: "1.6" }}>
                   {selectedTemplate === "ABSENT" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, <strong>Aarav Sharma</strong> was marked <strong>ABSENT</strong> for morning lecture at <strong>Apex Academy</strong> on {attendanceDate}. Please contact institute if unexpected."
+                      &quot;Dear Parent, <strong>Aarav Sharma</strong> was marked <strong>ABSENT</strong> for morning lecture at <strong>Apex Academy</strong> on {attendanceDate}. Please contact institute if unexpected.&quot;
                     </p>
                   )}
                   {selectedTemplate === "LATE" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, <strong>Aarav Sharma</strong> arrived 20 minutes LATE for class today on {attendanceDate}."
+                      &quot;Dear Parent, <strong>Aarav Sharma</strong> arrived 20 minutes LATE for class today on {attendanceDate}.&quot;
                     </p>
                   )}
                   {selectedTemplate === "PTM" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, All India Mock Test 04 score for <strong>Aarav Sharma</strong> is published. Batch Rank: #2, Score: 156/180 (98.5%ile)."
+                      &quot;Dear Parent, All India Mock Test 04 score for <strong>Aarav Sharma</strong> is published. Batch Rank: #2, Score: 156/180 (98.5%ile).&quot;
                     </p>
                   )}
                   {selectedTemplate === "NOTICE" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, Institute will remain closed on Tuesday for Diwali celebrations. Regular classes resume Wednesday."
+                      &quot;Dear Parent, Institute will remain closed on Tuesday for Diwali celebrations. Regular classes resume Wednesday.&quot;
                     </p>
                   )}
                 </div>
@@ -531,7 +531,7 @@ export default function AttendancePage() {
           }))}
         defaultTemplate="ABSENT_ALERT"
         onAlertsSent={(newLogs) => {
-          setLogs([...newLogs, ...logs]);
+          setLogs([...(newLogs as unknown as ParentNotificationLog[]), ...logs]);
           setIsSubmitted(true);
           setTimeout(() => setIsSubmitted(false), 4000);
         }}

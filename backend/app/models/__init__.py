@@ -4,6 +4,7 @@ from backend.app.models.crm import Lead
 from backend.app.models.subscription import SubscriptionPlan, OrganizationSubscription
 from backend.app.models.fee import StudentFee, FeeTransaction
 from backend.app.models.assessment import InstituteTest, TestAttempt
+from backend.app.models.webhook import ProcessedWebhookEvent
 
 __all__ = [
     "Institute",
@@ -17,4 +18,5 @@ __all__ = [
     "FeeTransaction",
     "InstituteTest",
     "TestAttempt",
+    "ProcessedWebhookEvent",
 ]

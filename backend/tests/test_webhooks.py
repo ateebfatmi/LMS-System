@@ -1,6 +1,7 @@
 import hmac
 import hashlib
 import json
+import uuid
 from fastapi.testclient import TestClient
 from backend.app.main import app
 
@@ -11,13 +12,14 @@ def generate_signature(payload_bytes: bytes, secret: str = SECRET) -> str:
     return hmac.new(secret.encode("utf-8"), payload_bytes, hashlib.sha256).hexdigest()
 
 def test_valid_razorpay_webhook():
+    evt_id = f"evt_test_{uuid.uuid4().hex[:8]}"
     payload = {
-        "event_id": "evt_test_12345",
+        "event_id": evt_id,
         "event": "payment.captured",
         "payload": {
             "payment": {
                 "entity": {
-                    "id": "pay_test_001",
+                    "id": f"pay_{uuid.uuid4().hex[:8]}",
                     "amount": 349900,
                     "currency": "INR",
                     "status": "captured",
@@ -41,11 +43,12 @@ def test_valid_razorpay_webhook():
     data = response.json()
     assert data["received"] is True
     assert data["processed"] is True
-    assert data["event_id"] == "evt_test_12345"
+    assert data["event_id"] == evt_id
 
 def test_idempotent_webhook():
+    evt_id = f"evt_test_idempotent_{uuid.uuid4().hex[:8]}"
     payload = {
-        "event_id": "evt_test_idempotent_999",
+        "event_id": evt_id,
         "event": "subscription.activated",
         "payload": {},
     }
@@ -76,3 +79,11 @@ def test_missing_signature():
         json={"event": "payment.captured"},
     )
     assert response.status_code == 400
+
+def test_health_check_database_readiness():
+    response = client.get("/api/v1/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert data["database"] == "connected"
+

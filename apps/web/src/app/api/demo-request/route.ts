@@ -34,8 +34,10 @@ export async function POST(req: NextRequest) {
     // Successfully received demo booking request
     return NextResponse.json({
       success: true,
-      message: `Thank you ${fullName}! Your demo request for ${instituteName} has been received. Our coaching solutions team will contact you within 2 business hours.`,
+      message: `Thank you ${fullName}! Your demo request for ${instituteName} (${studentCount || "50+"} students) has been received. Our coaching solutions team will contact you within 2 business hours.`,
       requestId: `demo-${Date.now()}`,
+      studentCount,
+      notes,
     });
   } catch (error) {
     console.error("Error processing demo request:", error);

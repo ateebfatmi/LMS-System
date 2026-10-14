@@ -315,7 +315,7 @@ export default function AssessmentsPage() {
                   </label>
                   <select
                     value={newPattern}
-                    onChange={(e) => setNewPattern(e.target.value as any)}
+                    onChange={(e) => setNewPattern(e.target.value as "JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "CUSTOM")}
                     className="select-input"
                     style={{ width: "100%" }}
                   >

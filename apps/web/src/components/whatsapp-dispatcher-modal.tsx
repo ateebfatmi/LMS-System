@@ -11,12 +11,24 @@ export interface RecipientTarget {
   scoreOrDetail?: string;
 }
 
+export interface DispatcherLogItem {
+  id: string;
+  studentName: string;
+  parentPhone: string;
+  batchName: string;
+  type: string;
+  channel: string;
+  messageText: string;
+  status: string;
+  sentAt: string;
+}
+
 export interface WhatsAppDispatcherModalProps {
   isOpen: boolean;
   onClose: () => void;
   recipients: RecipientTarget[];
   defaultTemplate?: "ABSENT_ALERT" | "LOW_SCORE_WARNING" | "PTM_RANK_CARD" | "GENERAL_NOTICE";
-  onAlertsSent?: (logs: any[]) => void;
+  onAlertsSent?: (logs: DispatcherLogItem[]) => void;
 }
 
 export function WhatsAppDispatcherModal({
@@ -214,7 +226,7 @@ export function WhatsAppDispatcherModal({
             </label>
             <select
               value={template}
-              onChange={(e) => setTemplate(e.target.value as any)}
+              onChange={(e) => setTemplate(e.target.value as "ABSENT_ALERT" | "LOW_SCORE_WARNING" | "PTM_RANK_CARD" | "GENERAL_NOTICE")}
               style={{
                 width: "100%",
                 padding: "10px 12px",
@@ -306,7 +318,7 @@ export function WhatsAppDispatcherModal({
                   textDecoration: "none",
                 }}
               >
-                ↗ Launch Direct WhatsApp to {previewTarget.studentName}'s Parent
+                ↗ Launch Direct WhatsApp to {previewTarget.studentName}&apos;s Parent
               </a>
             )}
           </div>

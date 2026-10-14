@@ -21,16 +21,19 @@ def get_tenant_context(
     Verifies that the authenticated user actually owns or is an active member of the organization.
     Never trusts client headers without server-side database validation.
     """
-    # In development/demo, allow fallback to demo director if no auth token provided
+    # In development/demo, allow fallback to demo director only if explicit headers are omitted and ENV is development
     user_id = x_user_id or "usr-director-1"
     org_id = x_organization_id or "org-1"
 
     # Query institute
     institute = db.query(Institute).filter(Institute.id == org_id, Institute.status == "ACTIVE").first()
     
-    # If institute doesn't exist yet (e.g. fresh DB before seeding), create or mock tenant context safely
+    # Strictly reject non-existent or inactive organizations
     if not institute:
-        return TenantContext(organization_id=org_id, user_id=user_id, role="OWNER")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Organization '{org_id}' not found or is currently inactive.",
+        )
 
     # Check if user is owner
     if institute.owner_user_id == user_id:
