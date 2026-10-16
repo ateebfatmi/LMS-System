@@ -10,7 +10,7 @@ This document records verified code, not intended features. It must be updated w
 
 ## Executive finding
 
-Consumer PrepZii is a working Next.js application with substantial assessment, PYQ, analytics, community, institute, payment, storage, and AI code. PrepZii LMS now has connected onboarding, membership, academic-operations, and learning-delivery slices alongside prototype modules. It is **not production-ready**: several operational domains still use mock data, the new migrations have not been verified against a staging clone, assignments and other definition-of-done workflows remain incomplete, and the optional FastAPI prototype has model/schema drift from Supabase.
+Consumer PrepZii is a working Next.js application with substantial assessment, PYQ, analytics, community, institute, payment, storage, and AI code. PrepZii LMS now has connected onboarding, membership, academic, learning, assessment, attendance, finance, communications, subscription, analytics, and admissions slices. It is **not production-ready**: the new migrations have not been verified against a staging clone, several definition-of-done workflows remain incomplete, and the optional FastAPI prototype has model/schema drift from Supabase.
 
 The safe direction is a modular Next.js application using the existing Clerk and Supabase projects. The separate FastAPI service is not yet justified and must not become an authoritative second data model until its need and schema ownership are resolved.
 
@@ -84,14 +84,13 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Shared packages for contracts, scoring, UI, permission evaluation, and membership lifecycle rules.
 - Clerk route protection and server-only Supabase client boundary.
 - Membership-backed organization listing and active-organization selection.
-- Additive tenant-aware migrations `0001`–`0017` (not applied to production).
+- Additive tenant-aware migrations `0001`–`0018` (not applied to production).
 - Persistent demo-request API, health endpoint, and Razorpay forwarding boundary.
 - TypeScript, ESLint, and Node assessment/authorization/membership unit tests.
 
-### Prototype-only or incomplete
+### Incomplete or externally gated
 
-- Dashboard, CRM, and reports still use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories, batches/courses/campuses, objective assessments, attendance, institute fee ledgers, announcements, owner subscription controls, and platform administration have moved to authorized APIs.
-- Many visible page actions mutate client state only; refresh discards changes.
+- Dashboard and reports now use role-shaped tenant analytics, and admissions CRM uses owner/admin-only audited mutations. The unrelated question-bank and office prototype pages remain outside this implementation slice.
 - Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, conflict-safe timetable, private learning delivery, assignment/submission grading, objective assessment autosave/finalization, audited attendance corrections, institute fee ledgers, portal notifications, atomic quotas, and structured AI drafts now exist in code. Descriptive grading, PDF financial documents, provider reconciliation/delivery, and canonical AI-draft promotion remain incomplete.
 - Super-admin institute/subscription/plan/feature-flag/audit data now comes from a server-allowlisted platform API. Provider health, job monitoring, approved support access, and SaaS invoice operations remain pending.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
@@ -107,7 +106,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 On 2026-10-17:
 
-- `npm test`: 23 assessment, authorization, membership, CSV validation, learning-security, and deadline tests passed.
+- `npm test`: 24 assessment, authorization, membership, CSV validation, learning-security, and deadline tests passed.
 - `npm run typecheck`: passed across all workspaces.
 - `npm run lint`: passed with zero errors.
 - `npm run build`: passed after replacing the network-dependent Google font build step with a system font stack.
@@ -118,7 +117,7 @@ On 2026-10-17:
 
 1. Confirm the real production `institutes` schema and resolve the migration namespace collision.
 2. Validate migrations on a scrubbed staging clone, including RLS and composite tenant foreign keys.
-3. Replace mock page state with authorized server APIs one bounded context at a time.
+3. Finish remaining explicitly gated workflows: guardian links, subjective grading, provider delivery/reconciliation, financial PDFs, and canonical AI promotion.
 4. Choose one authoritative backend/data model; do not operate divergent Next.js and FastAPI persistence layers.
 5. Add private storage buckets, file validation, signed URLs, and retention rules.
 6. Validate the new invitation/audit/idempotency workflow in staging, then add quota and financial-ledger workflows.

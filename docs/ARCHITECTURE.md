@@ -66,6 +66,8 @@ Roles:
 | Assessment | Existing PrepZii questions/tests + schema adapter + service-only attempt RPCs + shared deterministic scoring |
 | Attendance | Service-only session register, assigned-teacher scope, student reads, immutable corrections |
 | Finance | Separate institute fee plans/ledgers/invoices/receipts/refunds; service-only audited mutations |
+| Admissions CRM | Owner/admin-only tenant leads; validated service-only mutations and audit events |
+| Reports and analytics | Server-shaped data scoped by role, assigned batches, actor identity, and finance permission |
 | SaaS billing | Organization subscriptions, configurable entitlements, atomic quotas, grace and cancellation controls |
 | Audit | organization and platform audit logs |
 | AI | Shared Gemini credentials through tenant-scoped, quota-metered, structured draft service |
@@ -94,7 +96,7 @@ Razorpay calls the public Next.js webhook URL. Next.js forwards the exact signed
 2. Resolve the two incompatible `institutes` migration definitions.
 3. Apply consumer institute prerequisites if absent.
 4. Apply LMS migrations `0001`–`0004` to a staging clone.
-5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0017_communications_ai_drafts.sql` in order.
+5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0018_crm_analytics_readiness.sql` in order.
 6. Run `supabase/tests/tenant_isolation.sql` in the isolated database.
 7. Exercise onboarding and invitation concurrency/replay cases with Clerk test identities.
 8. Review query plans and only then schedule a production migration with rollback/backup checkpoints.
@@ -120,3 +122,9 @@ Platform administration is separate from tenant authorization. Access requires a
 Portal notifications are canonical. Announcement publication resolves recipients from active tenant memberships and, for batch notices, tenant-scoped enrolments. Each recipient receives an independent read state. External delivery jobs are persisted as `BLOCKED_CONFIG` until an opted-in provider is actually configured; the UI never reports fabricated delivery.
 
 The AI endpoint reuses PrepZii's Gemini environment configuration but does not import consumer application files. It authenticates a content manager, stores a request-scoped processing record, atomically consumes one tenant credit, treats supplied material as untrusted, requests schema-constrained JSON, validates it again with Zod, and stores only a reviewable draft. Inputs are hashed and source metadata avoids invented citations. AI output cannot publish itself or determine authorization.
+
+## Analytics and admissions boundaries
+
+The analytics route authenticates the active membership first, then derives every scope from the resolved role and user ID. Leadership sees tenant aggregates, teachers see assigned batches and tests/assignments they own, students see only their own records, accountants receive finance totals without academic rosters, and parents receive no child data until a reviewed guardian link exists. CSV reports export only the already-authorized batch aggregates returned by that endpoint.
+
+Admissions leads are visible and mutable only to owners and coaching admins. Browser payloads never carry an authoritative organization ID. A service-only database function validates any target batch inside the resolved tenant and appends an audit row. CRM cannot create a student or mark a lead converted; conversion is completed only by the reviewed membership/onboarding workflow.

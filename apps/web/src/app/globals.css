@@ -3414,7 +3414,37 @@ button {
 .notification-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .notification-row.read { opacity: .7; }
 
+/* --- Live analytics and admissions CRM --- */
+.crm-form { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
+.crm-form label { display: grid; gap: 5px; color: var(--muted); font-size: 11px; }
+.crm-form input, .crm-form select, .crm-form textarea, .directory-toolbar input, .directory-toolbar select, .crm-column select { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+.crm-form .crm-notes { grid-column: span 3; }
+.directory-toolbar { display: flex; gap: 10px; margin: 18px 0; }
+.directory-toolbar input { flex: 1; }
+.crm-board { display: grid; grid-template-columns: repeat(3, minmax(240px, 1fr)); gap: 14px; align-items: start; }
+.crm-column { display: grid; gap: 10px; padding: 14px; }
+.crm-column > header, .crm-column article { display: flex; justify-content: space-between; gap: 10px; }
+.crm-column article { flex-wrap: wrap; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.crm-column article > div { flex: 1; min-width: 150px; }
+.crm-column article strong, .crm-column article small { display: block; }
+.crm-column article small { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.crm-column article select { flex-basis: 100%; }
+.readiness-note { margin: 16px 0; padding: 12px 14px; border: 1px solid #fde68a; border-radius: 10px; background: #fffbeb; color: #76520b; font-size: 12px; line-height: 1.5; }
+.analytics-trend { min-height: 190px; display: flex; align-items: end; gap: 8px; padding-top: 12px; }
+.analytics-trend > div { flex: 1; height: 160px; display: flex; flex-direction: column; justify-content: end; gap: 5px; text-align: center; }
+.analytics-trend span { display: block; min-height: 3px; border-radius: 5px 5px 2px 2px; background: var(--green); }
+.analytics-trend small { color: var(--muted); font-size: 9px; }
+.analytics-completion { display: grid; gap: 14px; padding: 20px 0; }
+.analytics-completion > strong { font-size: 42px; font-family: var(--font-display); }
+.analytics-completion small { color: var(--muted); }
+.analytics-list article { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.analytics-list strong, .analytics-list small { display: block; }
+.analytics-list small { margin-top: 3px; color: var(--muted); font-size: 11px; }
+
 @media (max-width: 1180px) {
+  .crm-board { grid-template-columns: repeat(2, minmax(240px, 1fr)); }
+  .crm-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .crm-form .crm-notes { grid-column: span 2; }
   .announcement-layout { grid-template-columns: 1fr; }
   .admin-plan-form { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .finance-tools {
@@ -3441,6 +3471,9 @@ button {
 }
 
 @media (max-width: 760px) {
+  .crm-board, .crm-form { grid-template-columns: 1fr; }
+  .crm-form .crm-notes { grid-column: auto; }
+  .directory-toolbar { flex-direction: column; }
   .announcement-composer form > div:not(.channel-picker) { grid-template-columns: 1fr; }
   .announcement-card header, .notification-row { flex-direction: column; }
   .subscription-settings,

@@ -23,6 +23,7 @@ export function OrganizationSwitcher() {
       const result = await response.json();
       setActiveSlug(result.organization.slug);
       setRole(result.role);
+      window.dispatchEvent(new CustomEvent("prepzii:organization-changed", { detail: { role: result.role } }));
       if (refresh) router.refresh();
     }
     setBusy(false);

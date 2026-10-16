@@ -31,7 +31,7 @@ Order of implementation:
 
 1. [x] Transactional, retry-safe institute onboarding RPC (institute, owner membership, trial, audit row) plus Clerk-protected API and real form.
 2. [x] Invitations with hashed token, expiry, accepted/revoked state, verified-email binding, audit records, and idempotency.
-3. [~] Real organization switcher is connected; server-rendered role navigation remains pending.
+3. [x] Real organization switcher and authenticated role-shaped navigation/dashboard data are connected.
 4. [x] Tenant-scoped student/staff profiles and membership APIs with pagination, search, audited edits, and real directory screens.
 5. [x] CSV import staging, row-level validation report, service-only PII storage, and transactional idempotent commit to pending members.
 6. [x] Tenant-scoped courses, subjects, batches, enrolments, academic sessions, campuses, rooms, and conflict-safe basic timetable through audited database mutations.
@@ -105,12 +105,18 @@ Status: **portal communications and reviewed AI drafting implemented in code; ex
 
 ## Phase 8 — controlled pilot readiness
 
-Status: **pending**
+Status: **local application gates implemented; external readiness gates pending**
 
-- Full integration/E2E suite, accessibility audit, load tests, backup restore drill.
-- Staging migration rehearsal and rollback checkpoint.
-- Monitoring, alerting, retention/deletion workflows, DPDP legal review.
-- Pilot with explicitly limited tenants and documented support/escalation.
+- [x] Replace dashboard, reports, and admissions CRM mocks with role-scoped tenant APIs and real empty states.
+- [x] Restrict admissions CRM to owner/admin permissions and audited, service-only mutations.
+- [x] Prevent CRM from fabricating student conversion; reviewed onboarding remains authoritative.
+- [x] Add live role-shaped attendance, assessment, assignment, batch, and finance summaries.
+- [x] Keep CI gates for tests, type checking, lint, production build, dependency audit, and backend tests.
+- [ ] Provision a disposable Supabase test environment and run all migrations plus the SQL isolation suite.
+- [ ] Full browser E2E suite, accessibility audit, load tests, backup restore drill.
+- [ ] Staging migration rehearsal and rollback checkpoint.
+- [ ] Monitoring, alerting, retention/deletion workflows, DPDP legal review.
+- [ ] Pilot with explicitly limited tenants and documented support/escalation.
 
 ## Current completed versus pending
 
@@ -119,9 +125,11 @@ Completed and verified locally:
 - Shared scoring unit tests.
 - Shared RBAC/cross-tenant unit tests.
 - Shared invitation lifecycle unit tests.
-- Next.js type checking and lint baseline.
+- Next.js type checking, scoped lint, and production build.
 - Server-only membership resolution and active-tenant selection code.
 - Academic workspace route, real batches/courses/campuses screens, and timetable conflict guards.
+- Role-scoped operational dashboard and reports.
+- Audited admissions CRM with server-side tenant verification.
 
 Implemented but requiring external verification:
 
@@ -131,10 +139,6 @@ Implemented but requiring external verification:
 - Invitation create/accept/revoke RPCs and RLS-backed persistence.
 - Demo request persistence.
 - Razorpay forwarding/internal processor.
-
-Presentation prototypes only:
-
-- Role dashboards and several operational pages remain backed by mock data; student/faculty directories and academic-structure screens now use authoritative APIs.
 
 Not complete:
 

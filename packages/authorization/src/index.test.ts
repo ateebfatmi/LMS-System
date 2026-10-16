@@ -26,6 +26,13 @@ test("teachers can manage content and attendance but not institute structure, fe
   assert.equal(hasPermission("TEACHER", "attendance:manage"), true);
   assert.equal(hasPermission("TEACHER", "fees:manage"), false);
   assert.equal(hasPermission("TEACHER", "members:manage"), false);
+  assert.equal(hasPermission("TEACHER", "crm:read"), false);
+});
+
+test("admissions CRM is restricted to owners and coaching administrators", () => {
+  assert.equal(hasPermission("OWNER", "crm:manage"), true);
+  assert.equal(hasPermission("COACHING_ADMIN", "crm:read"), true);
+  assert.equal(hasPermission("ACADEMIC_COORDINATOR", "crm:read"), false);
 });
 test("users cannot promote themselves or others to privileged server-controlled roles", () => {
   assert.equal(canGrantRole("COACHING_ADMIN", "OWNER"), false);

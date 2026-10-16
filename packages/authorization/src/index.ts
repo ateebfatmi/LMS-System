@@ -17,6 +17,8 @@ export const permissions = [
   "fees:read",
   "fees:manage",
   "reports:read",
+  "crm:read",
+  "crm:manage",
   "subscriptions:manage",
   "announcements:read",
   "announcements:manage",
@@ -31,6 +33,7 @@ const rolePermissions: Record<OrganizationRole, ReadonlySet<Permission>> = {
     "organization:read", "members:read", "members:manage", "academics:read", "academics:manage",
     "content:read", "content:manage", "assessments:manage", "attendance:read", "attendance:manage",
     "fees:read", "fees:manage", "reports:read", "announcements:read", "announcements:manage",
+    "crm:read", "crm:manage",
   ]),
   ACADEMIC_COORDINATOR: new Set([
     "organization:read", "members:read", "academics:read", "academics:manage", "content:read",

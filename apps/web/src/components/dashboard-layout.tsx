@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { type PropsWithChildren, useState, Suspense } from "react";
+import { usePathname } from "next/navigation";
+import { type PropsWithChildren, useEffect, useState, Suspense } from "react";
 import { PrepziiMark, ZiAssistantBadge } from "@prepzii/ui";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 
-export type AppRole = "DIRECTOR" | "FACULTY" | "STUDENT" | "PARENT";
+export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT" | "ACCOUNTANT";
 
 const roleNavItems: Record<AppRole, { href: string; label: string; icon: string }[]> = {
   DIRECTOR: [
@@ -28,7 +28,7 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
     { href: "/dashboard/billing", label: "Plan & Quotas", icon: "💎" },
   ],
   FACULTY: [
-    { href: "/dashboard?role=FACULTY", label: "My Classes & Schedule", icon: "❖" },
+    { href: "/dashboard", label: "My Classes & Schedule", icon: "❖" },
     { href: "/dashboard/batches", label: "My Batches", icon: "⊞" },
     { href: "/dashboard/attendance", label: "Mark Attendance", icon: "✓" },
     { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: "▤" },
@@ -40,24 +40,45 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
     { href: "/dashboard/reports", label: "Batch Performance", icon: "📈" },
   ],
   STUDENT: [
-    { href: "/dashboard?role=STUDENT", label: "My Learning Dashboard", icon: "❖" },
+    { href: "/dashboard", label: "My Learning Dashboard", icon: "❖" },
     { href: "/dashboard/assessments", label: "CBT Mock Tests & PYQs", icon: "⏱" },
     { href: "/dashboard/courses", label: "My Courses & DPPs", icon: "▤" },
     { href: "/dashboard/assignments", label: "My Assignments", icon: "✎" },
-    { href: "/dashboard/fees?role=STUDENT", label: "My Fee Installments", icon: "₹" },
+    { href: "/dashboard/fees", label: "My Fee Installments", icon: "₹" },
     { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
     { href: "/dashboard/reports", label: "Weak Chapter Analytics", icon: "📈" },
     { href: "/dashboard/attendance", label: "My Attendance Log", icon: "✓" },
   ],
   PARENT: [
-    { href: "/dashboard?role=PARENT", label: "Child Progress Overview", icon: "❖" },
-    { href: "/dashboard/fees?role=PARENT", label: "Fee Dues & Receipts", icon: "₹" },
+    { href: "/dashboard", label: "Guardian Overview", icon: "❖" },
     { href: "/dashboard/announcements", label: "Circulars & Notices", icon: "🔔" },
-    { href: "/dashboard/reports", label: "Test Rank Cards", icon: "📈" },
-    { href: "/dashboard/attendance", label: "Attendance Calendar", icon: "✓" },
-    { href: "/dashboard/teachers", label: "Connect with Teachers", icon: "◈" },
+  ],
+  COORDINATOR: [
+    { href: "/dashboard", label: "Academic Overview", icon: "❖" },
+    { href: "/dashboard/batches", label: "Batches & Classrooms", icon: "⊞" },
+    { href: "/dashboard/students", label: "Student Directory", icon: "⚑" },
+    { href: "/dashboard/teachers", label: "Faculty Directory", icon: "◈" },
+    { href: "/dashboard/courses", label: "Courses & DPPs", icon: "▤" },
+    { href: "/dashboard/assignments", label: "Assignments", icon: "✎" },
+    { href: "/dashboard/assessments", label: "Assessments & PYQs", icon: "⏱" },
+    { href: "/dashboard/attendance", label: "Daily Attendance", icon: "✓" },
+    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
+    { href: "/dashboard/campuses", label: "Campus Rooms", icon: "🏛" },
+    { href: "/dashboard/reports", label: "Reports & Analytics", icon: "📈" },
+  ],
+  ACCOUNTANT: [
+    { href: "/dashboard", label: "Finance Overview", icon: "❖" },
+    { href: "/dashboard/fees", label: "Fee Management", icon: "₹" },
+    { href: "/dashboard/reports", label: "Financial Reports", icon: "📈" },
   ],
 };
+
+function mapMembershipRole(role: string): AppRole {
+  if (role === "TEACHER") return "FACULTY";
+  if (role === "ACADEMIC_COORDINATOR") return "COORDINATOR";
+  if (role === "STUDENT" || role === "PARENT" || role === "ACCOUNTANT") return role;
+  return "DIRECTOR";
+}
 
 function LayoutContent({
   children,
@@ -73,11 +94,23 @@ function LayoutContent({
   onRoleChange?: (role: AppRole) => void;
 }>) {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [membershipRole, setMembershipRole] = useState<AppRole>("DIRECTOR");
 
-  const urlRole = (searchParams?.get("role") as AppRole) || undefined;
-  const activeRole: AppRole = propRole || urlRole || "DIRECTOR";
+  useEffect(() => {
+    let cancelled = false;
+    const handleOrganizationChange = (event: Event) => {
+      const role = (event as CustomEvent<{ role?: string }>).detail?.role ?? "";
+      setMembershipRole(mapMembershipRole(role));
+    };
+    window.addEventListener("prepzii:organization-changed", handleOrganizationChange);
+    void fetch("/api/organizations/active", { cache: "no-store" }).then(async (response) => {
+      if (!cancelled && response.ok) setMembershipRole(mapMembershipRole(String((await response.json()).role ?? "")));
+    });
+    return () => { cancelled = true; window.removeEventListener("prepzii:organization-changed", handleOrganizationChange); };
+  }, [pathname]);
+
+  const activeRole: AppRole = propRole || membershipRole;
 
   const navItems = roleNavItems[activeRole] || roleNavItems.DIRECTOR;
   return (
@@ -94,12 +127,7 @@ function LayoutContent({
 
         <nav className="side-nav">
           {navItems.map((item) => {
-            const isActive =
-              item.href.includes("role=")
-                ? pathname === "/dashboard" && searchParams?.get("role") === activeRole
-                : item.href === "/dashboard"
-                ? pathname === "/dashboard" && !searchParams?.get("role")
-                : pathname.startsWith(item.href);
+            const isActive = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
 
             return (
               <Link

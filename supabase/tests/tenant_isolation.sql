@@ -102,6 +102,34 @@ values
   ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000051', 'student-a', 'STUDENT', 'A-001'),
   ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000052', 'student-b', 'STUDENT', 'B-001');
 
+insert into public.organization_leads (
+  id, organization_id, name, phone, target_exam, target_batch_id, source, stage
+) values
+  ('10000000-0000-0000-0000-0000000000a3', '10000000-0000-0000-0000-000000000001', 'Lead A', '9000000001', 'JEE_MAIN', '10000000-0000-0000-0000-000000000051', 'WALK_IN', 'NEW'),
+  ('20000000-0000-0000-0000-0000000000a4', '20000000-0000-0000-0000-000000000002', 'Lead B', '9000000002', 'NEET', '20000000-0000-0000-0000-000000000052', 'WEBSITE', 'NEW');
+
+do $$
+begin
+  begin
+    perform public.lms_crm_mutation(
+      '10000000-0000-0000-0000-000000000001', 'student-a', 'STUDENT', 'UPDATE_STAGE',
+      '{"leadId":"10000000-0000-0000-0000-0000000000a3","stage":"CONTACTED"}'::jsonb
+    );
+    raise exception 'CRM mutation failed to reject a student actor';
+  exception when insufficient_privilege then
+    null;
+  end;
+  begin
+    perform public.lms_crm_mutation(
+      '10000000-0000-0000-0000-000000000001', 'user-owner-a', 'OWNER', 'CREATE_LEAD',
+      '{"name":"Cross tenant","phone":"9000000003","targetExam":"NEET","targetBatchId":"20000000-0000-0000-0000-000000000052","source":"WALK_IN","estimatedFeePaise":0}'::jsonb
+    );
+    raise exception 'CRM mutation failed to reject a cross-tenant batch';
+  exception when foreign_key_violation then
+    null;
+  end;
+end $$;
+
 insert into public.organization_courses (id, organization_id, subject_id, title, status, created_by)
 values
   ('10000000-0000-0000-0000-000000000081', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000011', 'Course A', 'PUBLISHED', 'user-owner-a'),
@@ -433,6 +461,9 @@ begin
     or (select count(*) from public.organization_ai_drafts) <> 1 then
     raise exception 'Communications RLS failure: owner can see another tenant announcement or AI draft';
   end if;
+  if (select count(*) from public.organization_leads) <> 1 then
+    raise exception 'CRM RLS failure: owner can see another tenant lead';
+  end if;
 end $$;
 
 do $$
@@ -511,6 +542,9 @@ begin
     or (select count(*) from public.organization_notifications) <> 1
     or (select count(*) from public.organization_ai_drafts) <> 0 then
     raise exception 'Communications RLS failure: student visibility is incorrect';
+  end if;
+  if (select count(*) from public.organization_leads) <> 0 then
+    raise exception 'CRM RLS failure: student can read admissions leads';
   end if;
 end $$;
 
