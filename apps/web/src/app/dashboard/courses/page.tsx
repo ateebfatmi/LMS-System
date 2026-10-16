@@ -1,5 +1,5 @@
-import { AcademicWorkspace } from "@/components/academic-workspace";
+import { LearningWorkspace } from "@/components/learning-workspace";
 
 export default function CoursesPage() {
-  return <AcademicWorkspace view="COURSES" />;
+  return <LearningWorkspace />;
 }

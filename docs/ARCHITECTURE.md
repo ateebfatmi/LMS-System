@@ -25,7 +25,7 @@ Shared PrepZii Supabase project
   ├── existing questions/PYQs/tests/profiles
   ├── organization_* LMS tables
   ├── RLS + composite tenant foreign keys
-  └── private storage with tenant-prefixed objects (pending)
+  └── private learning storage with tenant-prefixed objects and signed access
 ```
 
 The current FastAPI directory is an optional prototype, not a second source of truth. If retained, it is reachable only through authenticated server-to-server requests and must use the same canonical schema and migrations.
@@ -62,7 +62,7 @@ Roles:
 | Identity and tenant membership | Clerk + `institutes` + `institute_members` |
 | Invitations | Hashed tokens + verified Clerk email + service-only transactional RPCs |
 | Academic structure | Tenant-scoped audited RPCs over `organization_campuses`, academic years, subjects, courses, batches, enrolments, rooms, and conflict-safe schedules |
-| Learning delivery | organization modules/lessons/resources (resources pending) |
+| Learning delivery | Organization modules/lessons, course-batch links, private resource metadata/storage, scheduled release, and per-user completion |
 | Assessment | existing PrepZii question/test data + shared scoring package |
 | Attendance | organization attendance sessions and records |
 | Finance | separate institute fee ledger; Razorpay events are verified and idempotent |
@@ -82,7 +82,7 @@ Roles:
 
 ## Storage
 
-Private object paths will use `organizations/{organization_id}/{domain}/{object_id}/{filename}`. Authorization must be checked before issuing a short-lived signed URL. Public URLs are permitted only for intentionally public branding assets. File metadata, MIME allowlists, byte limits, hashes, ownership, retention, and malware-processing state must be recorded before enabling student documents.
+Private learning objects use `organizations/{organization_id}/lessons/{lesson_id}/{uuid}-{safe_filename}` in the non-public `organization-learning` bucket. The server validates a narrow MIME allowlist and 25 MB limit, records byte size and SHA-256, rechecks membership/course enrolment/release state, and returns a five-minute signed URL. Public URLs are permitted only for intentionally public branding assets. Malware/content inspection and retention automation remain pending before accepting higher-risk student documents.
 
 ## Payments
 
@@ -94,7 +94,7 @@ Razorpay calls the public Next.js webhook URL. Next.js forwards the exact signed
 2. Resolve the two incompatible `institutes` migration definitions.
 3. Apply consumer institute prerequisites if absent.
 4. Apply LMS migrations `0001`–`0004` to a staging clone.
-5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0010_academic_operations.sql` in order.
+5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0011_learning_delivery.sql` in order.
 6. Run `supabase/tests/tenant_isolation.sql` in the isolated database.
 7. Exercise onboarding and invitation concurrency/replay cases with Clerk test identities.
 8. Review query plans and only then schedule a production migration with rollback/backup checkpoints.

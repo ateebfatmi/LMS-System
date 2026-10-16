@@ -2368,3 +2368,237 @@ button {
     justify-content: space-between;
   }
 }
+
+/* --- Learning delivery workspace --- */
+.learning-metrics {
+  margin-bottom: 20px;
+}
+
+.learning-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.68fr) minmax(420px, 1.45fr) minmax(270px, 0.78fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.learning-layout.student {
+  grid-template-columns: minmax(240px, 0.55fr) minmax(0, 1.45fr);
+}
+
+.learning-catalogue,
+.learning-content,
+.learning-tools {
+  padding: 20px;
+}
+
+.learning-catalogue > h2,
+.learning-tools > h2,
+.learning-content > header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.learning-catalogue > button {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 10px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.learning-catalogue > button.active {
+  border-radius: 10px;
+  background: var(--brand-light);
+  box-shadow: inset 3px 0 var(--brand-hover);
+}
+
+.learning-catalogue > button span,
+.learning-catalogue > button strong,
+.learning-catalogue > button small {
+  display: block;
+  min-width: 0;
+}
+
+.learning-catalogue > button strong {
+  font-size: 13px;
+}
+
+.learning-catalogue > button small {
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.learning-content > header,
+.learning-module > header,
+.lesson-row,
+.lesson-row > div,
+.lesson-actions {
+  display: flex;
+  align-items: center;
+}
+
+.learning-content > header,
+.learning-module > header,
+.lesson-row {
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.learning-content > header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.learning-module {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfcfd;
+}
+
+.learning-module > header {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.learning-module > header strong,
+.learning-module > header small {
+  display: block;
+}
+
+.learning-module > header small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lesson-row {
+  padding: 13px 16px;
+  border-top: 1px solid #edf0f2;
+  background: #fff;
+}
+
+.lesson-row:first-child {
+  border-top: 0;
+}
+
+.lesson-row > div:first-child {
+  min-width: 0;
+  gap: 10px;
+}
+
+.lesson-row > div:first-child > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.lesson-row strong,
+.lesson-row small {
+  display: block;
+}
+
+.lesson-row strong {
+  font-size: 13px;
+}
+
+.lesson-row small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.lesson-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.lesson-actions .pz-button {
+  min-height: 30px;
+  padding: 5px 9px;
+  font-size: 10px;
+}
+
+.learning-tools {
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+}
+
+.compact-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-secondary);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.compact-form .check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compact-form .check-row input {
+  width: 16px;
+  min-height: 16px;
+}
+
+.form-success {
+  padding: 12px 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  background: var(--green-soft);
+  color: #047857;
+  font-size: 13px;
+}
+
+@media (max-width: 1180px) {
+  .learning-layout,
+  .learning-layout.student {
+    grid-template-columns: minmax(230px, 0.65fr) minmax(0, 1.35fr);
+  }
+
+  .learning-tools {
+    grid-column: 1 / -1;
+    max-height: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .learning-layout,
+  .learning-layout.student {
+    grid-template-columns: 1fr;
+  }
+
+  .learning-tools {
+    grid-column: auto;
+  }
+
+  .lesson-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .lesson-actions {
+    justify-content: flex-start;
+  }
+}

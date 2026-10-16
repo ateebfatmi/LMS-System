@@ -10,7 +10,7 @@ This document records verified code, not intended features. It must be updated w
 
 ## Executive finding
 
-Consumer PrepZii is a working Next.js application with substantial assessment, PYQ, analytics, community, institute, payment, storage, and AI code. PrepZii LMS is currently a strong visual prototype plus an early database/API foundation. It is **not production-ready**: most LMS operational modules still import local mock data, only institute creation and invitations are connected, the new migrations have not been verified against a staging clone, and the optional FastAPI prototype has model/schema drift from Supabase.
+Consumer PrepZii is a working Next.js application with substantial assessment, PYQ, analytics, community, institute, payment, storage, and AI code. PrepZii LMS now has connected onboarding, membership, academic-operations, and learning-delivery slices alongside prototype modules. It is **not production-ready**: several operational domains still use mock data, the new migrations have not been verified against a staging clone, assignments and other definition-of-done workflows remain incomplete, and the optional FastAPI prototype has model/schema drift from Supabase.
 
 The safe direction is a modular Next.js application using the existing Clerk and Supabase projects. The separate FastAPI service is not yet justified and must not become an authoritative second data model until its need and schema ownership are resolved.
 
@@ -65,9 +65,9 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 ### Storage and uploads
 
-- Supabase Storage is used, including the `pyq-images` bucket.
+- Supabase Storage is used, including the consumer `pyq-images` bucket and the LMS service-only `organization-learning` private bucket declared by migration.
 - Institute uploads are written under `institute-uploads/{institute_id}/...`, which is a useful prefix convention.
-- The institute upload route returns a public URL and does not enforce a file-size allowlist, safe filename, content inspection, or private signed URLs. It must not be reused unchanged for student documents or paid course resources.
+- The consumer institute upload route still returns a public URL and must not be reused. LMS learning resources instead use a 25 MB MIME allowlist, normalized object names, SHA-256 metadata, tenant-prefixed private objects, authorization rechecks, and five-minute signed URLs. Malware/content inspection remains a deployment gate for higher-risk document intake.
 
 ### Payments
 
@@ -84,7 +84,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Shared packages for contracts, scoring, UI, permission evaluation, and membership lifecycle rules.
 - Clerk route protection and server-only Supabase client boundary.
 - Membership-backed organization listing and active-organization selection.
-- Additive tenant-aware migrations `0001`–`0010` (not applied to production).
+- Additive tenant-aware migrations `0001`–`0011` (not applied to production).
 - Persistent demo-request API, health endpoint, and Razorpay forwarding boundary.
 - TypeScript, ESLint, and Node assessment/authorization/membership unit tests.
 
@@ -92,7 +92,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 - Dashboard, assessments, attendance, fees, announcements, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories and batches/courses/campuses have been moved to tenant-scoped APIs.
 - Many visible page actions mutate client state only; refresh discards changes.
-- Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, and conflict-safe timetable mutations now exist in code. Learning-resource storage, assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
+- Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, conflict-safe timetable, and private learning delivery now exist in code. Assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
 - Super-admin UI data is mocked. Access is now guarded by a server-controlled user-ID allowlist, but the underlying platform APIs are not implemented.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
 
@@ -107,7 +107,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 On 2026-10-17:
 
-- `npm test`: 16 assessment, authorization, membership, and CSV validation tests passed.
+- `npm test`: 20 assessment, authorization, membership, CSV validation, and learning-security tests passed.
 - `npm run typecheck`: passed across all workspaces.
 - `npm run lint`: passed with zero errors.
 - `npm run build`: passed after replacing the network-dependent Google font build step with a system font stack.

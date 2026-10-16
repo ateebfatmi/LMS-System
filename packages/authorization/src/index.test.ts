@@ -20,7 +20,9 @@ test("rejects cross-tenant access before evaluating role permissions", () => {
     (error) => error instanceof AuthorizationError && error.code === "CROSS_TENANT",
   );
 });
-test("teachers can manage academics but cannot manage fees or members", () => {
+test("teachers can manage content and attendance but not institute structure, fees, or members", () => {
+  assert.equal(hasPermission("TEACHER", "academics:manage"), false);
+  assert.equal(hasPermission("TEACHER", "content:manage"), true);
   assert.equal(hasPermission("TEACHER", "attendance:manage"), true);
   assert.equal(hasPermission("TEACHER", "fees:manage"), false);
   assert.equal(hasPermission("TEACHER", "members:manage"), false);

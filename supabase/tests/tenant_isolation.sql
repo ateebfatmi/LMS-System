@@ -92,6 +92,53 @@ values
   ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000031', 'Student A', 'A-001'),
   ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000032', 'Student B', 'B-001');
 
+insert into public.organization_batch_members (organization_id, batch_id, user_id, role, roll_number)
+values
+  ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000051', 'student-a', 'STUDENT', 'A-001'),
+  ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000052', 'student-b', 'STUDENT', 'B-001');
+
+insert into public.organization_courses (id, organization_id, subject_id, title, status, created_by)
+values
+  ('10000000-0000-0000-0000-000000000081', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000011', 'Course A', 'PUBLISHED', 'user-owner-a'),
+  ('20000000-0000-0000-0000-000000000082', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000022', 'Course B', 'PUBLISHED', 'user-owner-b');
+
+insert into public.organization_course_batches (organization_id, course_id, batch_id)
+values
+  ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000081', '10000000-0000-0000-0000-000000000051'),
+  ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000082', '20000000-0000-0000-0000-000000000052');
+
+insert into public.organization_course_modules (id, organization_id, course_id, title, is_published)
+values
+  ('10000000-0000-0000-0000-000000000091', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000081', 'Module A', true),
+  ('20000000-0000-0000-0000-000000000092', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000082', 'Module B', true);
+
+insert into public.organization_course_lessons (id, organization_id, module_id, title, kind, is_published)
+values
+  ('10000000-0000-0000-0000-0000000000a1', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000091', 'Lesson A', 'DOCUMENT', true),
+  ('20000000-0000-0000-0000-0000000000a2', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000092', 'Lesson B', 'DOCUMENT', true);
+
+insert into public.organization_lesson_resources (
+  id, organization_id, lesson_id, name, resource_type, storage_bucket, storage_path, mime_type, byte_size, sha256, created_by
+) values (
+  '10000000-0000-0000-0000-0000000000b1', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000a1',
+  'Notes A', 'FILE', 'organization-learning', 'organizations/10000000-0000-0000-0000-000000000001/notes-a.pdf', 'application/pdf', 10, repeat('c', 64), 'user-owner-a'
+);
+
+do $$
+begin
+  begin
+    insert into public.organization_lesson_resources (
+      organization_id, lesson_id, name, resource_type, storage_bucket, storage_path, mime_type, byte_size, sha256, created_by
+    ) values (
+      '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-0000000000a1',
+      'Cross-tenant notes', 'FILE', 'organization-learning', 'cross-tenant.pdf', 'application/pdf', 10, repeat('d', 64), 'user-owner-b'
+    );
+    raise exception 'Composite tenant constraint failed to reject a cross-tenant lesson resource';
+  exception when foreign_key_violation then
+    null;
+  end;
+end $$;
+
 insert into public.organization_member_imports (
   id, organization_id, idempotency_key, request_hash, file_name, member_role,
   status, total_rows, valid_rows, invalid_rows, created_by
@@ -194,6 +241,21 @@ begin
   exception when foreign_key_violation then
     null;
   end;
+end $$;
+
+select set_config('request.jwt.claims', '{"sub":"student-a","role":"authenticated"}', true);
+
+do $$
+begin
+  if (select count(*) from public.organization_course_modules) <> 1 then
+    raise exception 'Learning RLS failure: student can see unassigned or cross-tenant modules';
+  end if;
+  if (select count(*) from public.organization_course_lessons) <> 1 then
+    raise exception 'Learning RLS failure: student can see unassigned or cross-tenant lessons';
+  end if;
+  if (select count(*) from public.organization_lesson_resources) <> 1 then
+    raise exception 'Learning RLS failure: student can see cross-tenant resources';
+  end if;
 end $$;
 
 rollback;
