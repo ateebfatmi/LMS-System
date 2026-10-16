@@ -8,6 +8,7 @@ const isProtectedRoute = createRouteMatcher([
   "/invite(.*)",
   "/api/invitations(.*)",
   "/api/organizations(.*)",
+  "/api/platform(.*)",
   "/super-admin(.*)",
 ]);
 

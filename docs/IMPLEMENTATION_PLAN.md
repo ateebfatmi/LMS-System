@@ -75,12 +75,18 @@ Status: **core attendance and institute ledger implemented in code; payment-prov
 
 ## Phase 6 — commercial SaaS
 
-Status: **schema/prototype only**
+Status: **core entitlements and administration implemented in code; provider billing verification pending**
 
-- Configurable plans/entitlements and atomic quota enforcement.
-- Trials, renewal, downgrade, grace/read-only policy, cancellation.
-- Real super-admin APIs, feature flags, support access approvals, audit views.
-- Branding and verified subdomain registry.
+- [x] Configurable plans, prices, feature entitlements, student/campus limits, and monthly usage counters.
+- [x] Database-atomic student/campus quota enforcement plus idempotent AI/storage/provider usage consumption.
+- [x] Trial/grace write checks, plan-change requests, and cancel-at-period-end controls without client-side activation.
+- [x] Server-allowlisted platform API for institute status, plan configuration, feature flags, and audit views.
+- [x] Tenant branding settings and globally unique, inactive-until-verified subdomain registry.
+- [x] Explicit support-access request schema with no implicit tenant-content grant.
+- [ ] Process verified SaaS billing webhooks into subscription transitions, invoices, renewals, and failures.
+- [ ] Build support approval/revocation UI and time-bound content-access enforcement.
+- [ ] Add automated downgrade/read-only transitions and customer data export workflows.
+- [ ] Rehearse migration `0016` and quota concurrency on an isolated database.
 
 ## Phase 7 — AI and communications
 

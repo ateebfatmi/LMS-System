@@ -7,6 +7,11 @@ values
   ('10000000-0000-0000-0000-000000000001', 'Tenant A', 'security-test-a', 'user-owner-a', 'ACTIVE'),
   ('20000000-0000-0000-0000-000000000002', 'Tenant B', 'security-test-b', 'user-owner-b', 'ACTIVE');
 
+insert into public.organization_subscriptions (organization_id, plan_id, status, current_period_end)
+values
+  ('10000000-0000-0000-0000-000000000001', 'basic', 'ACTIVE', now() + interval '30 days'),
+  ('20000000-0000-0000-0000-000000000002', 'basic', 'ACTIVE', now() + interval '30 days');
+
 insert into public.organization_subjects (id, organization_id, name)
 values
   ('10000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', 'Physics A'),
@@ -221,6 +226,33 @@ insert into public.organization_fee_invoices (
   ('10000000-0000-0000-0000-000000001105', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000001102', 'student-a', 'INV-SECURITY-A', 1000, current_date, 'PARTIAL'),
   ('20000000-0000-0000-0000-000000002205', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000002202', 'student-b', 'INV-SECURITY-B', 1000, current_date, 'ISSUED');
 
+insert into public.organization_branding (organization_id, primary_color, subdomain, updated_by)
+values
+  ('10000000-0000-0000-0000-000000000001', '#0B132B', 'security-test-a', 'user-owner-a'),
+  ('20000000-0000-0000-0000-000000000002', '#112233', 'security-test-b', 'user-owner-b');
+
+do $$
+declare
+  first_result jsonb;
+  replay_result jsonb;
+begin
+  select public.lms_consume_quota(
+    '10000000-0000-0000-0000-000000000001', 'AI_CREDITS', 1,
+    'security-test-ai-credit-0001', 'assessment-generator', 'user-owner-a'
+  ) into first_result;
+  select public.lms_consume_quota(
+    '10000000-0000-0000-0000-000000000001', 'AI_CREDITS', 1,
+    'security-test-ai-credit-0001', 'assessment-generator', 'user-owner-a'
+  ) into replay_result;
+  if (select quantity from public.organization_usage_counters
+      where organization_id = '10000000-0000-0000-0000-000000000001' and metric = 'AI_CREDITS') <> 1 then
+    raise exception 'Quota idempotency failure: replay consumed usage twice';
+  end if;
+  if coalesce((replay_result ->> 'idempotent')::boolean, false) is not true then
+    raise exception 'Quota idempotency failure: replay was not reported';
+  end if;
+end $$;
+
 do $$
 begin
   begin
@@ -359,6 +391,13 @@ begin
     or (select count(*) from public.organization_member_import_rows) <> 0 then
     raise exception 'RLS failure: browser role can read service-only member import PII';
   end if;
+  if (select count(*) from public.organization_usage_counters) <> 1
+    or (select count(*) from public.organization_branding) <> 1 then
+    raise exception 'SaaS RLS failure: owner can see another tenant usage or branding';
+  end if;
+  if (select count(*) from public.platform_feature_flags) <> 0 then
+    raise exception 'Platform RLS failure: tenant browser role can read internal feature flags';
+  end if;
 end $$;
 
 do $$
@@ -427,6 +466,11 @@ begin
     or (select count(*) from public.organization_fee_transactions) <> 1
     or (select count(*) from public.organization_fee_invoices) <> 1 then
     raise exception 'Finance RLS failure: student can see another tenant or student ledger';
+  end if;
+  if (select count(*) from public.organization_usage_counters) <> 0
+    or (select count(*) from public.organization_usage_events) <> 0
+    or (select count(*) from public.organization_branding) <> 1 then
+    raise exception 'SaaS RLS failure: student usage or branding visibility is incorrect';
   end if;
 end $$;
 

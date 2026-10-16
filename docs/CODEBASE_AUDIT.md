@@ -84,16 +84,16 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Shared packages for contracts, scoring, UI, permission evaluation, and membership lifecycle rules.
 - Clerk route protection and server-only Supabase client boundary.
 - Membership-backed organization listing and active-organization selection.
-- Additive tenant-aware migrations `0001`–`0015` (not applied to production).
+- Additive tenant-aware migrations `0001`–`0016` (not applied to production).
 - Persistent demo-request API, health endpoint, and Razorpay forwarding boundary.
 - TypeScript, ESLint, and Node assessment/authorization/membership unit tests.
 
 ### Prototype-only or incomplete
 
-- Dashboard, announcements, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories, batches/courses/campuses, objective assessments, attendance, and institute fee ledgers have been moved to tenant-scoped APIs.
+- Dashboard, announcements, CRM, and reports still use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories, batches/courses/campuses, objective assessments, attendance, institute fee ledgers, owner subscription controls, and platform administration have moved to authorized APIs.
 - Many visible page actions mutate client state only; refresh discards changes.
 - Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, conflict-safe timetable, private learning delivery, assignment/submission grading, objective assessment autosave/finalization, audited attendance corrections, and an institute fee ledger now exist in code. Descriptive grading, PDF financial documents, payment-provider reconciliation, notification delivery, quota enforcement, and AI service do not.
-- Super-admin UI data is mocked. Access is now guarded by a server-controlled user-ID allowlist, but the underlying platform APIs are not implemented.
+- Super-admin institute/subscription/plan/feature-flag/audit data now comes from a server-allowlisted platform API. Provider health, job monitoring, approved support access, and SaaS invoice operations remain pending.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
 
 ### FastAPI prototype

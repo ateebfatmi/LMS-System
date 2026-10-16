@@ -66,7 +66,7 @@ Roles:
 | Assessment | Existing PrepZii questions/tests + schema adapter + service-only attempt RPCs + shared deterministic scoring |
 | Attendance | Service-only session register, assigned-teacher scope, student reads, immutable corrections |
 | Finance | Separate institute fee plans/ledgers/invoices/receipts/refunds; service-only audited mutations |
-| SaaS billing | organization subscriptions and plan entitlements |
+| SaaS billing | Organization subscriptions, configurable entitlements, atomic quotas, grace and cancellation controls |
 | Audit | organization and platform audit logs |
 | AI | existing Gemini provider through tenant-filtered LMS service (pending) |
 
@@ -94,7 +94,7 @@ Razorpay calls the public Next.js webhook URL. Next.js forwards the exact signed
 2. Resolve the two incompatible `institutes` migration definitions.
 3. Apply consumer institute prerequisites if absent.
 4. Apply LMS migrations `0001`–`0004` to a staging clone.
-5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0015_institute_finance_ledger.sql` in order.
+5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0016_saas_entitlements_admin.sql` in order.
 6. Run `supabase/tests/tenant_isolation.sql` in the isolated database.
 7. Exercise onboarding and invitation concurrency/replay cases with Clerk test identities.
 8. Review query plans and only then schedule a production migration with rollback/backup checkpoints.
@@ -108,3 +108,9 @@ The LMS does not copy PrepZii questions. `@prepzii/assessment-core` adapts the e
 Attendance is stored per batch session. Staff mutations go through one transactionally audited RPC; teachers must be assigned to the batch. The first save finalizes a session. Later status changes require a reason and append an immutable correction record before changing the current register.
 
 Institute fee collection is deliberately separate from PrepZii SaaS subscription revenue. Browser/API money inputs are integer paise; PostgreSQL persists reviewed INR decimals. Fee-plan assignment creates a student ledger, installment schedule, and invoice in one transaction. Payments and refunds lock the ledger/installment, require tenant-unique references, update invoice and ledger status, and append audit records. Client redirects never mark an installment paid. Provider webhook-to-ledger integration remains a staging-gated follow-up.
+
+## SaaS entitlements and platform operations
+
+Subscription plans store paise prices, limits, and JSON feature entitlements. Database triggers serialize and enforce active-student and campus quotas at the canonical tables, so parallel API calls cannot bypass them. Metered usage uses a service-only idempotent RPC with monthly counters and subscription/grace checks. Plan changes are requests only; browser state never activates paid access.
+
+Platform administration is separate from tenant authorization. Access requires a server-controlled user-ID allowlist, and the platform RPC is callable only by the service role behind that check. Institute suspensions, plan edits, and feature flags append platform audit records. Support access has an explicit approval schema and confers no access until a separate, time-bound authorization path is implemented.
