@@ -32,7 +32,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@prepzii/contracts", "@prepzii/assessment-core", "@prepzii/ui"],
+  transpilePackages: [
+    "@prepzii/contracts",
+    "@prepzii/assessment-core",
+    "@prepzii/authorization",
+    "@prepzii/ui",
+  ],
   poweredByHeader: false,
   compress: true,
   async headers() {

@@ -1,9 +1,12 @@
 export const organizationRoles = [
+  "PLATFORM_SUPER_ADMIN",
   "OWNER",
   "COACHING_ADMIN",
+  "ACADEMIC_COORDINATOR",
   "TEACHER",
   "STUDENT",
   "PARENT",
+  "ACCOUNTANT",
 ] as const;
 
 export type OrganizationRole = (typeof organizationRoles)[number];

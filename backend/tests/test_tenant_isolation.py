@@ -6,6 +6,9 @@ from backend.app.core.database import Base
 from backend.app.models.organization import Institute, InstituteMember
 from backend.app.models.crm import Lead
 from backend.app.permissions.tenant import get_tenant_context
+from backend.app.core.config import settings
+
+INTERNAL_API_KEY = "test-internal-api-key"
 
 # In-memory SQLite for testing isolation
 TEST_DB_URL = "sqlite:///:memory:"
@@ -14,6 +17,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_
 
 @pytest.fixture(autouse=True)
 def setup_test_db():
+    settings.INTERNAL_API_KEY = INTERNAL_API_KEY
     Base.metadata.create_all(bind=test_engine)
     db = TestingSessionLocal()
     
@@ -63,7 +67,7 @@ def test_owner_access_own_tenant():
     context = get_tenant_context(
         x_organization_id="org-a",
         x_user_id="usr-owner-a",
-        authorization="Bearer valid-token",
+        x_internal_api_key=INTERNAL_API_KEY,
         db=db,
     )
     assert context.organization_id == "org-a"
@@ -77,11 +81,23 @@ def test_cross_tenant_access_blocked():
         get_tenant_context(
             x_organization_id="org-a",
             x_user_id="usr-owner-b",  # Owner of B tries to query Org A
-            authorization="Bearer valid-token",
+            x_internal_api_key=INTERNAL_API_KEY,
             db=db,
         )
     assert exc_info.value.status_code == 403
     assert "You are not an active member of this organization" in exc_info.value.detail
+    db.close()
+
+def test_untrusted_headers_without_internal_auth_are_rejected():
+    db = TestingSessionLocal()
+    with pytest.raises(HTTPException) as exc_info:
+        get_tenant_context(
+            x_organization_id="org-a",
+            x_user_id="usr-owner-a",
+            x_internal_api_key=None,
+            db=db,
+        )
+    assert exc_info.value.status_code == 401
     db.close()
 
 def test_tenant_data_scoping():

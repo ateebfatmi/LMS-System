@@ -1,3 +1,5 @@
+> Superseded on 2026-10-17 by [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), which reflects the verified shared-PrepZii architecture and current implementation state.
+
 # Architecture Documentation — PrepZii for Institutes
 ## Multi-Tenant Coaching Institute Management SaaS
 

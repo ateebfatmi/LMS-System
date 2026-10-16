@@ -1,49 +1,54 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getPrepziiAdmin } from "@/lib/prepzii-backend";
 
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { fullName, instituteName, email, phone, city, studentCount, notes } = body;
+const demoRequestSchema = z.object({
+  fullName: z.string().trim().min(2).max(120),
+  instituteName: z.string().trim().min(2).max(180),
+  email: z.email().max(254),
+  phone: z.string().trim().regex(/^(?:\+?91[\s-]?)?[6-9]\d{9}$/),
+  city: z.string().trim().min(2).max(120),
+  studentCount: z.string().trim().max(40).optional().default("not-specified"),
+  interestedPlan: z.enum(["basic", "growth", "scale", "enterprise"]).optional().default("growth"),
+  notes: z.string().trim().max(2_000).optional(),
+});
 
-    // Validate required fields
-    if (!fullName || !instituteName || !email || !phone || !city) {
-      return NextResponse.json(
-        { error: "Please fill in all required fields (Name, Institute, Email, Phone, City)." },
-        { status: 400 }
-      );
-    }
-
-    // Phone number validation (Indian 10-digit mobile check)
-    const phoneClean = String(phone).replace(/\D/g, "");
-    if (phoneClean.length < 10) {
-      return NextResponse.json(
-        { error: "Please enter a valid 10-digit contact mobile number." },
-        { status: 400 }
-      );
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: "Please enter a valid email address." },
-        { status: 400 }
-      );
-    }
-
-    // Successfully received demo booking request
-    return NextResponse.json({
-      success: true,
-      message: `Thank you ${fullName}! Your demo request for ${instituteName} (${studentCount || "50+"} students) has been received. Our coaching solutions team will contact you within 2 business hours.`,
-      requestId: `demo-${Date.now()}`,
-      studentCount,
-      notes,
-    });
-  } catch (error) {
-    console.error("Error processing demo request:", error);
+export async function POST(request: Request) {
+  const parsed = demoRequestSchema.safeParse(await request.json().catch(() => null));
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "An unexpected error occurred. Please try again." },
-      { status: 500 }
+      { error: "Please check the submitted contact details.", fields: parsed.error.flatten().fieldErrors },
+      { status: 400 },
     );
+  }
+
+  try {
+    const { data, error } = await getPrepziiAdmin()
+      .from("platform_demo_requests")
+      .insert({
+        full_name: parsed.data.fullName,
+        institute_name: parsed.data.instituteName,
+        email: parsed.data.email.toLowerCase(),
+        phone: parsed.data.phone,
+        city: parsed.data.city,
+        student_count: parsed.data.studentCount,
+        interested_plan: parsed.data.interestedPlan,
+        notes: parsed.data.notes ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw error;
+    return NextResponse.json(
+      {
+        success: true,
+        message: "Your demo request has been received. The PrepZii team will contact you shortly.",
+        requestId: data.id,
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("Failed to persist demo request", error);
+    return NextResponse.json({ error: "Unable to submit the request right now." }, { status: 503 });
   }
 }

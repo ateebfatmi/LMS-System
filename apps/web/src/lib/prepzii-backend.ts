@@ -2,7 +2,8 @@ import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { OrganizationRole, TenantContext } from "@prepzii/contracts";
+import { authorizeTenantAction, type Permission } from "@prepzii/authorization";
+import { organizationRoles, type OrganizationRole, type TenantContext } from "@prepzii/contracts";
 
 type Institute = {
   id: string;
@@ -17,7 +18,7 @@ type InstituteMember = {
   id: string;
   institute_id: string;
   user_id: string | null;
-  role: OrganizationRole;
+  role: string;
   status: string;
 };
 
@@ -41,6 +42,19 @@ export function getPrepziiAdmin(): SupabaseClient {
 export async function getActingUserId(): Promise<string | null> {
   const { userId } = await auth();
   return userId;
+}
+
+export async function isPlatformSuperAdmin(): Promise<boolean> {
+  const userId = await getActingUserId();
+  if (!userId) return false;
+
+  const allowedUserIds = new Set(
+    (process.env.PLATFORM_SUPER_ADMIN_USER_IDS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+  return allowedUserIds.has(userId);
 }
 
 export async function listMyOrganizations(userId: string): Promise<Institute[]> {
@@ -102,13 +116,30 @@ export async function getOrganizationContext(
         .maybeSingle<InstituteMember>();
 
   if (memberError) throw memberError;
-  const role: OrganizationRole | null = isOwner ? "OWNER" : member?.role ?? null;
-  if (!role || !allowedRoles.includes(role)) return null;
+  const rawRole = isOwner ? "OWNER" : member?.role ?? null;
+  if (!rawRole || !organizationRoles.includes(rawRole as OrganizationRole)) return null;
+  const role = rawRole as OrganizationRole;
+  if (!allowedRoles.includes(role)) return null;
 
   return {
     context: { organizationId: institute.id, userId, role },
     institute,
     member,
   };
+}
+
+export async function getAuthorizedOrganizationContext(slug: string, permission: Permission) {
+  const resolved = await getOrganizationContext(slug, [
+    "OWNER",
+    "COACHING_ADMIN",
+    "ACADEMIC_COORDINATOR",
+    "TEACHER",
+    "STUDENT",
+    "PARENT",
+    "ACCOUNTANT",
+  ]);
+  if (!resolved) return null;
+  authorizeTenantAction(resolved.context, resolved.institute.id, permission);
+  return resolved;
 }
 

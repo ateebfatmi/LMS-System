@@ -1,3 +1,5 @@
+> Superseded on 2026-10-17 by [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md). The completion claims below describe an earlier prototype pass and must not be used as production status.
+
 # Implementation Plan — PrepZii for Institutes
 
 ### Phase Status Overview

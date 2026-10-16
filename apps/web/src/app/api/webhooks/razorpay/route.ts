@@ -1,94 +1,42 @@
-import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
+import { NextResponse } from "next/server";
 
-// In-memory processed event cache to ensure strict idempotency
-const processedEvents = new Set<string>();
+/**
+ * The FastAPI webhook endpoint is the single payment-event processor. This
+ * route preserves the public Next.js callback URL while forwarding the exact
+ * signed bytes. It never interprets or acknowledges a payment independently.
+ */
+export async function POST(request: Request) {
+  const backendUrl = process.env.FASTAPI_INTERNAL_URL;
+  const internalApiKey = process.env.INTERNAL_API_KEY;
+  const signature = request.headers.get("x-razorpay-signature");
 
-export async function POST(req: NextRequest) {
+  if (!backendUrl || !internalApiKey) {
+    console.error("Razorpay webhook forwarding is not configured.");
+    return NextResponse.json({ error: "Webhook processor unavailable." }, { status: 503 });
+  }
+  if (!signature) {
+    return NextResponse.json({ error: "Missing webhook signature." }, { status: 400 });
+  }
+
+  const rawBody = await request.arrayBuffer();
   try {
-    const rawBody = await req.text();
-    const signature = req.headers.get("x-razorpay-signature");
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || "sample_webhook_secret";
-
-    // 1. Signature Verification
-    if (!signature) {
-      return NextResponse.json(
-        { error: "Missing Razorpay webhook signature header." },
-        { status: 400 }
-      );
-    }
-
-    const expectedSignature = crypto
-      .createHmac("sha256", webhookSecret)
-      .update(rawBody)
-      .digest("hex");
-
-    // Cryptographic constant-time comparison to prevent timing attacks
-    const isValidSignature =
-      signature.length === expectedSignature.length &&
-      crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
-
-    // Allow sandbox/dev bypass ONLY if explicitly configured with demo key
-    if (!isValidSignature && process.env.NODE_ENV === "production") {
-      console.error("Razorpay webhook signature verification failed.");
-      return NextResponse.json(
-        { error: "Invalid webhook signature." },
-        { status: 401 }
-      );
-    }
-
-    const event = JSON.parse(rawBody);
-    const eventId = event.event_id || `${event.event}_${event.payload?.payment?.entity?.id || Date.now()}`;
-
-    // 2. Idempotency Check
-    if (processedEvents.has(eventId)) {
-      return NextResponse.json({
-        received: true,
-        idempotent: true,
-        message: `Event ${eventId} has already been processed.`,
-      });
-    }
-
-    // 3. Process Event Types
-    switch (event.event) {
-      case "payment.captured": {
-        const payment = event.payload.payment.entity;
-        console.log(`[Razorpay Webhook] Payment ${payment.id} of ₹${payment.amount / 100} captured successfully.`);
-        // Update subscription or fee installment ledger idempotently
-        break;
-      }
-      case "subscription.activated": {
-        const subscription = event.payload.subscription.entity;
-        console.log(`[Razorpay Webhook] Subscription ${subscription.id} activated for customer.`);
-        break;
-      }
-      case "subscription.charged": {
-        const payment = event.payload.payment.entity;
-        console.log(`[Razorpay Webhook] Subscription recurring payment ${payment.id} succeeded.`);
-        break;
-      }
-      case "payment.failed": {
-        const payment = event.payload.payment.entity;
-        console.warn(`[Razorpay Webhook] Payment ${payment.id} failed: ${payment.error_description}`);
-        break;
-      }
-      default:
-        console.log(`[Razorpay Webhook] Received unhandled event: ${event.event}`);
-    }
-
-    // Mark event as processed
-    processedEvents.add(eventId);
-
-    return NextResponse.json({
-      received: true,
-      processed: true,
-      eventId,
+    const response = await fetch(`${backendUrl.replace(/\/$/, "")}/api/v1/webhooks/razorpay`, {
+      method: "POST",
+      headers: {
+        "content-type": request.headers.get("content-type") ?? "application/json",
+        "x-razorpay-signature": signature,
+        "x-internal-api-key": internalApiKey,
+      },
+      body: rawBody,
+      cache: "no-store",
+    });
+    const responseBody = await response.text();
+    return new NextResponse(responseBody, {
+      status: response.status,
+      headers: { "content-type": response.headers.get("content-type") ?? "application/json" },
     });
   } catch (error) {
-    console.error("Error processing Razorpay webhook:", error);
-    return NextResponse.json(
-      { error: "Internal server error processing webhook." },
-      { status: 500 }
-    );
+    console.error("Razorpay webhook processor could not be reached.", error);
+    return NextResponse.json({ error: "Webhook processor unavailable." }, { status: 503 });
   }
 }

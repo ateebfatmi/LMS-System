@@ -1,25 +1,6 @@
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
-import { Rajdhani, Space_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-
-const rajdhani = Rajdhani({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-prepzii-display",
-});
-
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-prepzii-body",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-prepzii-mono",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://institutes.prepzii.com"),
@@ -42,7 +23,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const hasClerk = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-  const fontClasses = `${rajdhani.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} font-sans antialiased`;
+  const fontClasses = "font-sans antialiased";
 
   if (hasClerk) {
     return (

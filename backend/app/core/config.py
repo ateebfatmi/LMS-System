@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     ENV: str = "development"
     SECRET_KEY: str = "prepzii-dev-secret-key-change-in-production-32-bytes"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+    INTERNAL_API_KEY: Optional[str] = None
     
     # Database
     DATABASE_URL: str = "sqlite:///./prepzii_local.db"

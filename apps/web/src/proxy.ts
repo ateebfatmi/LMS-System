@@ -3,11 +3,15 @@ import { NextRequest, NextFetchEvent, NextResponse } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
+  "/onboarding(.*)",
+  "/api/onboarding(.*)",
   "/api/organizations(.*)",
+  "/super-admin(.*)",
 ]);
 
 export default function proxy(req: NextRequest, ev: NextFetchEvent) {
-  // If Clerk publishable key is not configured, permit demo mode locally
+  // Local UI development can render without Clerk. Production deployment
+  // validation rejects missing Clerk configuration before release.
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
     return NextResponse.next();
   }

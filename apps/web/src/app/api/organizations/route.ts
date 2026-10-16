@@ -6,7 +6,15 @@ export async function GET() {
 
   try {
     const organizations = await listMyOrganizations(userId);
-    return Response.json({ organizations });
+    return Response.json({
+      organizations: organizations.map(({ id, name, slug, logo_url, status }) => ({
+        id,
+        name,
+        slug,
+        logoUrl: logo_url,
+        status,
+      })),
+    });
   } catch (error) {
     console.error("Failed to load Prepzii organizations", error);
     return Response.json({ error: "Failed to load organizations" }, { status: 500 });

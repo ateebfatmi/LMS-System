@@ -1,6 +1,8 @@
 import hmac
 import hashlib
 import json
+import logging
+import secrets
 from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Request, Header, HTTPException, status, Depends
 from sqlalchemy.orm import Session
@@ -11,11 +13,13 @@ from backend.app.models.subscription import OrganizationSubscription
 from backend.app.models.fee import FeeTransaction, StudentFee
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.post("/razorpay")
 async def razorpay_webhook(
     request: Request,
     x_razorpay_signature: str = Header(None, alias="X-Razorpay-Signature"),
+    x_internal_api_key: str = Header(None, alias="X-Internal-API-Key"),
     db: Session = Depends(get_db),
 ):
     """
@@ -24,8 +28,17 @@ async def razorpay_webhook(
     - Uses database-backed idempotency table to prevent double-charging or duplicate updates.
     - Updates subscriptions and student fee transaction ledgers within atomic DB transactions.
     """
+    if (
+        not settings.INTERNAL_API_KEY
+        or not x_internal_api_key
+        or not secrets.compare_digest(x_internal_api_key, settings.INTERNAL_API_KEY)
+    ):
+        raise HTTPException(status_code=401, detail="Unauthorised internal service request.")
+
     raw_body = await request.body()
-    webhook_secret = settings.RAZORPAY_WEBHOOK_SECRET or "sample_webhook_secret"
+    webhook_secret = settings.RAZORPAY_WEBHOOK_SECRET
+    if not webhook_secret:
+        raise HTTPException(status_code=503, detail="Webhook verification is not configured.")
 
     if not x_razorpay_signature:
         raise HTTPException(
@@ -120,11 +133,12 @@ async def razorpay_webhook(
         db.add(processed_event)
         db.commit()
 
-    except Exception as e:
+    except Exception:
         db.rollback()
+        logger.exception("Failed to process Razorpay webhook event")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process webhook event: {str(e)}",
+            detail="Failed to process webhook event.",
         )
 
     return {"received": True, "processed": True, "event_id": event_id}
