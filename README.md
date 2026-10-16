@@ -1,77 +1,72 @@
-# PrepZii for Institutes
-## Multi-Tenant Coaching Institute Management SaaS
+# PrepZii LMS
 
-PrepZii for Institutes is an enterprise-grade, multi-tenant B2B SaaS platform specifically engineered for coaching institutes across India (JEE, NEET, UPSC, SSC, Banking, and Foundation academies). It enables institutes to run their entire academic and administrative workflow from a single unified dashboard.
+PrepZii LMS is a separate multi-tenant B2B learning and institute-management application for Indian schools, coaching institutes, and tutors. It shares selected PrepZii infrastructure—Clerk identity, the canonical Supabase tenant/question data, assessment rules, storage, and Gemini configuration—without importing the consumer web application.
 
----
+The repository is an implementation candidate for isolated staging. It is **not yet approved for production or paying customers**; see [Production readiness](docs/PRODUCTION_READINESS.md).
 
-### Features & Capabilities
+## Implemented application slices
 
-- 🎯 **Authentic CBT Exam Engine**: Timed test simulator, question palette, numerical tolerance, and JEE Advanced partial marking algorithms.
-- 🏢 **Multi-Tenant Architecture**: Strict logical isolation using PostgreSQL Row-Level Security (RLS) linked to authenticated organization memberships.
-- 👥 **Roster & Batch OS**: Batch management, CSV bulk roster importer with duplicate detection, student directory, and faculty allocations.
-- 📋 **Admissions CRM**: Inquiries pipeline (New, Contacted, Counselling Scheduled, Trial Attended, Converted, Lost), follow-up tracking, and 1-click conversion to enrolled students.
-- 💳 **Fee Management & Ledger**: Course fee schedules, concession policies, offline cash/UPI receipts, and Razorpay subscription tiers.
-- 📊 **Academic Analytics**: Granular weak-chapter detection, speed vs. accuracy analytics, and ranked batch leaderboards.
-- ⚡ **Platform Super-Admin Portal**: Platform-level tenant provisioning, account suspension/reactivation, MRR metrics, and security audit logs.
-- 📢 **Notice Board & Circulars**: Role-aware circulars with integrated WhatsApp & SMS notification broadcaster.
-- 🏛️ **Campus & Smart Classrooms**: Resource manager for smart boards, lab benches, and conflict-free room scheduling.
+- Tenant onboarding, active-institute selection, memberships, hashed invitations, and CSV imports.
+- Permission-based server authorization, RLS migrations, composite tenant constraints, and audit records.
+- Student/faculty directories, academic years, campuses, rooms, courses, batches, enrolment, and conflict-safe timetable slots.
+- Private learning resources, signed downloads, lesson progress, assignments, submissions, feedback, and grading.
+- PrepZii question/test reuse, server-timed objective attempts, autosave, scoring, and result/solution release controls.
+- Session attendance with assigned-teacher scope and immutable correction history.
+- Institute fee plans, instalments, concessions, invoices, manual payments/refunds, and separate SaaS subscription controls.
+- Portal announcements/notifications and quota-metered, review-only Gemini drafts.
+- Role-scoped dashboards/reports and owner/admin-only audited admissions CRM.
+- Server-allowlisted platform administration, entitlements, branding, quotas, and feature flags.
 
----
+External delivery, payment reconciliation, parent data, subjective grading, PDF documents, and staging verification are explicitly gated—not simulated.
 
-### Monorepo Structure
+## Repository layout
 
 ```text
-apps/
-  web/                     Next.js 16 Web Application & Marketing Portal
-backend/                   Python FastAPI Assessment & Tenancy Service
-  app/
-    api/v1/                REST endpoints (CRM, Assessments, Health)
-    core/                  Config, Database engine, Security
-    models/                SQLAlchemy ORM models
-    schemas/               Pydantic validation schemas
-    services/              Pure assessment grading & CRM logic
-    permissions/           Tenant authorization & membership verification
-  tests/                   Automated pytest test suite (100% pass)
-packages/
-  contracts/               Shared TypeScript domain contracts & types
-  assessment-core/         Pure mathematical grading engine with unit tests
-  ui/                      PrepZii brand design system & accessible components
-supabase/
-  migrations/              Additive Postgres migrations with RLS policies
+apps/web/                 Next.js 16 application and route handlers
+packages/authorization/  Shared permission evaluation
+packages/assessment-core Shared deterministic objective scoring
+packages/contracts/      Shared domain contracts
+packages/learning/       Learning validation and release rules
+packages/membership/     Invitation and CSV rules
+packages/ui/             Shared UI primitives
+supabase/migrations/     Additive LMS migrations (0001–0018)
+supabase/tests/          Transactional tenant-isolation test
+backend/                 Optional, non-authoritative FastAPI prototype
+docs/                    Architecture, audit, phases, and readiness evidence
 ```
 
----
+## Local checks
 
-### Quick Start
+Use Node.js 22 or newer.
 
 ```bash
-# 1. Install Node workspace dependencies
-npm install
-
-# 2. Setup environment variables
-cp .env.example .env.local
-
-# 3. Run all tests
+npm ci
 npm test
-python3 -m pytest backend/tests
-
-# 4. Run typecheck across all workspaces
 npm run typecheck
-
-# 5. Start Next.js development server
-npm run dev
+npm run lint
+npm run build
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to view the application in your browser.
+The optional backend test environment is separate:
 
----
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r backend/requirements.txt
+.venv/bin/python -m pytest backend/tests -q
+```
 
-### Documentation Suite
+Copy `.env.example` to `.env.local` for local configuration. Never commit real credentials or point SQL tests at production.
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Comprehensive architecture, multi-tenancy model, RBAC policies.
-- [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) — PostgreSQL relational tables, indexes, and RLS policies.
-- [API_DOCUMENTATION.md](API_DOCUMENTATION.md) — REST API specification with request/response schemas.
-- [SECURITY.md](SECURITY.md) — Data isolation guarantees, server-side scoring, and credential guidelines.
-- [DEPLOYMENT.md](DEPLOYMENT.md) — Production setup, hosting recommendations, and environment configuration.
-- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — Roadmap, completed phases, and milestone status.
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Codebase audit](docs/CODEBASE_AUDIT.md)
+- [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
+- [Phase 8 staging handoff](docs/PHASE_8_READINESS.md)
+- [Production readiness](docs/PRODUCTION_READINESS.md)
+- [Deployment guide](DEPLOYMENT.md)
+- [Operations, backup, recovery, and release checklist](docs/OPERATIONS.md)
+
+## Safety boundary
+
+The two historical PrepZii `institutes` table definitions conflict. Inspect the actual deployed schema and rehearse all migrations on a disposable clone before applying anything. `supabase/tests/tenant_isolation.sql` intentionally creates and rolls back fixtures; it must never run against production.

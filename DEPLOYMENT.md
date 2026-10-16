@@ -1,61 +1,77 @@
-# Deployment Guide — PrepZii for Institutes
+# PrepZii LMS deployment guide
 
-### 1. Prerequisites
+This guide prepares an isolated staging deployment. It does not authorize a production migration.
 
-- Node.js >= 22
-- Python >= 3.11
-- PostgreSQL 15+ (or Supabase project)
-- Clerk account for authentication
-- Razorpay account (Sandbox or Production)
+## Prerequisites
 
----
+- Node.js 22+
+- A Clerk test instance or isolated test users in the shared instance
+- A disposable Supabase/PostgreSQL clone of the actual PrepZii schema
+- A private deployment target for the Next.js application
+- Optional provider sandbox credentials for Razorpay and Gemini
 
-### 2. Local Development Setup
+The FastAPI directory is an optional prototype, not the authoritative public API. Do not deploy it unless a reviewed server-to-server use case requires it and `INTERNAL_API_KEY` is set.
+
+## Configuration
+
+Create environment-specific secret values from `.env.example`. Store them in the deployment platform’s secret manager, not in Git or browser-visible configuration.
+
+Required for the core application:
+
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `DATABASE_URL` for controlled migration tooling only
+- `INVITATION_TOKEN_SECRET`
+
+Optional, feature-gated values:
+
+- `PLATFORM_SUPER_ADMIN_USER_IDS`
+- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
+- `GEMINI_API_KEY`, `ZI_AI_MODEL`
+- `FASTAPI_INTERNAL_URL`, `INTERNAL_API_KEY`
+
+Do not use production provider credentials during the staging rehearsal.
+
+## Build and application checks
 
 ```bash
-# 1. Install Node workspace dependencies
-npm install
-
-# 2. Setup environment variables
-cp .env.example .env.local
-
-# 3. Install Python backend dependencies
-python3 -m pip install -r backend/requirements.txt
-
-# 4. Run tests
+npm ci
 npm test
-python3 -m pytest backend/tests
-
-# 5. Start Next.js development server
-npm run dev
-
-# 6. (Optional) Run FastAPI backend service
-uvicorn backend.app.main:app --reload --port 8000
+npm run typecheck
+npm run lint
+npm run build
+npm audit --omit=dev
 ```
 
----
+Start the built web application using the hosting provider’s standard Next.js 16 runtime. The deployment must expose `/api/health` to platform health checks while authenticated dashboard routes remain protected by Clerk.
 
-### 3. Production Deployment
+## Database rehearsal
 
-#### Frontend Web Application (Next.js 16)
-- Deployable on Vercel, AWS ECS, or Docker container.
-- Build command: `npm run build`
-- Output: Standalone Next.js production server.
+1. Snapshot the deployed schema and create a disposable, access-restricted clone.
+2. Resolve the incompatible historical `institutes` definitions described in `docs/CODEBASE_AUDIT.md`.
+3. Record a restore point and verify it can be restored.
+4. Apply `supabase/migrations/0001_extend_prepzii_backend.sql` through `0018_crm_analytics_readiness.sql` in filename order.
+5. Run the transactional SQL suite only on that clone:
 
-#### Backend API Service (FastAPI)
-- Deployable on AWS App Runner, Fly.io, Railway, or Google Cloud Run.
-- Start command:
-  ```bash
-  uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --workers 4
-  ```
-
-#### Database Migrations
-Run Supabase migrations in sequence:
 ```bash
-supabase db push
-# Or apply migrations directly:
-# 0001_extend_prepzii_backend.sql
-# 0002_coaching_lms_modules.sql
-# 0003_institutional_fees_and_campuses.sql
-# 0004_crm_subscriptions_superadmin.sql
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/tenant_isolation.sql
 ```
+
+6. Run the Clerk-backed browser workflows listed in `docs/PHASE_8_READINESS.md`.
+7. Review locks, query plans, RLS policies, audit rows, storage policies, and rollback duration.
+
+Do not use `supabase db push` against the shared production project until this rehearsal is signed off. Migrations are forward-only; recovery uses the verified database backup plus a reviewed corrective migration.
+
+## Provider verification
+
+- Register the exact staging Razorpay webhook URL and secret. Verify HMAC failures, replay idempotency, amount/currency checks, and delayed events before enabling any ledger transition.
+- Use a Gemini test key. Confirm structured-output validation, timeouts, redacted logs, quota idempotency, and the policy for failed calls.
+- Leave email/SMS/WhatsApp jobs in `BLOCKED_CONFIG` until an adapter, consent model, suppression list, retries, and delivery receipts are tested.
+
+## Promotion
+
+Production promotion requires every item in [the operations checklist](docs/OPERATIONS.md) and [Phase 8 readiness](docs/PHASE_8_READINESS.md) to have dated evidence and an accountable reviewer. A successful build alone is insufficient.
