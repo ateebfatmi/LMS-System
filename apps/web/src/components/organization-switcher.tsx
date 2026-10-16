@@ -46,8 +46,11 @@ export function OrganizationSwitcher() {
         setBusy(false);
         return;
       }
-      if (list[0]) await select(list[0].slug, false);
-      else setBusy(false);
+      if (list[0]) {
+        await select(list[0].slug, false);
+      } else {
+        setBusy(false);
+      }
     }
     void load();
     return () => { cancelled = true; };

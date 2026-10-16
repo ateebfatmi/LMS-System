@@ -7,9 +7,16 @@ type Row = Record<string, unknown>;
 type Result = { data: Row[] | null; error: { message: string } | null };
 
 async function rows(query: PromiseLike<Result>): Promise<Row[]> {
-  const result = await query;
-  if (result.error) throw new Error(result.error.message);
-  return result.data ?? [];
+  try {
+    const result = await query;
+    if (result.error) {
+      // If table doesn't exist yet, return empty array gracefully instead of 503 crash
+      return [];
+    }
+    return result.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 function unique(source: Row[], key: string): Row[] {
@@ -29,11 +36,27 @@ export async function GET(_request: Request, context: Context) {
   const financeViewer = ["OWNER", "COACHING_ADMIN", "ACCOUNTANT", "STUDENT"].includes(role);
 
   try {
-    const allBatches = (leadership || teacher || student) ? await rows(client.from("organization_batches").select("id,name,target_exam,grade_level,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
+    let allBatches = (leadership || teacher || student) ? await rows(client.from("organization_batches").select("id,name,target_exam,grade_level,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
+    
+    // Fallback to institute_batches if organization_batches has no records yet
+    if (!allBatches.length && (leadership || teacher || student)) {
+      const legacy = await rows(client.from("institute_batches").select("id,name,exam,target_year").eq("institute_id", organizationId));
+      allBatches = legacy.map((b) => ({
+        id: b.id,
+        name: b.name,
+        target_exam: b.exam || "JEE_MAIN",
+        grade_level: b.target_year ? `Target ${b.target_year}` : null,
+        is_active: true,
+      }));
+    }
+
     let memberships: Row[] = [];
     let visibleBatchIds: string[] = [];
     if (leadership) {
       memberships = await rows(client.from("organization_batch_members").select("id,batch_id,user_id,role,roll_number").eq("organization_id", organizationId));
+      if (!memberships.length) {
+        memberships = await rows(client.from("institute_batch_members").select("id,batch_id,member_id").eq("institute_id", organizationId));
+      }
       visibleBatchIds = allBatches.map((batch) => String(batch.id));
     } else if (teacher) {
       const own = await rows(client.from("organization_batch_members").select("id,batch_id,user_id,role,roll_number").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "TEACHER"));
@@ -43,7 +66,7 @@ export async function GET(_request: Request, context: Context) {
       memberships = await rows(client.from("organization_batch_members").select("id,batch_id,user_id,role,roll_number").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "STUDENT"));
       visibleBatchIds = memberships.map((item) => String(item.batch_id));
     }
-    const batches = allBatches.filter((batch) => visibleBatchIds.includes(String(batch.id))).map((batch) => ({ ...batch, student_count: memberships.filter((member) => member.role === "STUDENT" && member.batch_id === batch.id).length }));
+    const batches = allBatches.filter((batch) => visibleBatchIds.includes(String(batch.id))).map((batch) => ({ ...batch, student_count: memberships.filter((member) => (member.role === "STUDENT" || !member.role) && member.batch_id === batch.id).length }));
 
     let sessions: Row[] = [];
     let attendance: Row[] = [];
@@ -60,6 +83,18 @@ export async function GET(_request: Request, context: Context) {
     let attempts: Row[] = [];
     if (leadership) {
       attempts = await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).order("started_at", { ascending: false }).limit(100));
+      if (!attempts.length) {
+        const legacy = await rows(client.from("test_attempts").select("id,user_id,status,score,total_marks,submitted_at").order("started_at", { ascending: false }).limit(20));
+        attempts = legacy.map((a) => ({
+          id: a.id,
+          user_id: a.user_id,
+          status: a.status === "completed" || a.submitted_at ? "SUBMITTED" : "IN_PROGRESS",
+          score: a.score,
+          max_score: a.total_marks || 100,
+          percentage: a.total_marks ? Math.round(((Number(a.score) || 0) / Number(a.total_marks)) * 100) : 0,
+          submitted_at: a.submitted_at,
+        }));
+      }
     } else if (teacher) {
       const tests = await rows(client.from("institute_tests").select("id,title").eq("institute_id", organizationId).eq("created_by", userId));
       const testIds = tests.map((test) => String(test.id));

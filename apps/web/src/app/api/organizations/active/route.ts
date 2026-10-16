@@ -25,7 +25,28 @@ function publicOrganization(institute: {
   };
 }
 export async function GET() {
-  const slug = (await cookies()).get(ACTIVE_ORGANIZATION_COOKIE)?.value;
+  const cookieStore = await cookies();
+  let slug = cookieStore.get(ACTIVE_ORGANIZATION_COOKIE)?.value;
+
+  if (!slug) {
+    // If no active organization cookie is set yet, auto-select the user's first authorized institute
+    const { getActingUserId, listMyOrganizations } = await import("@/lib/prepzii-backend");
+    const userId = await getActingUserId();
+    if (userId) {
+      const orgs = await listMyOrganizations(userId);
+      if (orgs.length > 0) {
+        slug = orgs[0].slug;
+        cookieStore.set(ACTIVE_ORGANIZATION_COOKIE, slug, {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+          path: "/",
+          maxAge: 60 * 60 * 24 * 30,
+        });
+      }
+    }
+  }
+
   if (!slug) return Response.json({ organization: null });
 
   const resolved = await getOrganizationContext(slug, selectableRoles);

@@ -24,12 +24,41 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
     if (!response.ok) setError(result.error ?? "Unable to load analytics."); else { setData(result); setError(""); }
     setLoading(false);
   }, []);
-  useEffect(() => { void (async () => {
-    const response = await fetch("/api/organizations/active", { cache: "no-store" });
-    const active = response.ok ? (await response.json()).organization as Organization | null : null;
-    setOrganization(active);
-    if (active) await load(active); else { setError("Select an institute to view analytics."); setLoading(false); }
-  })(); }, [load]);
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchActive() {
+      const response = await fetch("/api/organizations/active", { cache: "no-store" });
+      if (cancelled) return;
+      const active = response.ok ? (await response.json()).organization as Organization | null : null;
+      setOrganization(active);
+      if (active) {
+        await load(active);
+      } else {
+        // Fallback: fetch available organizations and auto-select first one
+        const orgsRes = await fetch("/api/organizations", { cache: "no-store" });
+        if (orgsRes.ok) {
+          const list = (await orgsRes.json()).organizations as Organization[];
+          if (list && list[0]) {
+            setOrganization(list[0]);
+            await load(list[0]);
+            return;
+          }
+        }
+        setError("Select an institute to view analytics.");
+        setLoading(false);
+      }
+    }
+    void fetchActive();
+
+    const handleOrgChange = () => {
+      void fetchActive();
+    };
+    window.addEventListener("prepzii:organization-changed", handleOrgChange);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("prepzii:organization-changed", handleOrgChange);
+    };
+  }, [load]);
 
   function exportCsv() {
     const rows = [["Batch", "Target exam", "Grade", "Students"], ...data.batches.map((batch) => [batch.name, batch.target_exam, batch.grade_level ?? "", String(batch.student_count)])];
