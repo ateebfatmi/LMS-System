@@ -25,7 +25,7 @@ Exit gate: no production application until schema collision and SQL security tes
 
 ## Phase 2 — core institute operations
 
-Status: **in progress; institute creation and invitations implemented, external verification pending**
+Status: **implemented in code through academic operations; external verification pending**
 
 Order of implementation:
 
@@ -34,8 +34,8 @@ Order of implementation:
 3. [~] Real organization switcher is connected; server-rendered role navigation remains pending.
 4. [x] Tenant-scoped student/staff profiles and membership APIs with pagination, search, audited edits, and real directory screens.
 5. [x] CSV import staging, row-level validation report, service-only PII storage, and transactional idempotent commit to pending members.
-6. Courses, batches, enrolments, academic sessions, branches, and basic timetable.
-7. Replace each corresponding `mock-data.ts` import only after its API and tests pass.
+6. [x] Tenant-scoped courses, subjects, batches, enrolments, academic sessions, campuses, rooms, and conflict-safe basic timetable through audited database mutations.
+7. [x] Replace the batches, courses, and campuses mock screens with authorized academic APIs and real empty states.
 
 ## Phase 3 — learning delivery
 
@@ -100,6 +100,7 @@ Completed and verified locally:
 - Shared invitation lifecycle unit tests.
 - Next.js type checking and lint baseline.
 - Server-only membership resolution and active-tenant selection code.
+- Academic workspace route, real batches/courses/campuses screens, and timetable conflict guards.
 
 Implemented but requiring external verification:
 
@@ -112,7 +113,7 @@ Implemented but requiring external verification:
 
 Presentation prototypes only:
 
-- Role dashboards and most operational pages remain backed by mock data; student and faculty directories now use authoritative APIs.
+- Role dashboards and several operational pages remain backed by mock data; student/faculty directories and academic-structure screens now use authoritative APIs.
 
 Not complete:
 

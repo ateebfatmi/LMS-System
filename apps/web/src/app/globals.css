@@ -1723,6 +1723,139 @@ button {
   }
 }
 
+/* --- Authoritative academic operations --- */
+.academic-metrics {
+  margin-bottom: 20px;
+}
+
+.academic-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(0, 1.5fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.academic-create-panel,
+.academic-records {
+  padding: 22px;
+}
+
+.academic-create-panel > h2,
+.academic-records > h2 {
+  margin: 0 0 18px;
+  font-size: 18px;
+}
+
+.compact-form {
+  display: grid;
+  gap: 10px;
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.compact-form:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.compact-form h3,
+.academic-records > h3 {
+  margin: 0 0 2px;
+  color: var(--ink-secondary);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+.compact-form > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compact-form input,
+.compact-form select,
+.compact-form textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.compact-form textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
+.compact-form input:focus,
+.compact-form select:focus,
+.compact-form textarea:focus {
+  border-color: #9d831b;
+  outline: 0;
+  box-shadow: 0 0 0 4px rgb(250 204 21 / 16%);
+}
+
+.academic-records article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 0;
+  border-top: 1px solid var(--line);
+}
+
+.academic-records article > div {
+  min-width: 0;
+}
+
+.academic-records article strong,
+.academic-records article small {
+  display: block;
+}
+
+.academic-records article strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.academic-records article small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.academic-records .empty-state {
+  padding: 28px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .academic-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .compact-form > div {
+    grid-template-columns: 1fr;
+  }
+
+  .academic-create-panel,
+  .academic-records {
+    padding: 16px;
+  }
+}
+
 .directory-actions,
 .import-actions,
 .import-summary,

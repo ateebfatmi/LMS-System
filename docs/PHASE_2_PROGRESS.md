@@ -1,33 +1,30 @@
-# Phase 2 progress report
+# Phase 2 progress — core institute operations
 
-Date: 2026-10-17
+Status date: 2026-10-17
 
-## Implemented in code
+Phase 2 is implemented in application and migration code. It is not production-certified until migrations `0001`–`0010` and the SQL isolation suite pass on an isolated clone of the shared PrepZii Supabase schema.
 
-- Transactional institute creation with owner membership, trial subscription, audit record, and retry serialization.
-- Real organization selection backed by server-verified Clerk membership and an HTTP-only context cookie.
-- Secure organization invitations with service-only database RPCs.
-- Deterministic HMAC invitation tokens for safe idempotent retries; only SHA-256 token digests are persisted.
-- Role grant checks that prevent owner or platform-admin escalation.
-- Expiry, revocation, accepted state, verified-email acceptance, replay handling, membership activation, and audit records.
-- A real members/invitations screen and invitation acceptance screen.
-- Tenant-bound student/faculty profiles with composite membership foreign keys.
-- Paginated and searchable directory APIs with audited profile/status edits.
-- Student and faculty screens backed by authoritative data instead of mock arrays.
-- RFC-style quoted CSV parsing with schema and row-level validation.
-- Tenant-owned, service-only import staging with atomic and idempotent commit.
-- Imported identities remain pending until verified-email invitation acceptance.
+## Delivered
 
-## Verified locally
+- Retry-safe institute onboarding with an owner membership, trial, and audit event in one transaction.
+- Hashed, expiring, verified-email invitations with revoke and idempotent acceptance.
+- Membership-backed active-institute switching; the browser-selected slug is re-authorized on every request.
+- Tenant-scoped student and faculty profiles, search, pagination, edits, and real directory screens.
+- Staged CSV student/teacher imports with validation reports and idempotent commit.
+- Academic years, campuses, subjects, courses, batches, and member enrolments through one service-only audited mutation boundary.
+- Campus rooms and weekly timetable slots with database-level room, batch, and faculty overlap prevention.
+- Real batches, courses, and campuses screens with loading, error, and empty states.
 
-- 13 shared-package tests pass.
-- Type checking and lint pass across all workspaces.
-- Next.js 16 production build passes.
+## Security properties
+
+- Every new tenant-owned record carries `organization_id` and is covered by RLS.
+- Parent/child tenant identity is enforced with composite foreign keys.
+- Route handlers resolve Clerk identity and active membership server-side before using the service role.
+- Sensitive writes and imports create persistent audit records.
+- Cross-tenant profile, import, course, room, batch, and timetable relationships are represented in the SQL isolation suite.
 
 ## External gate
 
-Migrations `0007`–`0009` have not been applied. They must be exercised with migrations `0005` and `0006` on an isolated Supabase clone, including concurrent invitation/import requests, cross-tenant profile/import relationships, pagination, search, duplicate identifiers, invalid CSV rows, and repeated commits.
+The shared database contains historically incompatible `institutes` migration definitions. Before deployment, inspect a scrubbed staging clone, reconcile that collision, apply all migrations in order, run `supabase/tests/tenant_isolation.sql`, and exercise onboarding/invitation/import concurrency with Clerk test identities.
 
-## Next slice
-
-Build real courses, batches, enrolments, academic sessions, branches, and the basic timetable, replacing mock pages one bounded workflow at a time.
+The next implementation phase is learning delivery: modules, lessons, private resources, signed access, release rules, and student progress.

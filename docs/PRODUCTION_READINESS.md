@@ -16,8 +16,8 @@ As of 2026-10-17, PrepZii LMS is **not ready for paying customers or a controlle
 
 - Production database shape has not been inspected or migrated in staging.
 - The incompatible `institutes` migration definitions are unresolved.
-- Most operational screens still use mock/local state; student and faculty directories now use authoritative APIs.
-- Institute creation, secure invitations, and member profile management exist in code, but staging verification, course delivery, test attempt, attendance, fee, and subscription workflows are incomplete.
+- Many operational screens still use mock/local state; student/faculty directories and the core academic-structure screens now use authoritative APIs.
+- Institute creation, secure invitations, member profile management, academic structure, enrolment, and basic timetable operations exist in code, but staging verification, course delivery, test attempt, attendance, fee, and subscription workflows are incomplete.
 - Parent/guardian authorization model does not exist.
 - Private file storage and upload controls do not exist.
 - Invitation replay protection and transaction-level invitation audit code exist but are unverified against staging; quotas and rate limiting remain incomplete.

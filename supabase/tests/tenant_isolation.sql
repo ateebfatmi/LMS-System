@@ -12,6 +12,63 @@ values
   ('10000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', 'Physics A'),
   ('20000000-0000-0000-0000-000000000022', '20000000-0000-0000-0000-000000000002', 'Physics B');
 
+insert into public.organization_campuses (id, organization_id, name)
+values
+  ('10000000-0000-0000-0000-000000000041', '10000000-0000-0000-0000-000000000001', 'Campus A'),
+  ('20000000-0000-0000-0000-000000000042', '20000000-0000-0000-0000-000000000002', 'Campus B');
+
+insert into public.organization_batches (id, organization_id, campus_id, name, target_exam)
+values
+  ('10000000-0000-0000-0000-000000000051', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000041', 'Batch A', 'JEE_MAIN'),
+  ('20000000-0000-0000-0000-000000000052', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000042', 'Batch B', 'NEET');
+
+insert into public.organization_campus_rooms (id, organization_id, campus_id, name, capacity)
+values
+  ('10000000-0000-0000-0000-000000000061', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000041', 'Room A1', 40),
+  ('10000000-0000-0000-0000-000000000062', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000041', 'Room A2', 40),
+  ('20000000-0000-0000-0000-000000000063', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000042', 'Room B1', 40);
+
+insert into public.organization_room_schedules (
+  id, organization_id, room_id, batch_id, faculty_id, time_slot, subject, day_of_week, starts_at, ends_at
+) values (
+  '10000000-0000-0000-0000-000000000071',
+  '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000061',
+  '10000000-0000-0000-0000-000000000051',
+  'teacher-a', '09:00–10:00', 'Physics', 'MON', '09:00', '10:00'
+);
+
+do $$
+begin
+  begin
+    insert into public.organization_room_schedules (
+      organization_id, room_id, batch_id, faculty_id, time_slot, subject, day_of_week, starts_at, ends_at
+    ) values (
+      '10000000-0000-0000-0000-000000000001',
+      '10000000-0000-0000-0000-000000000062',
+      '10000000-0000-0000-0000-000000000051',
+      'teacher-b', '09:30–10:30', 'Chemistry', 'MON', '09:30', '10:30'
+    );
+    raise exception 'Timetable guard failed to reject an overlapping batch slot';
+  exception when exclusion_violation then
+    null;
+  end;
+
+  begin
+    insert into public.organization_room_schedules (
+      organization_id, room_id, batch_id, faculty_id, time_slot, subject, day_of_week, starts_at, ends_at
+    ) values (
+      '10000000-0000-0000-0000-000000000001',
+      '20000000-0000-0000-0000-000000000063',
+      '10000000-0000-0000-0000-000000000051',
+      'teacher-a', '11:00–12:00', 'Physics', 'MON', '11:00', '12:00'
+    );
+    raise exception 'Composite tenant constraint failed to reject a cross-tenant room schedule';
+  exception when foreign_key_violation then
+    null;
+  end;
+end $$;
+
 insert into public.organization_invitations (
   id, organization_id, email, role, token_hash, idempotency_key, invited_by, expires_at
 ) values (
