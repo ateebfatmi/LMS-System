@@ -68,7 +68,7 @@ Roles:
 | Finance | Separate institute fee plans/ledgers/invoices/receipts/refunds; service-only audited mutations |
 | SaaS billing | Organization subscriptions, configurable entitlements, atomic quotas, grace and cancellation controls |
 | Audit | organization and platform audit logs |
-| AI | existing Gemini provider through tenant-filtered LMS service (pending) |
+| AI | Shared Gemini credentials through tenant-scoped, quota-metered, structured draft service |
 
 ## Request flow
 
@@ -94,7 +94,7 @@ Razorpay calls the public Next.js webhook URL. Next.js forwards the exact signed
 2. Resolve the two incompatible `institutes` migration definitions.
 3. Apply consumer institute prerequisites if absent.
 4. Apply LMS migrations `0001`–`0004` to a staging clone.
-5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0016_saas_entitlements_admin.sql` in order.
+5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0017_communications_ai_drafts.sql` in order.
 6. Run `supabase/tests/tenant_isolation.sql` in the isolated database.
 7. Exercise onboarding and invitation concurrency/replay cases with Clerk test identities.
 8. Review query plans and only then schedule a production migration with rollback/backup checkpoints.
@@ -114,3 +114,9 @@ Institute fee collection is deliberately separate from PrepZii SaaS subscription
 Subscription plans store paise prices, limits, and JSON feature entitlements. Database triggers serialize and enforce active-student and campus quotas at the canonical tables, so parallel API calls cannot bypass them. Metered usage uses a service-only idempotent RPC with monthly counters and subscription/grace checks. Plan changes are requests only; browser state never activates paid access.
 
 Platform administration is separate from tenant authorization. Access requires a server-controlled user-ID allowlist, and the platform RPC is callable only by the service role behind that check. Institute suspensions, plan edits, and feature flags append platform audit records. Support access has an explicit approval schema and confers no access until a separate, time-bound authorization path is implemented.
+
+## Communications and AI drafts
+
+Portal notifications are canonical. Announcement publication resolves recipients from active tenant memberships and, for batch notices, tenant-scoped enrolments. Each recipient receives an independent read state. External delivery jobs are persisted as `BLOCKED_CONFIG` until an opted-in provider is actually configured; the UI never reports fabricated delivery.
+
+The AI endpoint reuses PrepZii's Gemini environment configuration but does not import consumer application files. It authenticates a content manager, stores a request-scoped processing record, atomically consumes one tenant credit, treats supplied material as untrusted, requests schema-constrained JSON, validates it again with Zod, and stores only a reviewable draft. Inputs are hashed and source metadata avoids invented citations. AI output cannot publish itself or determine authorization.

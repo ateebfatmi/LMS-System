@@ -8,7 +8,7 @@ update public.subscription_plans set
   annual_price_paise = coalesce(annual_price_paise, price_inr::bigint * 100 * 10),
   entitlements = case when entitlements = '{}'::jsonb then jsonb_build_object(
     'assessments', true, 'assignments', true, 'attendance', true, 'fees', true,
-    'advancedAnalytics', id <> 'basic', 'ai', id = 'scale', 'whiteLabel', id = 'scale'
+    'advancedAnalytics', id <> 'basic', 'ai', ai_credits_per_month > 0, 'whiteLabel', id = 'scale'
   ) else entitlements end;
 alter table public.subscription_plans alter column monthly_price_paise set not null;
 alter table public.subscription_plans alter column annual_price_paise set not null;
@@ -138,6 +138,10 @@ begin
     return jsonb_build_object('quantity', counter.quantity, 'limit', null, 'idempotent', true);
   end if;
   perform pg_advisory_xact_lock(hashtextextended(p_organization_id::text || ':' || p_metric || ':' || period_start::text, 0));
+  if exists (select 1 from public.organization_usage_events where organization_id = p_organization_id and metric = p_metric and idempotency_key = p_idempotency_key) then
+    select * into counter from public.organization_usage_counters candidate where candidate.organization_id = p_organization_id and candidate.metric = p_metric and candidate.period_start = lms_consume_quota.period_start;
+    return jsonb_build_object('quantity', counter.quantity, 'limit', null, 'idempotent', true);
+  end if;
   select * into subscription from public.organization_subscriptions candidate where candidate.organization_id = p_organization_id for update;
   if not found or subscription.status not in ('TRIAL', 'ACTIVE', 'PAST_DUE') then raise exception 'Subscription is not writable' using errcode = '42501'; end if;
   if subscription.status = 'TRIAL' and coalesce(subscription.trial_ends_at, subscription.current_period_end) < now() then raise exception 'Subscription trial ended' using errcode = '42501'; end if;

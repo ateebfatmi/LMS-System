@@ -61,7 +61,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Gemini integration exists in `src/lib/zi/provider.js`; transcription support is separate.
 - Model names and token caps are environment/config driven (`GEMINI_API_KEY`, `ZI_AI_MODEL`, `ZI_TRANSCRIPTION_MODEL`).
 - Current consumer access accounting uses `zi_preferences`; increments are read-then-upsert and are not concurrency-safe quotas.
-- LMS AI retrieval, tenant filters, draft/review workflow, and per-tenant usage budgets do not yet exist.
+- LMS structured AI drafting now authenticates a tenant content manager, consumes an atomic plan quota, stores input hashes/source metadata, validates strict JSON, and persists review-only drafts. Canonical question/lesson promotion, richer tenant retrieval, and provider-quality evaluation remain pending.
 
 ### Storage and uploads
 
@@ -84,15 +84,15 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Shared packages for contracts, scoring, UI, permission evaluation, and membership lifecycle rules.
 - Clerk route protection and server-only Supabase client boundary.
 - Membership-backed organization listing and active-organization selection.
-- Additive tenant-aware migrations `0001`–`0016` (not applied to production).
+- Additive tenant-aware migrations `0001`–`0017` (not applied to production).
 - Persistent demo-request API, health endpoint, and Razorpay forwarding boundary.
 - TypeScript, ESLint, and Node assessment/authorization/membership unit tests.
 
 ### Prototype-only or incomplete
 
-- Dashboard, announcements, CRM, and reports still use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories, batches/courses/campuses, objective assessments, attendance, institute fee ledgers, owner subscription controls, and platform administration have moved to authorized APIs.
+- Dashboard, CRM, and reports still use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories, batches/courses/campuses, objective assessments, attendance, institute fee ledgers, announcements, owner subscription controls, and platform administration have moved to authorized APIs.
 - Many visible page actions mutate client state only; refresh discards changes.
-- Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, conflict-safe timetable, private learning delivery, assignment/submission grading, objective assessment autosave/finalization, audited attendance corrections, and an institute fee ledger now exist in code. Descriptive grading, PDF financial documents, payment-provider reconciliation, notification delivery, quota enforcement, and AI service do not.
+- Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, conflict-safe timetable, private learning delivery, assignment/submission grading, objective assessment autosave/finalization, audited attendance corrections, institute fee ledgers, portal notifications, atomic quotas, and structured AI drafts now exist in code. Descriptive grading, PDF financial documents, provider reconciliation/delivery, and canonical AI-draft promotion remain incomplete.
 - Super-admin institute/subscription/plan/feature-flag/audit data now comes from a server-allowlisted platform API. Provider health, job monitoring, approved support access, and SaaS invoice operations remain pending.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
 

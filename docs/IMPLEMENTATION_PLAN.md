@@ -90,11 +90,18 @@ Status: **core entitlements and administration implemented in code; provider bil
 
 ## Phase 7 — AI and communications
 
-Status: **pending**
+Status: **portal communications and reviewed AI drafting implemented in code; external delivery pending**
 
-- Tenant-filtered AI content service using existing Gemini integration.
-- Strict structured output, source references, draft/review state, budgets, and usage records.
-- In-app notifications first; provider adapters for opted-in email/SMS/WhatsApp later.
+- [x] Tenant-scoped announcement drafts/publication with audience and assigned-batch checks.
+- [x] In-app notifications with per-recipient read state and role-scoped notice-board queries.
+- [x] External email/SMS/WhatsApp jobs remain explicitly blocked until a provider is configured; no fake delivery success.
+- [x] Reuse the configured Gemini key/model through a server-only, timeout-bounded REST adapter.
+- [x] Strict structured outputs for announcement, question, and lesson-summary drafts.
+- [x] Untrusted-input instruction boundary, input hashes, source metadata, draft-only state, token metadata, and idempotent AI quota consumption.
+- [ ] Add faculty approval/rejection UI for question/summary drafts and promotion into canonical content.
+- [ ] Configure opt-in provider adapters, preferences, retries, delivery receipts, and suppression lists.
+- [ ] Add AI output quality fixtures, abuse rate limits, and provider-failure quota policy.
+- [ ] Rehearse migration `0017` and real provider calls in staging.
 
 ## Phase 8 — controlled pilot readiness
 

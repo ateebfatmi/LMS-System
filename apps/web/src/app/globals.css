@@ -3394,7 +3394,28 @@ button {
 .platform-side .compact-form input { min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; }
 .platform-side article { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
 
+/* --- Portal-first announcements --- */
+.announcement-layout { display: grid; grid-template-columns: minmax(300px, .7fr) minmax(0, 1.3fr); gap: 18px; margin-top: 18px; align-items: start; }
+.announcement-composer, .announcement-composer form, .announcement-feed { display: grid; gap: 12px; }
+.announcement-composer h2, .announcement-feed h2 { margin: 0 0 4px; font-size: 16px; }
+.announcement-composer input, .announcement-composer textarea, .announcement-composer select, .ai-draft-box textarea { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: white; }
+.announcement-composer textarea, .ai-draft-box textarea { min-height: 100px; resize: vertical; }
+.announcement-composer form > div:not(.channel-picker) { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.ai-draft-box { display: grid; gap: 8px; padding: 12px; border: 1px dashed #c4b5fd; border-radius: 12px; background: #faf8ff; }
+.channel-picker { display: flex; flex-wrap: wrap; gap: 12px; }
+.channel-picker label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.channel-picker input { width: 15px; min-height: 15px; }
+.announcement-card { display: grid; gap: 10px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.announcement-card header { display: flex; justify-content: space-between; gap: 12px; }
+.announcement-card header > div:last-child { display: flex; align-items: flex-start; gap: 5px; }
+.announcement-card strong, .announcement-card small, .notification-row strong, .notification-row small { display: block; }
+.announcement-card small, .notification-row small { margin-top: 4px; color: var(--muted); font-size: 11px; }
+.announcement-card p { margin: 0; color: var(--ink-secondary); font-size: 13px; line-height: 1.6; white-space: pre-wrap; }
+.notification-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.notification-row.read { opacity: .7; }
+
 @media (max-width: 1180px) {
+  .announcement-layout { grid-template-columns: 1fr; }
   .admin-plan-form { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .finance-tools {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3420,6 +3441,8 @@ button {
 }
 
 @media (max-width: 760px) {
+  .announcement-composer form > div:not(.channel-picker) { grid-template-columns: 1fr; }
+  .announcement-card header, .notification-row { flex-direction: column; }
   .subscription-settings,
   .platform-grid { grid-template-columns: 1fr; }
   .platform-admin > header,

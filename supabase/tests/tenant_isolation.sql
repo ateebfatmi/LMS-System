@@ -231,6 +231,24 @@ values
   ('10000000-0000-0000-0000-000000000001', '#0B132B', 'security-test-a', 'user-owner-a'),
   ('20000000-0000-0000-0000-000000000002', '#112233', 'security-test-b', 'user-owner-b');
 
+insert into public.organization_announcements (
+  id, organization_id, title, content, target_audience, priority, category, status, channels, created_by, published_at
+) values
+  ('10000000-0000-0000-0000-000000001201', '10000000-0000-0000-0000-000000000001', 'Notice A', 'Tenant A notice', 'ALL', 'NORMAL', 'GENERAL', 'PUBLISHED', array['PORTAL'], 'user-owner-a', now()),
+  ('20000000-0000-0000-0000-000000002201', '20000000-0000-0000-0000-000000000002', 'Notice B', 'Tenant B notice', 'ALL', 'NORMAL', 'GENERAL', 'PUBLISHED', array['PORTAL'], 'user-owner-b', now());
+
+insert into public.organization_notifications (
+  id, organization_id, announcement_id, recipient_user_id, kind, title, body
+) values
+  ('10000000-0000-0000-0000-000000001202', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000001201', 'student-a', 'ANNOUNCEMENT', 'Notice A', 'Tenant A notice'),
+  ('20000000-0000-0000-0000-000000002202', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000002201', 'student-b', 'ANNOUNCEMENT', 'Notice B', 'Tenant B notice');
+
+insert into public.organization_ai_drafts (
+  organization_id, request_id, feature, status, input_hash, source_references, output, model, prompt_version, created_by
+) values
+  ('10000000-0000-0000-0000-000000000001', 'security-ai-a', 'ANNOUNCEMENT_DRAFT', 'DRAFT', repeat('a', 64), '[]', '{"title":"Draft A","content":"Draft"}', 'test-model', 'test-v1', 'teacher-a'),
+  ('20000000-0000-0000-0000-000000000002', 'security-ai-b', 'ANNOUNCEMENT_DRAFT', 'DRAFT', repeat('b', 64), '[]', '{"title":"Draft B","content":"Draft"}', 'test-model', 'test-v1', 'teacher-b');
+
 do $$
 declare
   first_result jsonb;
@@ -318,6 +336,19 @@ begin
   exception when foreign_key_violation then
     null;
   end;
+
+  begin
+    insert into public.organization_notifications (
+      organization_id, announcement_id, recipient_user_id, kind, title, body
+    ) values (
+      '20000000-0000-0000-0000-000000000002',
+      '10000000-0000-0000-0000-000000001201',
+      'student-b', 'ANNOUNCEMENT', 'Cross tenant', 'Cross tenant'
+    );
+    raise exception 'Composite tenant constraint failed to reject a cross-tenant notification';
+  exception when foreign_key_violation then
+    null;
+  end;
 end $$;
 
 insert into public.organization_member_imports (
@@ -398,6 +429,10 @@ begin
   if (select count(*) from public.platform_feature_flags) <> 0 then
     raise exception 'Platform RLS failure: tenant browser role can read internal feature flags';
   end if;
+  if (select count(*) from public.organization_announcements) <> 1
+    or (select count(*) from public.organization_ai_drafts) <> 1 then
+    raise exception 'Communications RLS failure: owner can see another tenant announcement or AI draft';
+  end if;
 end $$;
 
 do $$
@@ -471,6 +506,11 @@ begin
     or (select count(*) from public.organization_usage_events) <> 0
     or (select count(*) from public.organization_branding) <> 1 then
     raise exception 'SaaS RLS failure: student usage or branding visibility is incorrect';
+  end if;
+  if (select count(*) from public.organization_announcements) <> 1
+    or (select count(*) from public.organization_notifications) <> 1
+    or (select count(*) from public.organization_ai_drafts) <> 0 then
+    raise exception 'Communications RLS failure: student visibility is incorrect';
   end if;
 end $$;
 
