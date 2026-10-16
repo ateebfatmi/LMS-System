@@ -11,6 +11,9 @@ Date: 2026-10-17
 - Role grant checks that prevent owner or platform-admin escalation.
 - Expiry, revocation, accepted state, verified-email acceptance, replay handling, membership activation, and audit records.
 - A real members/invitations screen and invitation acceptance screen.
+- Tenant-bound student/faculty profiles with composite membership foreign keys.
+- Paginated and searchable directory APIs with audited profile/status edits.
+- Student and faculty screens backed by authoritative data instead of mock arrays.
 
 ## Verified locally
 
@@ -20,8 +23,8 @@ Date: 2026-10-17
 
 ## External gate
 
-Migration `0007_organization_invitations.sql` has not been applied. It must be exercised with migrations `0005` and `0006` on an isolated Supabase clone, including concurrent create/accept/revoke requests and Clerk identities with matching and non-matching verified emails.
+Migrations `0007_organization_invitations.sql` and `0008_member_profiles_directory.sql` have not been applied. They must be exercised with migrations `0005` and `0006` on an isolated Supabase clone, including concurrent invitation requests, cross-tenant profile relationships, pagination, search, and duplicate roll/employee codes.
 
 ## Next slice
 
-Build tenant-scoped member/profile APIs with pagination and search, then replace the mock student and staff directories. CSV imports follow after the single-record persistence path is verified.
+Build staged CSV imports with validation reports and an idempotent commit path, using the verified single-record profile schema as the destination.

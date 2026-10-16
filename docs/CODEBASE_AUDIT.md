@@ -84,15 +84,15 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Shared packages for contracts, scoring, UI, permission evaluation, and membership lifecycle rules.
 - Clerk route protection and server-only Supabase client boundary.
 - Membership-backed organization listing and active-organization selection.
-- Additive tenant-aware migrations `0001`–`0007` (not applied to production).
+- Additive tenant-aware migrations `0001`–`0008` (not applied to production).
 - Persistent demo-request API, health endpoint, and Razorpay forwarding boundary.
 - TypeScript, ESLint, and Node assessment/authorization/membership unit tests.
 
 ### Prototype-only or incomplete
 
-- Dashboard, students, teachers, batches, courses, assessments, attendance, fees, announcements, campuses, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data.
+- Dashboard, batches, courses, assessments, attendance, fees, announcements, campuses, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student and faculty directories have been moved to tenant-scoped member APIs.
 - Many visible page actions mutate client state only; refresh discards changes.
-- Transactional institute creation and a complete invitation lifecycle now exist in code, including hashed tokens, expiry, revocation, verified-email acceptance, audit records, and idempotency. CSV persistence, timetable service, learning-resource storage, assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
+- Transactional institute creation, invitations, and paginated member/profile directories now exist in code. CSV persistence, timetable service, learning-resource storage, assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
 - Super-admin UI data is mocked. Access is now guarded by a server-controlled user-ID allowlist, but the underlying platform APIs are not implemented.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
 

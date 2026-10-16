@@ -25,6 +25,16 @@ insert into public.organization_invitations (
   now() + interval '7 days'
 );
 
+insert into public.institute_members (id, institute_id, user_id, email, role, status)
+values
+  ('10000000-0000-0000-0000-000000000031', '10000000-0000-0000-0000-000000000001', 'student-a', 'student-a@example.com', 'STUDENT', 'ACTIVE'),
+  ('20000000-0000-0000-0000-000000000032', '20000000-0000-0000-0000-000000000002', 'student-b', 'student-b@example.com', 'STUDENT', 'ACTIVE');
+
+insert into public.organization_member_profiles (organization_id, membership_id, display_name, roll_number)
+values
+  ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000031', 'Student A', 'A-001'),
+  ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000032', 'Student B', 'B-001');
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"user-owner-a","role":"authenticated"}', true);
 
@@ -42,6 +52,9 @@ begin
   if (select count(*) from public.organization_invitations) <> 0 then
     raise exception 'RLS failure: browser role can read service-only invitation records';
   end if;
+  if (select count(*) from public.organization_member_profiles) <> 1 then
+    raise exception 'RLS failure: tenant A can see member profiles outside its organization';
+  end if;
 end $$;
 
 do $$
@@ -55,6 +68,21 @@ begin
       'user-owner-a'
     );
     raise exception 'Composite tenant constraint failed to reject cross-tenant subject';
+  exception when foreign_key_violation then
+    null;
+  end;
+end $$;
+
+do $$
+begin
+  begin
+    insert into public.organization_member_profiles (organization_id, membership_id, display_name)
+    values (
+      '10000000-0000-0000-0000-000000000001',
+      '20000000-0000-0000-0000-000000000032',
+      'Cross-tenant profile'
+    );
+    raise exception 'Composite tenant constraint failed to reject cross-tenant profile';
   exception when foreign_key_violation then
     null;
   end;

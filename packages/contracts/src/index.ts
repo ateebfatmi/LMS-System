@@ -21,6 +21,26 @@ export interface TenantContext {
   role: OrganizationRole;
 }
 
+export interface OrganizationMemberDirectoryRecord {
+  id: string;
+  userId: string | null;
+  email: string;
+  role: OrganizationRole;
+  status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  displayName: string;
+  phone: string | null;
+  alternatePhone: string | null;
+  rollNumber: string | null;
+  employeeCode: string | null;
+  guardianName: string | null;
+  guardianPhone: string | null;
+  qualification: string | null;
+  subjectSpecialization: string | null;
+  joinedOn: string | null;
+  batches: { id: string; name: string; targetExam: string }[];
+  createdAt: string;
+}
+
 // ==========================================
 // Academic & Batch Contracts
 // ==========================================

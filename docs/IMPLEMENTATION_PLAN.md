@@ -32,7 +32,7 @@ Order of implementation:
 1. [x] Transactional, retry-safe institute onboarding RPC (institute, owner membership, trial, audit row) plus Clerk-protected API and real form.
 2. [x] Invitations with hashed token, expiry, accepted/revoked state, verified-email binding, audit records, and idempotency.
 3. [~] Real organization switcher is connected; server-rendered role navigation remains pending.
-4. Student/staff profiles and membership APIs with pagination/search.
+4. [x] Tenant-scoped student/staff profiles and membership APIs with pagination, search, audited edits, and real directory screens.
 5. CSV import staging, validation report, and idempotent commit.
 6. Courses, batches, enrolments, academic sessions, branches, and basic timetable.
 7. Replace each corresponding `mock-data.ts` import only after its API and tests pass.
@@ -112,7 +112,7 @@ Implemented but requiring external verification:
 
 Presentation prototypes only:
 
-- All role dashboards and most operational pages currently backed by mock data.
+- Role dashboards and most operational pages remain backed by mock data; student and faculty directories now use authoritative APIs.
 
 Not complete:
 
