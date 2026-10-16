@@ -10,7 +10,7 @@ This document records verified code, not intended features. It must be updated w
 
 ## Executive finding
 
-Consumer PrepZii is a working Next.js application with substantial assessment, PYQ, analytics, community, institute, payment, storage, and AI code. PrepZii LMS is currently a strong visual prototype plus an early database/API foundation. It is **not production-ready**: 14 LMS page modules import local mock data, only the first institute-onboarding slice is connected, most operational mutations are not connected end to end, the new migrations have not been verified against a staging clone, and the optional FastAPI prototype has model/schema drift from Supabase.
+Consumer PrepZii is a working Next.js application with substantial assessment, PYQ, analytics, community, institute, payment, storage, and AI code. PrepZii LMS is currently a strong visual prototype plus an early database/API foundation. It is **not production-ready**: most LMS operational modules still import local mock data, only institute creation and invitations are connected, the new migrations have not been verified against a staging clone, and the optional FastAPI prototype has model/schema drift from Supabase.
 
 The safe direction is a modular Next.js application using the existing Clerk and Supabase projects. The separate FastAPI service is not yet justified and must not become an authoritative second data model until its need and schema ownership are resolved.
 
@@ -40,7 +40,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Institute ownership is stored in `institutes.owner_user_id`; membership is stored in `institute_members`.
 - Consumer roles currently centre on `COACHING_ADMIN` and `STUDENT`; the LMS needs a reviewed expansion.
 - Consumer platform-admin access reads Clerk `publicMetadata.role`. The LMS must not copy this pattern because public/user-editable metadata is not an acceptable server-controlled super-admin grant.
-- Pending email invitations are opportunistically bound to a Clerk user ID when membership is loaded. This requires explicit invitation expiry and replay review before reuse.
+- Consumer pending email invitations are opportunistically bound to a Clerk user ID when membership is loaded. The LMS does not reuse that path; it now has a separate hashed-token, expiry, revocation, verified-email, and idempotency lifecycle.
 
 ### Database and migration risk
 
@@ -81,18 +81,18 @@ The safe direction is a modular Next.js application using the existing Clerk and
 ### Working foundations
 
 - Independent Git repository and deployable Next.js 16 workspace.
-- Shared packages for contracts, scoring, UI, and permission evaluation.
+- Shared packages for contracts, scoring, UI, permission evaluation, and membership lifecycle rules.
 - Clerk route protection and server-only Supabase client boundary.
 - Membership-backed organization listing and active-organization selection.
-- Additive tenant-aware migrations `0001`–`0005` (not applied to production).
+- Additive tenant-aware migrations `0001`–`0007` (not applied to production).
 - Persistent demo-request API, health endpoint, and Razorpay forwarding boundary.
-- TypeScript, ESLint, and Node assessment/authorization unit tests.
+- TypeScript, ESLint, and Node assessment/authorization/membership unit tests.
 
 ### Prototype-only or incomplete
 
 - Dashboard, students, teachers, batches, courses, assessments, attendance, fees, announcements, campuses, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data.
 - Many visible page actions mutate client state only; refresh discards changes.
-- A transactional institute-creation RPC and Clerk-protected onboarding API now exist, but the remaining onboarding steps, invitation lifecycle, CSV persistence, timetable service, learning-resource storage, assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
+- Transactional institute creation and a complete invitation lifecycle now exist in code, including hashed tokens, expiry, revocation, verified-email acceptance, audit records, and idempotency. CSV persistence, timetable service, learning-resource storage, assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
 - Super-admin UI data is mocked. Access is now guarded by a server-controlled user-ID allowlist, but the underlying platform APIs are not implemented.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
 
@@ -107,7 +107,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 On 2026-10-17:
 
-- `npm test`: 8 assessment and authorization tests passed.
+- `npm test`: 13 assessment, authorization, and membership tests passed.
 - `npm run typecheck`: passed across all workspaces.
 - `npm run lint`: passed with zero errors.
 - `npm run build`: passed after replacing the network-dependent Google font build step with a system font stack.
@@ -121,5 +121,5 @@ On 2026-10-17:
 3. Replace mock page state with authorized server APIs one bounded context at a time.
 4. Choose one authoritative backend/data model; do not operate divergent Next.js and FastAPI persistence layers.
 5. Add private storage buckets, file validation, signed URLs, and retention rules.
-6. Add persistent invitation, audit, idempotency, quota, and financial-ledger workflows.
+6. Validate the new invitation/audit/idempotency workflow in staging, then add quota and financial-ledger workflows.
 7. Add an isolated test database and run the SQL tenant-isolation suite in CI.

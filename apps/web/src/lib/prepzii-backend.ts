@@ -2,7 +2,7 @@ import "server-only";
 
 import { auth } from "@clerk/nextjs/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { authorizeTenantAction, type Permission } from "@prepzii/authorization";
+import { AuthorizationError, authorizeTenantAction, type Permission } from "@prepzii/authorization";
 import { organizationRoles, type OrganizationRole, type TenantContext } from "@prepzii/contracts";
 
 type Institute = {
@@ -139,7 +139,12 @@ export async function getAuthorizedOrganizationContext(slug: string, permission:
     "ACCOUNTANT",
   ]);
   if (!resolved) return null;
-  authorizeTenantAction(resolved.context, resolved.institute.id, permission);
+  try {
+    authorizeTenantAction(resolved.context, resolved.institute.id, permission);
+  } catch (error) {
+    if (error instanceof AuthorizationError) return null;
+    throw error;
+  }
   return resolved;
 }
 

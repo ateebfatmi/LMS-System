@@ -12,6 +12,19 @@ values
   ('10000000-0000-0000-0000-000000000011', '10000000-0000-0000-0000-000000000001', 'Physics A'),
   ('20000000-0000-0000-0000-000000000022', '20000000-0000-0000-0000-000000000002', 'Physics B');
 
+insert into public.organization_invitations (
+  id, organization_id, email, role, token_hash, idempotency_key, invited_by, expires_at
+) values (
+  '10000000-0000-0000-0000-000000000099',
+  '10000000-0000-0000-0000-000000000001',
+  'student@example.com',
+  'STUDENT',
+  repeat('a', 64),
+  'security-test-invitation',
+  'user-owner-a',
+  now() + interval '7 days'
+);
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"user-owner-a","role":"authenticated"}', true);
 
@@ -25,6 +38,9 @@ begin
     where organization_id = '20000000-0000-0000-0000-000000000002'
   ) then
     raise exception 'RLS failure: tenant B subject leaked to tenant A';
+  end if;
+  if (select count(*) from public.organization_invitations) <> 0 then
+    raise exception 'RLS failure: browser role can read service-only invitation records';
   end if;
 end $$;
 

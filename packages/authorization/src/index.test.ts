@@ -42,3 +42,15 @@ test("platform admins do not implicitly receive tenant content permissions", () 
     (error) => error instanceof AuthorizationError && error.code === "FORBIDDEN",
   );
 });
+
+test("parents cannot read attendance or fees before guardian linking exists", () => {
+  const parent = { organizationId: "organization-a", userId: "parent-1", role: "PARENT" } as const;
+  assert.throws(
+    () => authorizeTenantAction(parent, "organization-a", "attendance:read"),
+    (error) => error instanceof AuthorizationError && error.code === "FORBIDDEN",
+  );
+  assert.throws(
+    () => authorizeTenantAction(parent, "organization-a", "fees:read"),
+    (error) => error instanceof AuthorizationError && error.code === "FORBIDDEN",
+  );
+});

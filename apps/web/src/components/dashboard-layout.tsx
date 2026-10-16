@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { type PropsWithChildren, useState, Suspense } from "react";
 import { PrepziiMark, ZiAssistantBadge } from "@prepzii/ui";
+import { OrganizationSwitcher } from "@/components/organization-switcher";
 
 export type AppRole = "DIRECTOR" | "FACULTY" | "STUDENT" | "PARENT";
 
@@ -14,8 +15,10 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
     { href: "/dashboard/batches", label: "Batches & Classrooms", icon: "⊞" },
     { href: "/dashboard/students", label: "Student Directory", icon: "⚑" },
     { href: "/dashboard/teachers", label: "Faculty Directory", icon: "◈" },
+    { href: "/dashboard/members", label: "Members & Invites", icon: "♙" },
     { href: "/dashboard/courses", label: "Courses & DPPs", icon: "▤" },
     { href: "/dashboard/assessments", label: "Assessments & PYQs", icon: "⏱" },
+    { href: "/dashboard/question-bank", label: "Question Bank", icon: "⌗" },
     { href: "/dashboard/attendance", label: "Daily Attendance", icon: "✓" },
     { href: "/dashboard/fees", label: "Fee Management", icon: "₹" },
     { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
@@ -29,6 +32,7 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
     { href: "/dashboard/attendance", label: "Mark Attendance", icon: "✓" },
     { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: "▤" },
     { href: "/dashboard/assessments", label: "Create & Evaluate Tests", icon: "⏱" },
+    { href: "/dashboard/question-bank", label: "Question Bank & PYQs", icon: "⌗" },
     { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
     { href: "/dashboard/campuses", label: "Room Allocations", icon: "🏛" },
     { href: "/dashboard/reports", label: "Batch Performance", icon: "📈" },
@@ -52,13 +56,6 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
   ],
 };
 
-const roleInfo: Record<AppRole, { name: string; title: string; avatar: string; color: string }> = {
-  DIRECTOR: { name: "Ateeb Fatmi", title: "Managing Director", avatar: "AF", color: "var(--brand)" },
-  FACULTY: { name: "Er. Vivek Gupta", title: "Senior Physics Faculty", avatar: "VG", color: "#60a5fa" },
-  STUDENT: { name: "Aarav Sharma", title: "Class 12 JEE Advanced (Titans)", avatar: "AS", color: "#4ade80" },
-  PARENT: { name: "Rajesh Sharma", title: "Parent of Aarav Sharma", avatar: "RS", color: "#f87171" },
-};
-
 function LayoutContent({
   children,
   title,
@@ -80,8 +77,6 @@ function LayoutContent({
   const activeRole: AppRole = propRole || urlRole || "DIRECTOR";
 
   const navItems = roleNavItems[activeRole] || roleNavItems.DIRECTOR;
-  const currentProfile = roleInfo[activeRole];
-
   return (
     <main className="app-shell">
       <aside className={`sidebar ${isMobileMenuOpen ? "mobile-open" : ""}`}>
@@ -92,16 +87,7 @@ function LayoutContent({
           <span className="inst-pill">INSTITUTIONS</span>
         </div>
 
-        {/* Profile Card */}
-        <div className="org-switcher">
-          <span className="org-avatar" style={{ background: currentProfile.color, color: "#0f172a" }}>
-            {currentProfile.avatar}
-          </span>
-          <span>
-            <strong>{currentProfile.name}</strong>
-            <small style={{ color: "var(--brand)" }}>{currentProfile.title}</small>
-          </span>
-        </div>
+        <OrganizationSwitcher />
 
         <nav className="side-nav">
           {navItems.map((item) => {

@@ -45,7 +45,9 @@ const rolePermissions: Record<OrganizationRole, ReadonlySet<Permission>> = {
     "organization:read", "academics:read", "content:read", "assessments:take", "attendance:read",
     "fees:read", "announcements:read",
   ]),
-  PARENT: new Set(["organization:read", "attendance:read", "fees:read", "announcements:read"]),
+  // Parent attendance/fee access stays denied until a reviewed guardian-child
+  // relationship can scope those reads to a specific student.
+  PARENT: new Set(["organization:read", "announcements:read"]),
   ACCOUNTANT: new Set(["organization:read", "members:read", "fees:read", "fees:manage", "reports:read"]),
 };
 

@@ -36,6 +36,7 @@ const nextConfig: NextConfig = {
     "@prepzii/contracts",
     "@prepzii/assessment-core",
     "@prepzii/authorization",
+    "@prepzii/membership",
     "@prepzii/ui",
   ],
   poweredByHeader: false,

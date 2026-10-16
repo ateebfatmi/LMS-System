@@ -25,13 +25,13 @@ Exit gate: no production application until schema collision and SQL security tes
 
 ## Phase 2 — core institute operations
 
-Status: **in progress; onboarding vertical slice implemented, external verification pending**
+Status: **in progress; institute creation and invitations implemented, external verification pending**
 
 Order of implementation:
 
 1. [x] Transactional, retry-safe institute onboarding RPC (institute, owner membership, trial, audit row) plus Clerk-protected API and real form.
-2. Invitations with hashed token, expiry, accepted/revoked state, and idempotency.
-3. Real organization switcher and server-rendered role navigation.
+2. [x] Invitations with hashed token, expiry, accepted/revoked state, verified-email binding, audit records, and idempotency.
+3. [~] Real organization switcher is connected; server-rendered role navigation remains pending.
 4. Student/staff profiles and membership APIs with pagination/search.
 5. CSV import staging, validation report, and idempotent commit.
 6. Courses, batches, enrolments, academic sessions, branches, and basic timetable.
@@ -97,6 +97,7 @@ Completed and verified locally:
 
 - Shared scoring unit tests.
 - Shared RBAC/cross-tenant unit tests.
+- Shared invitation lifecycle unit tests.
 - Next.js type checking and lint baseline.
 - Server-only membership resolution and active-tenant selection code.
 
@@ -105,6 +106,7 @@ Implemented but requiring external verification:
 - Supabase migrations and SQL RLS test.
 - Clerk-protected organization endpoints.
 - Institute onboarding RPC/API against a Clerk-enabled staging tenant.
+- Invitation create/accept/revoke RPCs and RLS-backed persistence.
 - Demo request persistence.
 - Razorpay forwarding/internal processor.
 
