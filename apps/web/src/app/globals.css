@@ -1723,6 +1723,146 @@ button {
   }
 }
 
+.directory-actions,
+.import-actions,
+.import-summary,
+.member-import-dialog footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.member-import-dialog {
+  width: min(100%, 900px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 26px;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 30px 90px rgb(15 23 42 / 30%);
+}
+
+.member-import-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.member-import-dialog h2 {
+  margin: 0;
+  font-size: 21px;
+}
+
+.member-import-dialog header p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.member-import-dialog header > button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.import-actions {
+  flex-wrap: wrap;
+  margin: 24px 0 18px;
+  padding: 16px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.import-file-button {
+  position: relative;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.import-file-button input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.import-summary {
+  flex-wrap: wrap;
+  margin: 18px 0 10px;
+  color: #475569;
+  font-size: 12px;
+}
+
+.import-summary > span:not(.pz-badge) {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.import-preview {
+  max-height: 330px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.import-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.import-preview th,
+.import-preview td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #eef2f0;
+  vertical-align: top;
+}
+
+.import-preview th {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  color: #475569;
+}
+
+.import-preview > p {
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.row-errors {
+  color: #b91c1c;
+}
+
+.row-valid {
+  color: #15803d;
+  font-weight: 750;
+}
+
+.member-import-dialog footer {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+@media (max-width: 640px) {
+  .directory-actions {
+    display: none;
+  }
+
+  .import-actions > * {
+    width: 100%;
+  }
+}
+
 .real-org-switcher {
   gap: 10px;
 }

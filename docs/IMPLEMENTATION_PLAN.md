@@ -33,7 +33,7 @@ Order of implementation:
 2. [x] Invitations with hashed token, expiry, accepted/revoked state, verified-email binding, audit records, and idempotency.
 3. [~] Real organization switcher is connected; server-rendered role navigation remains pending.
 4. [x] Tenant-scoped student/staff profiles and membership APIs with pagination, search, audited edits, and real directory screens.
-5. CSV import staging, validation report, and idempotent commit.
+5. [x] CSV import staging, row-level validation report, service-only PII storage, and transactional idempotent commit to pending members.
 6. Courses, batches, enrolments, academic sessions, branches, and basic timetable.
 7. Replace each corresponding `mock-data.ts` import only after its API and tests pass.
 

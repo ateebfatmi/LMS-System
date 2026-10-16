@@ -92,7 +92,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 - Dashboard, batches, courses, assessments, attendance, fees, announcements, campuses, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student and faculty directories have been moved to tenant-scoped member APIs.
 - Many visible page actions mutate client state only; refresh discards changes.
-- Transactional institute creation, invitations, and paginated member/profile directories now exist in code. CSV persistence, timetable service, learning-resource storage, assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
+- Transactional institute creation, invitations, paginated member/profile directories, and staged CSV member imports now exist in code. Timetable service, learning-resource storage, assignment workflow, attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
 - Super-admin UI data is mocked. Access is now guarded by a server-controlled user-ID allowlist, but the underlying platform APIs are not implemented.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
 
@@ -107,7 +107,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 On 2026-10-17:
 
-- `npm test`: 13 assessment, authorization, and membership tests passed.
+- `npm test`: 16 assessment, authorization, membership, and CSV validation tests passed.
 - `npm run typecheck`: passed across all workspaces.
 - `npm run lint`: passed with zero errors.
 - `npm run build`: passed after replacing the network-dependent Google font build step with a system font stack.

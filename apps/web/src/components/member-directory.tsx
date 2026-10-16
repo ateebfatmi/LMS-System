@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { OrganizationMemberDirectoryRecord } from "@prepzii/contracts";
 import { Badge, Button, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { MemberImportDialog } from "@/components/member-import-dialog";
 
 type Organization = { id: string; name: string; slug: string };
 type DirectoryRole = "STUDENT" | "TEACHER";
@@ -18,6 +19,7 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<OrganizationMemberDirectoryRecord | null>(null);
+  const [importing, setImporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -106,7 +108,7 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
     <DashboardLayout
       title={isStudent ? "Student directory" : "Faculty directory"}
       subtitle={organization ? `${organization.name} · Authoritative member records` : "Select an institute"}
-      action={<Link className="pz-button pz-button-primary" href="/dashboard/members">＋ Invite {isStudent ? "student" : "faculty"}</Link>}
+      action={<div className="directory-actions"><Button variant="outline" onClick={() => setImporting(true)}>Import CSV</Button><Link className="pz-button pz-button-primary" href="/dashboard/members">＋ Invite {isStudent ? "student" : "faculty"}</Link></div>}
     >
       <div className="metrics-grid directory-metrics">
         <MetricCard label={isStudent ? "Students found" : "Faculty found"} value={String(pagination.total)} detail="Tenant-scoped records" accent="yellow" />
@@ -160,6 +162,7 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
           </form>
         </div>
       )}
+      {importing && organization && <MemberImportDialog organizationSlug={organization.slug} role={role} onClose={() => setImporting(false)} onCommitted={() => load(organization, search, page)} />}
     </DashboardLayout>
   );
 }

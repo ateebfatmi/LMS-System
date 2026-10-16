@@ -14,6 +14,9 @@ Date: 2026-10-17
 - Tenant-bound student/faculty profiles with composite membership foreign keys.
 - Paginated and searchable directory APIs with audited profile/status edits.
 - Student and faculty screens backed by authoritative data instead of mock arrays.
+- RFC-style quoted CSV parsing with schema and row-level validation.
+- Tenant-owned, service-only import staging with atomic and idempotent commit.
+- Imported identities remain pending until verified-email invitation acceptance.
 
 ## Verified locally
 
@@ -23,8 +26,8 @@ Date: 2026-10-17
 
 ## External gate
 
-Migrations `0007_organization_invitations.sql` and `0008_member_profiles_directory.sql` have not been applied. They must be exercised with migrations `0005` and `0006` on an isolated Supabase clone, including concurrent invitation requests, cross-tenant profile relationships, pagination, search, and duplicate roll/employee codes.
+Migrations `0007`–`0009` have not been applied. They must be exercised with migrations `0005` and `0006` on an isolated Supabase clone, including concurrent invitation/import requests, cross-tenant profile/import relationships, pagination, search, duplicate identifiers, invalid CSV rows, and repeated commits.
 
 ## Next slice
 
-Build staged CSV imports with validation reports and an idempotent commit path, using the verified single-record profile schema as the destination.
+Build real courses, batches, enrolments, academic sessions, branches, and the basic timetable, replacing mock pages one bounded workflow at a time.

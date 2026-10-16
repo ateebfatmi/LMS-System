@@ -35,6 +35,53 @@ values
   ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000031', 'Student A', 'A-001'),
   ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000032', 'Student B', 'B-001');
 
+insert into public.organization_member_imports (
+  id, organization_id, idempotency_key, request_hash, file_name, member_role,
+  status, total_rows, valid_rows, invalid_rows, created_by
+) values (
+  '10000000-0000-0000-0000-000000000098',
+  '10000000-0000-0000-0000-000000000001',
+  'security-test-import',
+  repeat('b', 64),
+  'students.csv',
+  'STUDENT',
+  'VALIDATED',
+  1,
+  1,
+  0,
+  'user-owner-a'
+);
+
+insert into public.organization_member_import_rows (
+  organization_id, import_id, row_number, raw_data, normalized_data, status
+) values (
+  '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000000098',
+  2,
+  '{"name":"Imported Student"}'::jsonb,
+  '{"displayName":"Imported Student","email":"import@example.com"}'::jsonb,
+  'VALID'
+);
+
+do $$
+begin
+  begin
+    insert into public.organization_member_import_rows (
+      organization_id, import_id, row_number, raw_data, normalized_data, status
+    ) values (
+      '20000000-0000-0000-0000-000000000002',
+      '10000000-0000-0000-0000-000000000098',
+      3,
+      '{}'::jsonb,
+      '{}'::jsonb,
+      'VALID'
+    );
+    raise exception 'Composite tenant constraint failed to reject cross-tenant import row';
+  exception when foreign_key_violation then
+    null;
+  end;
+end $$;
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"user-owner-a","role":"authenticated"}', true);
 
@@ -54,6 +101,10 @@ begin
   end if;
   if (select count(*) from public.organization_member_profiles) <> 1 then
     raise exception 'RLS failure: tenant A can see member profiles outside its organization';
+  end if;
+  if (select count(*) from public.organization_member_imports) <> 0
+    or (select count(*) from public.organization_member_import_rows) <> 0 then
+    raise exception 'RLS failure: browser role can read service-only member import PII';
   end if;
 end $$;
 

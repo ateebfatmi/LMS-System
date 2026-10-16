@@ -4,7 +4,7 @@ As of 2026-10-17, PrepZii LMS is **not ready for paying customers or a controlle
 
 ## Passing local gates
 
-- `npm test`: 13 assessment/authorization/membership tests passed.
+- `npm test`: 16 assessment/authorization/membership/CSV tests passed.
 - `npm run typecheck`: passed across all workspaces.
 - `npm run lint`: passed with zero errors.
 - `npm run build`: production Next.js build passed.
