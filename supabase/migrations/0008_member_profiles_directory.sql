@@ -223,6 +223,6 @@ end;
 $$;
 
 revoke all on function public.lms_list_members(uuid, text, text, text, integer, integer) from public;
-revoke all on function public.lms_update_member_profile(uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, text, date) from public;
+revoke all on function public.lms_update_member_profile(uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, text, text, date) from public;
 grant execute on function public.lms_list_members(uuid, text, text, text, integer, integer) to service_role;
-grant execute on function public.lms_update_member_profile(uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, text, date) to service_role;
+grant execute on function public.lms_update_member_profile(uuid, uuid, text, text, text, text, text, text, text, text, text, text, text, text, text, date) to service_role;

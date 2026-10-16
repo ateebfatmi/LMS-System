@@ -90,7 +90,8 @@ insert into public.organization_invitations (
 insert into public.institute_members (id, institute_id, user_id, email, role, status)
 values
   ('10000000-0000-0000-0000-000000000031', '10000000-0000-0000-0000-000000000001', 'student-a', 'student-a@example.com', 'STUDENT', 'ACTIVE'),
-  ('20000000-0000-0000-0000-000000000032', '20000000-0000-0000-0000-000000000002', 'student-b', 'student-b@example.com', 'STUDENT', 'ACTIVE');
+  ('20000000-0000-0000-0000-000000000032', '20000000-0000-0000-0000-000000000002', 'student-b', 'student-b@example.com', 'STUDENT', 'ACTIVE'),
+  ('20000000-0000-0000-0000-000000000033', '20000000-0000-0000-0000-000000000002', 'student-b2', 'student-b2@example.com', 'STUDENT', 'ACTIVE');
 
 insert into public.organization_member_profiles (organization_id, membership_id, display_name, roll_number)
 values
@@ -488,7 +489,7 @@ begin
     insert into public.organization_member_profiles (organization_id, membership_id, display_name)
     values (
       '10000000-0000-0000-0000-000000000001',
-      '20000000-0000-0000-0000-000000000032',
+      '20000000-0000-0000-0000-000000000033',
       'Cross-tenant profile'
     );
     raise exception 'Composite tenant constraint failed to reject cross-tenant profile';
@@ -548,4 +549,71 @@ begin
   end if;
 end $$;
 
+reset role;
+select set_config('request.jwt.claims', '', true);
+
+-- Phase 8 tests: Guardian linking & parent scope
+insert into public.organization_guardian_links (
+  organization_id, guardian_user_id, student_user_id, relationship, status
+) values
+  ('10000000-0000-0000-0000-000000000001', 'parent-a', 'student-a', 'MOTHER', 'APPROVED'),
+  ('20000000-0000-0000-0000-000000000002', 'parent-b', 'student-b', 'FATHER', 'PENDING_REVIEW');
+
+-- Descriptive assessment submission
+insert into public.organization_descriptive_submissions (
+  id, organization_id, attempt_id, test_id, question_id, student_user_id, answer_text, max_marks
+) values (
+  '10000000-0000-0000-0000-0000000000d1', '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-0000000000f5', '10000000-0000-0000-0000-0000000000f1',
+  '10000000-0000-0000-0000-0000000000b1', 'student-a', 'Detailed derivation of rotational dynamics', 10.0
+);
+
+-- Evaluate descriptive submission
+select public.lms_grade_descriptive_submission(
+  '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-0000000000d1',
+  'teacher-a', 'TEACHER', 8.5, 'Good physical reasoning; minor algebraic flaw'
+);
+
+-- AI draft promotion
+select public.lms_promote_ai_draft(
+  '10000000-0000-0000-0000-000000000001',
+  (select id from public.organization_ai_drafts where organization_id = '10000000-0000-0000-0000-000000000001' limit 1),
+  'user-owner-a', 'OWNER', 'APPROVE_AND_PUBLISH'
+);
+
+-- Test parent-a access (approved guardian of student-a)
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"parent-a","role":"authenticated"}', true);
+
+do $$
+begin
+  if (select count(*) from public.organization_attendance_records) <> 1 then
+    raise exception 'Guardian RLS failure: approved guardian should see exactly their child attendance record';
+  end if;
+  if exists (select 1 from public.organization_attendance_records where student_id <> 'student-a') then
+    raise exception 'Guardian RLS failure: parent saw another student attendance';
+  end if;
+  if (select count(*) from public.organization_student_fees) <> 1 then
+    raise exception 'Guardian RLS failure: approved guardian should see exactly their child fee record';
+  end if;
+  if exists (select 1 from public.organization_student_fees where student_id <> 'student-a') then
+    raise exception 'Guardian RLS failure: parent saw another student fee ledger';
+  end if;
+end $$;
+
+-- Test parent-b access (pending review guardian)
+select set_config('request.jwt.claims', '{"sub":"parent-b","role":"authenticated"}', true);
+
+do $$
+begin
+  if (select count(*) from public.organization_attendance_records) <> 0 then
+    raise exception 'Guardian RLS failure: unapproved guardian cannot view attendance';
+  end if;
+  if (select count(*) from public.organization_student_fees) <> 0 then
+    raise exception 'Guardian RLS failure: unapproved guardian cannot view fee ledger';
+  end if;
+end $$;
+
 rollback;
+

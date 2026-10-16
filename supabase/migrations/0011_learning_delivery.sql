@@ -9,6 +9,7 @@ alter table public.organization_course_lessons add column if not exists learning
 alter table public.organization_course_lessons add column if not exists release_at timestamptz;
 alter table public.organization_course_lessons add column if not exists updated_at timestamptz not null default now();
 alter table public.organization_course_lessons alter column is_published set default false;
+alter table public.organization_course_lessons add constraint organization_lessons_id_org_unique unique (id, organization_id);
 
 create table if not exists public.organization_course_batches (
   organization_id uuid not null references public.institutes(id) on delete cascade,

@@ -129,17 +129,17 @@ declare
   plan public.subscription_plans%rowtype;
   counter public.organization_usage_counters%rowtype;
   metric_limit bigint;
-  period_start date := date_trunc('month', current_date)::date;
-  period_end date := (date_trunc('month', current_date) + interval '1 month')::date;
+  v_period_start date := date_trunc('month', current_date)::date;
+  v_period_end date := (date_trunc('month', current_date) + interval '1 month')::date;
 begin
   if p_quantity <= 0 or char_length(p_idempotency_key) not between 8 and 200 then raise exception 'Invalid quota request' using errcode = '22023'; end if;
   if exists (select 1 from public.organization_usage_events where organization_id = p_organization_id and metric = p_metric and idempotency_key = p_idempotency_key) then
-    select * into counter from public.organization_usage_counters candidate where candidate.organization_id = p_organization_id and candidate.metric = p_metric and candidate.period_start = lms_consume_quota.period_start;
+    select * into counter from public.organization_usage_counters candidate where candidate.organization_id = p_organization_id and candidate.metric = p_metric and candidate.period_start = v_period_start;
     return jsonb_build_object('quantity', counter.quantity, 'limit', null, 'idempotent', true);
   end if;
-  perform pg_advisory_xact_lock(hashtextextended(p_organization_id::text || ':' || p_metric || ':' || period_start::text, 0));
+  perform pg_advisory_xact_lock(hashtextextended(p_organization_id::text || ':' || p_metric || ':' || v_period_start::text, 0));
   if exists (select 1 from public.organization_usage_events where organization_id = p_organization_id and metric = p_metric and idempotency_key = p_idempotency_key) then
-    select * into counter from public.organization_usage_counters candidate where candidate.organization_id = p_organization_id and candidate.metric = p_metric and candidate.period_start = lms_consume_quota.period_start;
+    select * into counter from public.organization_usage_counters candidate where candidate.organization_id = p_organization_id and candidate.metric = p_metric and candidate.period_start = v_period_start;
     return jsonb_build_object('quantity', counter.quantity, 'limit', null, 'idempotent', true);
   end if;
   select * into subscription from public.organization_subscriptions candidate where candidate.organization_id = p_organization_id for update;
@@ -155,10 +155,10 @@ begin
   end;
   if metric_limit <= 0 then raise exception 'Feature is not included in this plan' using errcode = '42501'; end if;
   insert into public.organization_usage_counters (organization_id, metric, period_start, period_end, quantity)
-  values (p_organization_id, p_metric, period_start, period_end, 0)
+  values (p_organization_id, p_metric, v_period_start, v_period_end, 0)
   on conflict (organization_id, metric, period_start) do nothing;
   select * into counter from public.organization_usage_counters candidate
-  where candidate.organization_id = p_organization_id and candidate.metric = p_metric and candidate.period_start = lms_consume_quota.period_start for update;
+  where candidate.organization_id = p_organization_id and candidate.metric = p_metric and candidate.period_start = v_period_start for update;
   if counter.quantity + p_quantity > metric_limit then raise exception 'Plan quota exceeded' using errcode = '22023'; end if;
   insert into public.organization_usage_events (organization_id, metric, quantity, idempotency_key, feature, actor_user_id)
   values (p_organization_id, p_metric, p_quantity, p_idempotency_key, p_feature, p_actor_user_id);

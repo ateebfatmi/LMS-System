@@ -4,8 +4,14 @@ import type { TenantContext } from "@prepzii/contracts";
 import {
   AuthorizationError,
   authorizeTenantAction,
+  canAccessAssignment,
+  canAccessBatch,
   canGrantRole,
+  evaluateQuotaAvailability,
   hasPermission,
+  isAnswerKeyReleased,
+  isMembershipActive,
+  isPaymentUnique,
 } from "./index.ts";
 
 const teacherA: TenantContext = {
@@ -63,3 +69,105 @@ test("parents cannot read attendance or fees before guardian linking exists", ()
     (error) => error instanceof AuthorizationError && error.code === "FORBIDDEN",
   );
 });
+
+test("teacher batch scope restricts teachers to assigned batches only", () => {
+  const teacherCtx: TenantContext = { organizationId: "org-1", userId: "teacher-1", role: "TEACHER" };
+  const ownerCtx: TenantContext = { organizationId: "org-1", userId: "owner-1", role: "OWNER" };
+  const studentCtx: TenantContext = { organizationId: "org-1", userId: "student-1", role: "STUDENT" };
+
+  const assignedBatches = ["batch-jee-12a", "batch-jee-12b"];
+
+  assert.equal(canAccessBatch(teacherCtx, "batch-jee-12a", assignedBatches), true);
+  assert.equal(canAccessBatch(teacherCtx, "batch-neet-11", assignedBatches), false);
+  assert.equal(canAccessBatch(ownerCtx, "batch-neet-11", []), true);
+  assert.equal(canAccessBatch(studentCtx, "batch-jee-12a", assignedBatches), true);
+  assert.equal(canAccessBatch(studentCtx, "batch-neet-11", assignedBatches), false);
+});
+
+test("answer key release policy blocks early solution disclosure", () => {
+  const now = new Date("2026-10-17T10:00:00.000Z");
+
+  // Immediate release policy
+  assert.equal(isAnswerKeyReleased({ solutionReleasePolicy: "IMMEDIATE" }, now), true);
+
+  // Never release policy
+  assert.equal(isAnswerKeyReleased({ solutionReleasePolicy: "NEVER" }, now), false);
+
+  // Manual release policy
+  assert.equal(isAnswerKeyReleased({ solutionReleasePolicy: "MANUAL", manuallyReleased: false }, now), false);
+  assert.equal(isAnswerKeyReleased({ solutionReleasePolicy: "MANUAL", manuallyReleased: true }, now), true);
+
+  // Window closes in future -> not released
+  assert.equal(
+    isAnswerKeyReleased({ solutionReleasePolicy: "AFTER_WINDOW", windowClosesAt: "2026-10-17T11:00:00.000Z" }, now),
+    false,
+  );
+  // Window closed in past -> released
+  assert.equal(
+    isAnswerKeyReleased({ solutionReleasePolicy: "AFTER_WINDOW", windowClosesAt: "2026-10-17T09:00:00.000Z" }, now),
+    true,
+  );
+  // Invalid window date -> safe fallback to false
+  assert.equal(
+    isAnswerKeyReleased({ solutionReleasePolicy: "AFTER_WINDOW", windowClosesAt: "invalid-date" }, now),
+    false,
+  );
+});
+
+test("assignment and file access enforces batch enrollment and publication", () => {
+  const studentCtx: TenantContext = { organizationId: "org-1", userId: "student-1", role: "STUDENT" };
+  const teacherCtx: TenantContext = { organizationId: "org-1", userId: "teacher-1", role: "TEACHER" };
+  const crossTenantCtx: TenantContext = { organizationId: "org-2", userId: "student-2", role: "STUDENT" };
+
+  const publishedAssignment = {
+    organizationId: "org-1",
+    batchId: "batch-101",
+    isPublished: true,
+  };
+
+  const draftAssignment = {
+    organizationId: "org-1",
+    batchId: "batch-101",
+    isPublished: false,
+  };
+
+  // Student enrolled in batch can access published assignment
+  assert.equal(canAccessAssignment(studentCtx, publishedAssignment, ["batch-101"]), true);
+  // Student not enrolled cannot access
+  assert.equal(canAccessAssignment(studentCtx, publishedAssignment, ["batch-999"]), false);
+  // Student cannot access unpublished draft assignment even if in batch
+  assert.equal(canAccessAssignment(studentCtx, draftAssignment, ["batch-101"]), false);
+  // Teacher in batch can view draft assignment
+  assert.equal(canAccessAssignment(teacherCtx, draftAssignment, ["batch-101"]), true);
+  // Cross-tenant student is completely rejected
+  assert.equal(canAccessAssignment(crossTenantCtx, publishedAssignment, ["batch-101"]), false);
+});
+
+test("membership status rejects suspended, inactive, or pending states", () => {
+  assert.equal(isMembershipActive("ACTIVE"), true);
+  assert.equal(isMembershipActive("PENDING"), false);
+  assert.equal(isMembershipActive("INACTIVE"), false);
+  assert.equal(isMembershipActive("SUSPENDED"), false);
+});
+
+test("payment idempotency prevents duplicate reference recording", () => {
+  const existing = new Set(["REC-2026-001", "UPI-REF-9988"]);
+
+  assert.equal(isPaymentUnique(existing, "REC-2026-002"), true);
+  assert.equal(isPaymentUnique(existing, "REC-2026-001"), false);
+  assert.equal(isPaymentUnique(existing, "  rec-2026-001  "), false); // Case & whitespace insensitive
+  assert.equal(isPaymentUnique(existing, "   "), false); // Blank reference rejected
+});
+
+test("quota evaluation rejects negative increments and enforces plan limits", () => {
+  // Within limit
+  assert.deepEqual(evaluateQuotaAvailability(BigInt(100), BigInt(50), BigInt(200)), { allowed: true, remaining: BigInt(50) });
+  // Exceeds limit
+  assert.deepEqual(evaluateQuotaAvailability(BigInt(180), BigInt(30), BigInt(200)), { allowed: false, remaining: BigInt(20) });
+  // Invalid zero or negative quantity
+  assert.deepEqual(evaluateQuotaAvailability(BigInt(100), BigInt(0), BigInt(200)), { allowed: false, remaining: BigInt(100) });
+  assert.deepEqual(evaluateQuotaAvailability(BigInt(100), BigInt(-5), BigInt(200)), { allowed: false, remaining: BigInt(100) });
+  // Exact boundary match
+  assert.deepEqual(evaluateQuotaAvailability(BigInt(150), BigInt(50), BigInt(200)), { allowed: true, remaining: BigInt(0) });
+});
+

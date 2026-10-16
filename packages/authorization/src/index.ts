@@ -98,3 +98,87 @@ export function canGrantRole(actorRole: OrganizationRole, targetRole: Organizati
   if (actorRole !== "COACHING_ADMIN") return false;
   return !["COACHING_ADMIN", "PLATFORM_SUPER_ADMIN", "OWNER"].includes(targetRole);
 }
+
+export function canAccessBatch(
+  context: TenantContext,
+  targetBatchId: string,
+  assignedBatchIds: readonly string[],
+): boolean {
+  if (context.role === "OWNER" || context.role === "COACHING_ADMIN" || context.role === "ACADEMIC_COORDINATOR") {
+    return true;
+  }
+  if (context.role === "TEACHER" || context.role === "STUDENT") {
+    return assignedBatchIds.includes(targetBatchId);
+  }
+  return false;
+}
+
+export interface AnswerKeyReleasePolicy {
+  solutionReleasePolicy: "IMMEDIATE" | "AFTER_WINDOW" | "MANUAL" | "NEVER";
+  windowClosesAt?: string | null;
+  manuallyReleased?: boolean;
+}
+
+export function isAnswerKeyReleased(policy: AnswerKeyReleasePolicy, now: Date = new Date()): boolean {
+  if (policy.solutionReleasePolicy === "IMMEDIATE") return true;
+  if (policy.solutionReleasePolicy === "MANUAL") return Boolean(policy.manuallyReleased);
+  if (policy.solutionReleasePolicy === "NEVER") return false;
+  if (policy.solutionReleasePolicy === "AFTER_WINDOW") {
+    if (!policy.windowClosesAt) return false;
+    const closesAt = new Date(policy.windowClosesAt);
+    if (Number.isNaN(closesAt.getTime())) return false;
+    return now.getTime() >= closesAt.getTime();
+  }
+  return false;
+}
+
+export function canAccessAssignment(
+  context: TenantContext,
+  assignment: { organizationId: string; batchId: string; isPublished: boolean; dueDate?: string | null },
+  userBatchIds: readonly string[],
+): boolean {
+  if (context.organizationId !== assignment.organizationId) {
+    return false;
+  }
+  if (context.role === "OWNER" || context.role === "COACHING_ADMIN" || context.role === "ACADEMIC_COORDINATOR") {
+    return true;
+  }
+  if (context.role === "TEACHER") {
+    return userBatchIds.includes(assignment.batchId);
+  }
+  if (context.role === "STUDENT") {
+    return assignment.isPublished && userBatchIds.includes(assignment.batchId);
+  }
+  return false;
+}
+
+export function isMembershipActive(status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED"): boolean {
+  return status === "ACTIVE";
+}
+
+export function isPaymentUnique(
+  existingReferences: ReadonlySet<string>,
+  candidateReference: string,
+): boolean {
+  const normalized = candidateReference.trim().toUpperCase();
+  if (!normalized) return false;
+  return !existingReferences.has(normalized);
+}
+
+export function evaluateQuotaAvailability(
+  currentUsage: bigint | number,
+  increment: bigint | number,
+  limit: bigint | number,
+): { allowed: boolean; remaining: bigint } {
+  const current = BigInt(currentUsage);
+  const inc = BigInt(increment);
+  const max = BigInt(limit);
+  const zero = BigInt(0);
+  if (inc <= zero) return { allowed: false, remaining: max > current ? max - current : zero };
+  const projected = current + inc;
+  if (projected > max) {
+    return { allowed: false, remaining: max > current ? max - current : zero };
+  }
+  return { allowed: true, remaining: max - projected };
+}
+
