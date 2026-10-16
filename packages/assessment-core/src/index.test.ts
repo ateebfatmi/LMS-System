@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { gradeAssessment, gradeAnswer, computeLeaderboard } from "./index.ts";
+import { adaptPrepziiQuestion, gradeAssessment, gradeAnswer, computeLeaderboard } from "./index.ts";
 
 test("grades unordered multiple-choice selections", () => {
   const result = gradeAnswer(
@@ -92,6 +92,18 @@ test("computes ranked leaderboard with percentiles", () => {
   assert.equal(leaderboard[2].studentName, "Rohan Verma");
   assert.equal(leaderboard[2].rank, 3);
   assert.equal(leaderboard[2].totalScore, -2); // -1 - 1 = -2
+});
+
+test("adapts the existing PrepZii question schema without changing scoring signs", () => {
+  const question = adaptPrepziiQuestion({
+    id: "q1", exam: "JEE Advanced", subject: "Physics", question_type: "Multiple Correct",
+    question_text: "Choose all", option_a: "A", option_b: "B", option_c: "C", option_d: "D",
+    correct_option: "A,C", marks: 4, negative_marks: -2,
+  });
+  assert.equal(question.kind, "multiple_choice");
+  assert.deepEqual(question.correctOptionIds, ["A", "C"]);
+  assert.equal(question.negativeMarks, 2);
+  assert.equal(question.partialMarking, true);
 });
 
 

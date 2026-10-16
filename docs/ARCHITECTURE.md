@@ -63,7 +63,7 @@ Roles:
 | Invitations | Hashed tokens + verified Clerk email + service-only transactional RPCs |
 | Academic structure | Tenant-scoped audited RPCs over `organization_campuses`, academic years, subjects, courses, batches, enrolments, rooms, and conflict-safe schedules |
 | Learning delivery | Organization modules/lessons, course-batch links, private resource/submission storage, release rules, completion, assignments, and grading |
-| Assessment | existing PrepZii question/test data + shared scoring package |
+| Assessment | Existing PrepZii questions/tests + schema adapter + service-only attempt RPCs + shared deterministic scoring |
 | Attendance | organization attendance sessions and records |
 | Finance | separate institute fee ledger; Razorpay events are verified and idempotent |
 | SaaS billing | organization subscriptions and plan entitlements |
@@ -94,7 +94,11 @@ Razorpay calls the public Next.js webhook URL. Next.js forwards the exact signed
 2. Resolve the two incompatible `institutes` migration definitions.
 3. Apply consumer institute prerequisites if absent.
 4. Apply LMS migrations `0001`–`0004` to a staging clone.
-5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0012_assignments.sql` in order.
+5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0013_assessment_attempts.sql` in order.
 6. Run `supabase/tests/tenant_isolation.sql` in the isolated database.
 7. Exercise onboarding and invitation concurrency/replay cases with Clerk test identities.
 8. Review query plans and only then schedule a production migration with rollback/backup checkpoints.
+
+## Assessment trust boundary
+
+The LMS does not copy PrepZii questions. `@prepzii/assessment-core` adapts the existing row shape into a versioned domain contract and produces deterministic objective scores. Students receive only sanitized question fields. Start/resume, enrolment, attempt count, expiry, optimistic answer versions, and finalization are enforced by service-only PostgreSQL functions. The browser submits answers, never marks. Results and correct answers are returned only after the configured release policy or to an authorized staff reviewer. Teacher attempt visibility is restricted to tests they created; tenant composite keys prevent schedules and attempts from referencing another institute.

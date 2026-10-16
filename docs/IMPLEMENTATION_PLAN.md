@@ -48,13 +48,16 @@ Status: **learning content and assignments implemented in code; external verific
 
 ## Phase 4 — assessments
 
-Status: **partial foundation**
+Status: **objective assessment lifecycle implemented in code; external verification and subjective grading pending**
 
-- Reconcile shared contracts with the consumer question/test schema.
-- Reuse the existing question bank through adapters.
-- Add server-authoritative attempt lifecycle, deadline, autosave versioning, idempotent submit, and solution-release rules.
-- Add subjective grading and authorized analytics.
-- Preserve and expand scoring parity fixtures between consumer and LMS.
+- [x] Reconcile the shared objective-question contract with the consumer `questions` schema through an adapter.
+- [x] Reuse the existing question bank and institute test tables without a duplicate LMS bank.
+- [x] Add enrolled-student start/resume, server-authoritative expiry, optimistic autosave, attempt limits, and idempotent final submission.
+- [x] Keep correct answers server-only until result/solution release policy permits them.
+- [x] Add teacher-owned authoring, batch scheduling, publication, result release, and a responsive test-taking workspace.
+- [x] Preserve and expand scoring parity fixtures for single, multiple-select/JEE partial, and numerical questions.
+- [ ] Add descriptive-answer contracts, manual-grading queues, moderation, and authorized aggregate analytics.
+- [ ] Rehearse migration `0013` and the expanded cross-tenant SQL suite on an isolated Supabase clone.
 
 ## Phase 5 — attendance and finance
 

@@ -145,6 +145,25 @@ insert into public.organization_assignment_submission_files (
   'organizations/10000000-0000-0000-0000-000000000001/answer-a.pdf', 'application/pdf', 10, repeat('e', 64)
 );
 
+insert into public.institute_tests (
+  id, institute_id, title, exam, subject, chapters, difficulty, duration_minutes,
+  total_questions, status, created_by, max_attempts, result_release_policy, solution_release_policy
+) values
+  ('10000000-0000-0000-0000-0000000000f1', '10000000-0000-0000-0000-000000000001', 'Assessment A', 'JEE_MAIN', 'Physics', '{}', 'medium', 60, 1, 'PUBLISHED', 'teacher-a', 1, 'IMMEDIATE', 'AFTER_WINDOW'),
+  ('20000000-0000-0000-0000-0000000000f2', '20000000-0000-0000-0000-000000000002', 'Assessment B', 'NEET', 'Physics', '{}', 'medium', 60, 1, 'PUBLISHED', 'teacher-b', 1, 'IMMEDIATE', 'AFTER_WINDOW');
+
+insert into public.organization_test_schedules (
+  id, organization_id, test_id, batch_id, starts_at, ends_at
+) values
+  ('10000000-0000-0000-0000-0000000000f3', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000f1', '10000000-0000-0000-0000-000000000051', now() - interval '1 hour', now() + interval '1 hour'),
+  ('20000000-0000-0000-0000-0000000000f4', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-0000000000f2', '20000000-0000-0000-0000-000000000052', now() - interval '1 hour', now() + interval '1 hour');
+
+insert into public.organization_assessment_attempts (
+  id, organization_id, test_id, schedule_id, user_id, attempt_number, expires_at
+) values
+  ('10000000-0000-0000-0000-0000000000f5', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000f1', '10000000-0000-0000-0000-0000000000f3', 'student-a', 1, now() + interval '30 minutes'),
+  ('20000000-0000-0000-0000-0000000000f6', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-0000000000f2', '20000000-0000-0000-0000-0000000000f4', 'student-b', 1, now() + interval '30 minutes');
+
 do $$
 begin
   begin
@@ -167,6 +186,20 @@ begin
       'student-b', 1, 'Cross-tenant answer', 'SUBMITTED'
     );
     raise exception 'Composite tenant constraint failed to reject a cross-tenant assignment submission';
+  exception when foreign_key_violation then
+    null;
+  end;
+
+  begin
+    insert into public.organization_assessment_attempts (
+      organization_id, test_id, schedule_id, user_id, attempt_number, expires_at
+    ) values (
+      '20000000-0000-0000-0000-000000000002',
+      '10000000-0000-0000-0000-0000000000f1',
+      '20000000-0000-0000-0000-0000000000f4',
+      'student-b', 2, now() + interval '30 minutes'
+    );
+    raise exception 'Composite tenant constraint failed to reject a cross-tenant assessment attempt';
   exception when foreign_key_violation then
     null;
   end;
@@ -297,6 +330,9 @@ begin
   end if;
   if (select count(*) from public.organization_assignment_submission_files) <> 1 then
     raise exception 'Assignment RLS failure: student cannot see only their own submission files';
+  end if;
+  if (select count(*) from public.organization_assessment_attempts) <> 1 then
+    raise exception 'Assessment RLS failure: student can see another student attempt';
   end if;
 end $$;
 

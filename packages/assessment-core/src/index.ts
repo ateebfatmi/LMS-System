@@ -4,6 +4,53 @@ import type {
   QuestionDefinition,
 } from "@prepzii/contracts";
 
+export type PrepziiQuestionRow = {
+  id: string;
+  exam?: string | null;
+  subject?: string | null;
+  topic?: string | null;
+  question_type?: string | null;
+  question_text?: string | null;
+  option_a?: string | null;
+  option_b?: string | null;
+  option_c?: string | null;
+  option_d?: string | null;
+  correct_option?: string | null;
+  marks?: number | null;
+  negative_marks?: number | null;
+};
+
+export function adaptPrepziiQuestion(row: PrepziiQuestionRow): QuestionDefinition {
+  const rawType = String(row.question_type ?? "MCQ").trim().toLowerCase();
+  const kind: QuestionDefinition["kind"] = rawType.includes("numerical")
+    ? "numerical"
+    : rawType.includes("multiple")
+      ? "multiple_choice"
+      : "single_choice";
+  const optionIds = String(row.correct_option ?? "")
+    .split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter((value) => ["A", "B", "C", "D"].includes(value));
+  const correctNumber = Number(row.correct_option);
+  const optionValue = (id: "A" | "B" | "C" | "D") => row[`option_${id.toLowerCase()}` as "option_a" | "option_b" | "option_c" | "option_d"];
+  return {
+    id: row.id,
+    kind,
+    subject: row.subject ?? undefined,
+    topic: row.topic ?? undefined,
+    text: row.question_text ?? undefined,
+    options: kind === "numerical" ? undefined : (["A", "B", "C", "D"] as const)
+      .map((id) => ({ id, text: String(optionValue(id) ?? "") }))
+      .filter((option) => option.text),
+    correctOptionIds: kind === "numerical" ? undefined : optionIds,
+    correctNumber: kind === "numerical" && Number.isFinite(correctNumber) ? correctNumber : undefined,
+    numericalTolerance: kind === "numerical" ? 1e-9 : undefined,
+    marks: Number(row.marks) > 0 ? Number(row.marks) : 4,
+    negativeMarks: Math.abs(Number(row.negative_marks) || 0),
+    partialMarking: kind === "multiple_choice" && String(row.exam ?? "").toUpperCase().includes("ADVANCED"),
+  };
+}
+
 function sameSet(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value) => right.includes(value));
 }

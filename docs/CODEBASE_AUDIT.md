@@ -54,7 +54,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Consumer PrepZii already has central `questions`, `pyq_questions`, `pyq_exams`, test-session, attempt, review, and analytics workflows.
 - It supports structured question/explanation content, question images, PYQ metadata, institute-authored questions, and objective scoring.
 - The LMS must adapt to these tables; it must not create a second question bank.
-- Shared `@prepzii/assessment-core` now has executable tests for single choice, multiple choice partial scoring, numerical tolerance, summaries, and leaderboards. Server-authoritative attempt timing/submission is still pending in the LMS.
+- Shared `@prepzii/assessment-core` has executable tests for single choice, multiple choice partial scoring, numerical tolerance, summaries, leaderboards, and consumer-row adaptation. Migration `0013` and the LMS assessment routes now provide server-authoritative objective attempt timing, versioned autosave, idempotent finalization, and release controls; staging execution and descriptive grading remain pending.
 
 ### AI
 
@@ -84,15 +84,15 @@ The safe direction is a modular Next.js application using the existing Clerk and
 - Shared packages for contracts, scoring, UI, permission evaluation, and membership lifecycle rules.
 - Clerk route protection and server-only Supabase client boundary.
 - Membership-backed organization listing and active-organization selection.
-- Additive tenant-aware migrations `0001`–`0012` (not applied to production).
+- Additive tenant-aware migrations `0001`–`0013` (not applied to production).
 - Persistent demo-request API, health endpoint, and Razorpay forwarding boundary.
 - TypeScript, ESLint, and Node assessment/authorization/membership unit tests.
 
 ### Prototype-only or incomplete
 
-- Dashboard, assessments, attendance, fees, announcements, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories and batches/courses/campuses have been moved to tenant-scoped APIs.
+- Dashboard, attendance, fees, announcements, CRM, billing, reports, and super-admin pages use `apps/web/src/lib/mock-data.ts` or hard-coded display data. Student/faculty directories, batches/courses/campuses, and objective assessments have been moved to tenant-scoped APIs.
 - Many visible page actions mutate client state only; refresh discards changes.
-- Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, conflict-safe timetable, private learning delivery, and assignment/submission grading now exist in code. Assessment attempt autosave, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
+- Transactional institute creation, invitations, paginated member/profile directories, staged CSV member imports, academic structure, enrolment, conflict-safe timetable, private learning delivery, assignment/submission grading, and objective assessment autosave/finalization now exist in code. Descriptive grading, invoice/receipt generation, notification delivery, quota enforcement, and AI service do not.
 - Super-admin UI data is mocked. Access is now guarded by a server-controlled user-ID allowlist, but the underlying platform APIs are not implemented.
 - Parent/guardian links are absent; parent visibility must remain denied rather than inferred.
 
@@ -107,7 +107,7 @@ The safe direction is a modular Next.js application using the existing Clerk and
 
 On 2026-10-17:
 
-- `npm test`: 22 assessment, authorization, membership, CSV validation, learning-security, and deadline tests passed.
+- `npm test`: 23 assessment, authorization, membership, CSV validation, learning-security, and deadline tests passed.
 - `npm run typecheck`: passed across all workspaces.
 - `npm run lint`: passed with zero errors.
 - `npm run build`: passed after replacing the network-dependent Google font build step with a system font stack.
