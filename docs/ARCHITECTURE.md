@@ -64,8 +64,8 @@ Roles:
 | Academic structure | Tenant-scoped audited RPCs over `organization_campuses`, academic years, subjects, courses, batches, enrolments, rooms, and conflict-safe schedules |
 | Learning delivery | Organization modules/lessons, course-batch links, private resource/submission storage, release rules, completion, assignments, and grading |
 | Assessment | Existing PrepZii questions/tests + schema adapter + service-only attempt RPCs + shared deterministic scoring |
-| Attendance | organization attendance sessions and records |
-| Finance | separate institute fee ledger; Razorpay events are verified and idempotent |
+| Attendance | Service-only session register, assigned-teacher scope, student reads, immutable corrections |
+| Finance | Separate institute fee plans/ledgers/invoices/receipts/refunds; service-only audited mutations |
 | SaaS billing | organization subscriptions and plan entitlements |
 | Audit | organization and platform audit logs |
 | AI | existing Gemini provider through tenant-filtered LMS service (pending) |
@@ -94,7 +94,7 @@ Razorpay calls the public Next.js webhook URL. Next.js forwards the exact signed
 2. Resolve the two incompatible `institutes` migration definitions.
 3. Apply consumer institute prerequisites if absent.
 4. Apply LMS migrations `0001`–`0004` to a staging clone.
-5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0013_assessment_attempts.sql` in order.
+5. Apply `0005_tenant_integrity_rbac_audit.sql` through `0015_institute_finance_ledger.sql` in order.
 6. Run `supabase/tests/tenant_isolation.sql` in the isolated database.
 7. Exercise onboarding and invitation concurrency/replay cases with Clerk test identities.
 8. Review query plans and only then schedule a production migration with rollback/backup checkpoints.
@@ -102,3 +102,9 @@ Razorpay calls the public Next.js webhook URL. Next.js forwards the exact signed
 ## Assessment trust boundary
 
 The LMS does not copy PrepZii questions. `@prepzii/assessment-core` adapts the existing row shape into a versioned domain contract and produces deterministic objective scores. Students receive only sanitized question fields. Start/resume, enrolment, attempt count, expiry, optimistic answer versions, and finalization are enforced by service-only PostgreSQL functions. The browser submits answers, never marks. Results and correct answers are returned only after the configured release policy or to an authorized staff reviewer. Teacher attempt visibility is restricted to tests they created; tenant composite keys prevent schedules and attempts from referencing another institute.
+
+## Attendance and institute finance
+
+Attendance is stored per batch session. Staff mutations go through one transactionally audited RPC; teachers must be assigned to the batch. The first save finalizes a session. Later status changes require a reason and append an immutable correction record before changing the current register.
+
+Institute fee collection is deliberately separate from PrepZii SaaS subscription revenue. Browser/API money inputs are integer paise; PostgreSQL persists reviewed INR decimals. Fee-plan assignment creates a student ledger, installment schedule, and invoice in one transaction. Payments and refunds lock the ledger/installment, require tenant-unique references, update invoice and ledger status, and append audit records. Client redirects never mark an installment paid. Provider webhook-to-ledger integration remains a staging-gated follow-up.

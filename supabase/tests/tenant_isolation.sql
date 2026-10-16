@@ -164,6 +164,63 @@ insert into public.organization_assessment_attempts (
   ('10000000-0000-0000-0000-0000000000f5', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000f1', '10000000-0000-0000-0000-0000000000f3', 'student-a', 1, now() + interval '30 minutes'),
   ('20000000-0000-0000-0000-0000000000f6', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-0000000000f2', '20000000-0000-0000-0000-0000000000f4', 'student-b', 1, now() + interval '30 minutes');
 
+insert into public.organization_attendance_sessions (
+  id, organization_id, batch_id, session_date, session_label, starts_at, ends_at, marked_by, finalized_at
+) values
+  ('10000000-0000-0000-0000-0000000000f7', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000051', current_date, 'Physics', '09:00', '10:00', 'teacher-a', now()),
+  ('20000000-0000-0000-0000-0000000000f8', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000000052', current_date, 'Physics', '09:00', '10:00', 'teacher-b', now());
+
+insert into public.organization_attendance_records (
+  id, organization_id, session_id, student_id, status
+) values
+  ('10000000-0000-0000-0000-0000000000f9', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000f7', 'student-a', 'PRESENT'),
+  ('20000000-0000-0000-0000-0000000000fa', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-0000000000f8', 'student-b', 'ABSENT');
+
+insert into public.organization_attendance_corrections (
+  id, organization_id, session_id, attendance_record_id, student_id, previous_status, corrected_status, reason, corrected_by
+) values
+  ('10000000-0000-0000-0000-0000000000fb', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000f7', '10000000-0000-0000-0000-0000000000f9', 'student-a', 'ABSENT', 'PRESENT', 'Entry corrected', 'teacher-a'),
+  ('20000000-0000-0000-0000-0000000000fc', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-0000000000f8', '20000000-0000-0000-0000-0000000000fa', 'student-b', 'PRESENT', 'ABSENT', 'Entry corrected', 'teacher-b');
+
+insert into public.organization_fee_plans (
+  id, organization_id, name, target_exam, total_amount, installment_count
+) values
+  ('10000000-0000-0000-0000-000000001101', '10000000-0000-0000-0000-000000000001', 'Fee Plan A', 'JEE_MAIN', 1000, 1),
+  ('20000000-0000-0000-0000-000000002201', '20000000-0000-0000-0000-000000000002', 'Fee Plan B', 'NEET', 1000, 1);
+
+insert into public.organization_fee_plan_installments (
+  organization_id, fee_plan_id, sequence_number, title, amount, due_date
+) values
+  ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000001101', 1, 'Term 1', 1000, current_date),
+  ('20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000002201', 1, 'Term 1', 1000, current_date);
+
+insert into public.organization_student_fees (
+  id, organization_id, student_id, batch_id, fee_plan_id, total_course_fee, concession_amount, net_payable, status
+) values
+  ('10000000-0000-0000-0000-000000001102', '10000000-0000-0000-0000-000000000001', 'student-a', '10000000-0000-0000-0000-000000000051', '10000000-0000-0000-0000-000000001101', 1000, 0, 1000, 'PARTIAL'),
+  ('20000000-0000-0000-0000-000000002202', '20000000-0000-0000-0000-000000000002', 'student-b', '20000000-0000-0000-0000-000000000052', '20000000-0000-0000-0000-000000002201', 1000, 0, 1000, 'UNPAID');
+
+insert into public.organization_fee_installments (
+  id, organization_id, student_fee_id, title, amount, due_date, status, paid_amount
+) values
+  ('10000000-0000-0000-0000-000000001103', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000001102', 'Term 1', 1000, current_date, 'PARTIAL', 500),
+  ('20000000-0000-0000-0000-000000002203', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000002202', 'Term 1', 1000, current_date, 'PENDING', 0);
+
+insert into public.organization_fee_transactions (
+  id, organization_id, student_fee_id, installment_id, student_id, amount, method, reference_number,
+  receipt_number, installment_title, recorded_by, transaction_type
+) values (
+  '10000000-0000-0000-0000-000000001104', '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-000000001102', '10000000-0000-0000-0000-000000001103',
+  'student-a', 500, 'UPI', 'security-payment-a', 'REC-SECURITY-A', 'Term 1', 'user-owner-a', 'PAYMENT'
+);
+
+insert into public.organization_fee_invoices (
+  id, organization_id, student_fee_id, student_id, invoice_number, amount, due_date, status
+) values
+  ('10000000-0000-0000-0000-000000001105', '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000001102', 'student-a', 'INV-SECURITY-A', 1000, current_date, 'PARTIAL'),
+  ('20000000-0000-0000-0000-000000002205', '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-000000002202', 'student-b', 'INV-SECURITY-B', 1000, current_date, 'ISSUED');
+
 do $$
 begin
   begin
@@ -200,6 +257,32 @@ begin
       'student-b', 2, now() + interval '30 minutes'
     );
     raise exception 'Composite tenant constraint failed to reject a cross-tenant assessment attempt';
+  exception when foreign_key_violation then
+    null;
+  end;
+
+  begin
+    insert into public.organization_attendance_records (
+      organization_id, session_id, student_id, status
+    ) values (
+      '20000000-0000-0000-0000-000000000002',
+      '10000000-0000-0000-0000-0000000000f7',
+      'student-b', 'PRESENT'
+    );
+    raise exception 'Composite tenant constraint failed to reject a cross-tenant attendance record';
+  exception when foreign_key_violation then
+    null;
+  end;
+
+  begin
+    insert into public.organization_fee_invoices (
+      organization_id, student_fee_id, student_id, invoice_number, amount, due_date
+    ) values (
+      '20000000-0000-0000-0000-000000000002',
+      '10000000-0000-0000-0000-000000001102',
+      'student-b', 'INV-CROSS-TENANT', 1000, current_date
+    );
+    raise exception 'Composite tenant constraint failed to reject a cross-tenant fee invoice';
   exception when foreign_key_violation then
     null;
   end;
@@ -333,6 +416,17 @@ begin
   end if;
   if (select count(*) from public.organization_assessment_attempts) <> 1 then
     raise exception 'Assessment RLS failure: student can see another student attempt';
+  end if;
+  if (select count(*) from public.organization_attendance_sessions) <> 1
+    or (select count(*) from public.organization_attendance_records) <> 1
+    or (select count(*) from public.organization_attendance_corrections) <> 1 then
+    raise exception 'Attendance RLS failure: student can see another tenant or student history';
+  end if;
+  if (select count(*) from public.organization_student_fees) <> 1
+    or (select count(*) from public.organization_fee_installments) <> 1
+    or (select count(*) from public.organization_fee_transactions) <> 1
+    or (select count(*) from public.organization_fee_invoices) <> 1 then
+    raise exception 'Finance RLS failure: student can see another tenant or student ledger';
   end if;
 end $$;
 

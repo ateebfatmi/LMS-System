@@ -3169,7 +3169,197 @@ button {
   font-size: 13px;
 }
 
+/* --- Audited attendance workspace --- */
+.attendance-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.55fr);
+  gap: 18px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.attendance-register,
+.attendance-history {
+  display: grid;
+  gap: 16px;
+}
+
+.attendance-toolbar {
+  display: grid;
+  grid-template-columns: 1.2fr repeat(4, minmax(120px, 0.7fr));
+  gap: 10px;
+}
+
+.attendance-toolbar label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.attendance-toolbar input,
+.attendance-toolbar select,
+.attendance-actions input,
+.attendance-student-list select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  color: var(--ink);
+}
+
+.attendance-actions {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) auto;
+  gap: 10px;
+}
+
+.attendance-student-list,
+.attendance-history {
+  gap: 8px;
+}
+
+.attendance-student-list article,
+.attendance-history article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.attendance-student-list strong,
+.attendance-student-list small,
+.attendance-history strong,
+.attendance-history small {
+  display: block;
+}
+
+.attendance-student-list small,
+.attendance-history small,
+.attendance-history time {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.attendance-student-list select {
+  width: 130px;
+}
+
+.success-banner {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 10px;
+  background: var(--green-soft);
+  color: #047857;
+}
+
+/* --- Institute finance ledger --- */
+.finance-tools {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.finance-tools .compact-form {
+  display: grid;
+  gap: 10px;
+}
+
+.finance-tools .compact-form h2,
+.finance-ledger h2 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.finance-tools input,
+.finance-tools select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+}
+
+.finance-tools .compact-form > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.finance-ledger {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 18px;
+  margin-top: 18px;
+  align-items: start;
+}
+
+.ledger-row,
+.finance-event {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ledger-row strong,
+.ledger-row small,
+.finance-event strong,
+.finance-event small {
+  display: block;
+}
+
+.ledger-row small,
+.finance-event small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.installment-chips {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.installment-chips span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--ink-secondary);
+  font-size: 10px;
+}
+
+.payment-amount { color: var(--green); font-weight: 800; }
+.refund-amount { color: var(--orange); font-weight: 800; }
+
 @media (max-width: 1180px) {
+  .finance-tools {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .attendance-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .attendance-toolbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .learning-layout,
   .learning-layout.student {
     grid-template-columns: minmax(230px, 0.65fr) minmax(0, 1.35fr);
@@ -3182,6 +3372,16 @@ button {
 }
 
 @media (max-width: 760px) {
+  .finance-tools,
+  .finance-ledger {
+    grid-template-columns: 1fr;
+  }
+
+  .attendance-toolbar,
+  .attendance-actions {
+    grid-template-columns: 1fr;
+  }
+
   .learning-layout,
   .learning-layout.student {
     grid-template-columns: 1fr;

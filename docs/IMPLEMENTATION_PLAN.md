@@ -61,12 +61,17 @@ Status: **objective assessment lifecycle implemented in code; external verificat
 
 ## Phase 5 — attendance and finance
 
-Status: **schema/prototype only**
+Status: **core attendance and institute ledger implemented in code; payment-provider and document verification pending**
 
-- Attendance corrections with immutable audit history.
-- Fee plans, invoices, instalments, concessions, receipts, refunds, reconciliation.
-- Integer minor-unit currency at API boundaries; reviewed decimal storage in DB.
-- Razorpay sandbox integration and replay/concurrency tests.
+- [x] Session-wise attendance entry for authorized staff and assigned teachers.
+- [x] Student-scoped attendance history and immutable, reasoned correction history.
+- [x] Fee plans, instalment templates, student ledgers, concessions, invoices, manual receipts, partial payments, and refunds.
+- [x] Integer minor-unit currency validation at API/RPC boundaries with reviewed `numeric(12,2)` INR persistence.
+- [x] Unique payment references, transactional balance updates, tenant constraints, and audit events.
+- [ ] Generate and visually verify downloadable PDF invoices/receipts.
+- [ ] Connect verified Razorpay institute-fee events to the ledger and add sandbox replay/concurrency tests.
+- [ ] Add bulk fee assignment, reconciliation queues, credit adjustments, and overdue reminder delivery.
+- [ ] Rehearse migrations `0014`–`0015` and the expanded SQL isolation suite on an isolated Supabase clone.
 
 ## Phase 6 — commercial SaaS
 
