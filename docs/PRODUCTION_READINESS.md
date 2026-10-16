@@ -4,7 +4,7 @@ As of 2026-10-17, PrepZii LMS is **not ready for paying customers or a controlle
 
 ## Passing local gates
 
-- `npm test`: 20 assessment/authorization/membership/CSV/learning-security tests passed.
+- `npm test`: 22 assessment/authorization/membership/CSV/learning-security/deadline tests passed.
 - `npm run typecheck`: passed across all workspaces.
 - `npm run lint`: passed with zero errors.
 - `npm run build`: production Next.js build passed.
@@ -17,9 +17,9 @@ As of 2026-10-17, PrepZii LMS is **not ready for paying customers or a controlle
 - Production database shape has not been inspected or migrated in staging.
 - The incompatible `institutes` migration definitions are unresolved.
 - Many operational screens still use mock/local state; student/faculty directories and the core academic-structure screens now use authoritative APIs.
-- Institute creation, secure invitations, member profile management, academic structure, enrolment, basic timetable, and private course delivery exist in code, but staging verification, assignments, test attempts, attendance corrections, fee, and subscription workflows are incomplete.
+- Institute creation, secure invitations, member profile management, academic structure, enrolment, basic timetable, private course delivery, and assignments exist in code, but staging verification, test attempts, attendance corrections, fee, and subscription workflows are incomplete.
 - Parent/guardian authorization model does not exist.
-- Private learning storage, upload controls, and signed access exist in code; staging policy validation, content inspection, retention, and student-submission storage remain incomplete.
+- Private learning and student-submission storage, upload controls, hashes, and signed access exist in code; staging policy validation, content inspection, and retention remain incomplete.
 - Invitation replay protection and transaction-level invitation audit code exist but are unverified against staging; quotas and rate limiting remain incomplete.
 - Python dependencies are not locked in a reproducible environment. The isolated suite passes (13 tests), with a Starlette/httpx deprecation warning that should be resolved before framework upgrades.
 - No backup restore drill, staging validation, accessibility audit, or load test has been completed.

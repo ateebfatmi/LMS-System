@@ -39,11 +39,11 @@ Order of implementation:
 
 ## Phase 3 — learning delivery
 
-Status: **learning content implemented in code; assignments pending; external verification pending**
+Status: **learning content and assignments implemented in code; external verification pending**
 
 - [x] Modules, lessons, resources, scheduled release rules, course-to-batch assignment, and completion tracking.
 - [x] Private storage bucket, upload validation, tenant-prefixed object paths, and short-lived authorized signed URLs.
-- Assignments, submissions, rubrics, grading, and resubmission.
+- [x] Course/batch/student assignments, rubrics, server-timed text/file submissions, grading, feedback, and controlled resubmission.
 - [x] Staff authoring and enrolled-student course experience backed by authoritative data.
 
 ## Phase 4 — assessments

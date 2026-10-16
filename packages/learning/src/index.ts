@@ -8,6 +8,7 @@ export const learningResourceMimeTypes = [
 ] as const;
 
 export const maximumLearningResourceBytes = 25 * 1024 * 1024;
+export const maximumSubmissionBytes = 10 * 1024 * 1024;
 
 export type LearningUpload = {
   name: string;
@@ -21,6 +22,14 @@ export function validateLearningUpload(file: LearningUpload): string[] {
   if (!(learningResourceMimeTypes as readonly string[]).includes(file.type)) errors.push("File type is not supported.");
   if (!Number.isSafeInteger(file.size) || file.size < 1 || file.size > maximumLearningResourceBytes) {
     errors.push("File must be between 1 byte and 25 MB.");
+  }
+  return errors;
+}
+
+export function validateSubmissionUpload(file: LearningUpload): string[] {
+  const errors = validateLearningUpload(file).filter((error) => !error.includes("25 MB"));
+  if (!Number.isSafeInteger(file.size) || file.size < 1 || file.size > maximumSubmissionBytes) {
+    errors.push("Submission file must be between 1 byte and 10 MB.");
   }
   return errors;
 }
@@ -51,4 +60,21 @@ export function isReleased(isPublished: boolean, releaseAt: string | null, now =
   if (!releaseAt) return true;
   const release = new Date(releaseAt);
   return !Number.isNaN(release.getTime()) && release.getTime() <= now.getTime();
+}
+
+export type AssignmentWindow = {
+  status: "DRAFT" | "PUBLISHED" | "CLOSED";
+  availableFrom: string | null;
+  dueAt: string;
+  allowLate: boolean;
+};
+
+export function assignmentSubmissionState(window: AssignmentWindow, now = new Date()): "UNAVAILABLE" | "OPEN" | "LATE" | "CLOSED" {
+  if (window.status !== "PUBLISHED") return "UNAVAILABLE";
+  const available = window.availableFrom ? new Date(window.availableFrom) : null;
+  const due = new Date(window.dueAt);
+  if (Number.isNaN(due.getTime()) || (available && Number.isNaN(available.getTime()))) return "UNAVAILABLE";
+  if (available && available.getTime() > now.getTime()) return "UNAVAILABLE";
+  if (due.getTime() >= now.getTime()) return "OPEN";
+  return window.allowLate ? "LATE" : "CLOSED";
 }

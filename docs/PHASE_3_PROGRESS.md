@@ -2,7 +2,7 @@
 
 Status date: 2026-10-17
 
-The course-delivery core is implemented in code. Assignment/submission workflows and staging verification are still required before Phase 3 is complete.
+The course-delivery and assignment cores are implemented in code. Staging verification and file-inspection operations are still required before Phase 3 is production-certified.
 
 ## Delivered
 
@@ -14,15 +14,17 @@ The course-delivery core is implemented in code. Assignment/submission workflows
 - Five-minute signed resource URLs issued only after fresh organization, enrolment, publication, and release checks.
 - Lesson completion state and continue-learning metadata scoped to the authenticated user.
 - Database RLS and composite tenant constraints for course-batch links, resources, and progress.
+- Course, batch, or individual assignments with rubrics, availability windows, deadlines, late policy, and bounded attempts.
+- Server-authoritative text/file submission, grading, feedback, and teacher-controlled resubmission.
+- Private 10 MB submission attachments with hashes and five-minute signed reviewer/student access.
 
 ## Verified locally
 
-- Shared learning-domain tests cover uploads, safe object names, HTTPS links, and release dates.
+- Shared learning-domain tests cover uploads, safe object names, HTTPS links, release dates, assignment windows, and submission file limits.
 - Type checking and scoped lint pass.
 - The SQL isolation suite now includes cross-tenant learning-resource relationships and enrolled-student visibility assertions, but cannot run until an isolated Supabase database is available.
 
-## Remaining in Phase 3
+## Remaining production gates
 
-- Assignments, scoped recipients, text/file submissions, deadlines, rubrics, grading, feedback, and controlled resubmission.
 - Content inspection/malware workflow and automated retention for uploaded files.
-- Live staging exercise of storage bucket configuration, RLS, signed access expiry, and concurrent completion writes.
+- Live staging exercise of storage bucket configuration, RLS, signed access expiry, concurrent completion writes, submission retries, and deadline races.

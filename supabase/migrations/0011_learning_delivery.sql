@@ -110,15 +110,6 @@ create policy org_modules_read on public.organization_course_modules
   );
 
 drop policy if exists org_modules_manage on public.organization_course_modules;
-create policy org_modules_manage on public.organization_course_modules
-  for all using (
-    public.has_organization_role(organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
-    and public.can_access_organization_course(course_id)
-  )
-  with check (
-    public.has_organization_role(organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
-    and public.can_access_organization_course(course_id)
-  );
 
 drop policy if exists org_lessons_read on public.organization_course_lessons;
 create policy org_lessons_read on public.organization_course_lessons
@@ -127,7 +118,6 @@ create policy org_lessons_read on public.organization_course_lessons
       select 1 from public.organization_course_modules module
       where module.id = module_id
         and module.organization_id = organization_course_lessons.organization_id
-        and public.has_organization_role(module.organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
         and public.can_access_organization_course(module.course_id)
         and (
           public.has_organization_role(module.organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
@@ -141,24 +131,6 @@ create policy org_lessons_read on public.organization_course_lessons
   );
 
 drop policy if exists org_lessons_manage on public.organization_course_lessons;
-create policy org_lessons_manage on public.organization_course_lessons
-  for all using (
-    exists (
-      select 1 from public.organization_course_modules module
-      where module.id = module_id
-        and module.organization_id = organization_course_lessons.organization_id
-        and public.has_organization_role(module.organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
-        and public.can_access_organization_course(module.course_id)
-    )
-  )
-  with check (
-    exists (
-      select 1 from public.organization_course_modules module
-      where module.id = module_id
-        and module.organization_id = organization_course_lessons.organization_id
-        and public.can_access_organization_course(module.course_id)
-    )
-  );
 
 create policy organization_course_batches_read on public.organization_course_batches
   for select using (
@@ -170,9 +142,6 @@ create policy organization_course_batches_read on public.organization_course_bat
         and enrollment.user_id = public.requesting_user_id()
     )
   );
-create policy organization_course_batches_manage on public.organization_course_batches
-  for all using (public.has_organization_role(organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR']))
-  with check (public.has_organization_role(organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR']));
 
 create policy organization_lesson_resources_read on public.organization_lesson_resources
   for select using (
@@ -182,7 +151,6 @@ create policy organization_lesson_resources_read on public.organization_lesson_r
       join public.organization_course_modules module on module.id = lesson.module_id and module.organization_id = lesson.organization_id
       where lesson.id = lesson_id
         and lesson.organization_id = organization_lesson_resources.organization_id
-        and public.has_organization_role(lesson.organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
         and public.can_access_organization_course(module.course_id)
         and (
           public.has_organization_role(lesson.organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
@@ -191,28 +159,6 @@ create policy organization_lesson_resources_read on public.organization_lesson_r
             and lesson.is_published and (lesson.release_at is null or lesson.release_at <= now())
           )
         )
-    )
-  );
-create policy organization_lesson_resources_manage on public.organization_lesson_resources
-  for all using (
-    exists (
-      select 1
-      from public.organization_course_lessons lesson
-      join public.organization_course_modules module on module.id = lesson.module_id and module.organization_id = lesson.organization_id
-      where lesson.id = lesson_id
-        and lesson.organization_id = organization_lesson_resources.organization_id
-        and public.has_organization_role(lesson.organization_id, array['OWNER', 'COACHING_ADMIN', 'ACADEMIC_COORDINATOR', 'TEACHER'])
-        and public.can_access_organization_course(module.course_id)
-    )
-  )
-  with check (
-    exists (
-      select 1
-      from public.organization_course_lessons lesson
-      join public.organization_course_modules module on module.id = lesson.module_id and module.organization_id = lesson.organization_id
-      where lesson.id = lesson_id
-        and lesson.organization_id = organization_lesson_resources.organization_id
-        and public.can_access_organization_course(module.course_id)
     )
   );
 
@@ -232,8 +178,6 @@ create policy organization_lesson_progress_read on public.organization_lesson_pr
       )
     )
   );
-create policy organization_lesson_progress_self_write on public.organization_lesson_progress
-  for all using (user_id = public.requesting_user_id()) with check (user_id = public.requesting_user_id());
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (

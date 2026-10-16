@@ -124,6 +124,27 @@ insert into public.organization_lesson_resources (
   'Notes A', 'FILE', 'organization-learning', 'organizations/10000000-0000-0000-0000-000000000001/notes-a.pdf', 'application/pdf', 10, repeat('c', 64), 'user-owner-a'
 );
 
+insert into public.organization_assignments (
+  id, organization_id, title, instructions, course_id, due_at, max_marks, status, created_by
+) values
+  ('10000000-0000-0000-0000-0000000000c1', '10000000-0000-0000-0000-000000000001', 'Assignment A', 'Solve A', '10000000-0000-0000-0000-000000000081', now() + interval '1 day', 10, 'PUBLISHED', 'user-owner-a'),
+  ('20000000-0000-0000-0000-0000000000c2', '20000000-0000-0000-0000-000000000002', 'Assignment B', 'Solve B', '20000000-0000-0000-0000-000000000082', now() + interval '1 day', 10, 'PUBLISHED', 'user-owner-b');
+
+insert into public.organization_assignment_submissions (
+  id, organization_id, assignment_id, student_user_id, attempt_number, text_response, status
+) values (
+  '10000000-0000-0000-0000-0000000000d1', '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-0000000000c1', 'student-a', 1, 'Answer A', 'SUBMITTED'
+);
+
+insert into public.organization_assignment_submission_files (
+  id, organization_id, submission_id, name, storage_bucket, storage_path, mime_type, byte_size, sha256
+) values (
+  '10000000-0000-0000-0000-0000000000e1', '10000000-0000-0000-0000-000000000001',
+  '10000000-0000-0000-0000-0000000000d1', 'Answer A.pdf', 'organization-submissions',
+  'organizations/10000000-0000-0000-0000-000000000001/answer-a.pdf', 'application/pdf', 10, repeat('e', 64)
+);
+
 do $$
 begin
   begin
@@ -134,6 +155,18 @@ begin
       'Cross-tenant notes', 'FILE', 'organization-learning', 'cross-tenant.pdf', 'application/pdf', 10, repeat('d', 64), 'user-owner-b'
     );
     raise exception 'Composite tenant constraint failed to reject a cross-tenant lesson resource';
+  exception when foreign_key_violation then
+    null;
+  end;
+
+  begin
+    insert into public.organization_assignment_submissions (
+      organization_id, assignment_id, student_user_id, attempt_number, text_response, status
+    ) values (
+      '20000000-0000-0000-0000-000000000002', '10000000-0000-0000-0000-0000000000c1',
+      'student-b', 1, 'Cross-tenant answer', 'SUBMITTED'
+    );
+    raise exception 'Composite tenant constraint failed to reject a cross-tenant assignment submission';
   exception when foreign_key_violation then
     null;
   end;
@@ -255,6 +288,15 @@ begin
   end if;
   if (select count(*) from public.organization_lesson_resources) <> 1 then
     raise exception 'Learning RLS failure: student can see cross-tenant resources';
+  end if;
+  if (select count(*) from public.organization_assignments) <> 1 then
+    raise exception 'Assignment RLS failure: student can see unassigned or cross-tenant assignments';
+  end if;
+  if (select count(*) from public.organization_assignment_submissions) <> 1 then
+    raise exception 'Assignment RLS failure: student can see another student submission';
+  end if;
+  if (select count(*) from public.organization_assignment_submission_files) <> 1 then
+    raise exception 'Assignment RLS failure: student cannot see only their own submission files';
   end if;
 end $$;
 
