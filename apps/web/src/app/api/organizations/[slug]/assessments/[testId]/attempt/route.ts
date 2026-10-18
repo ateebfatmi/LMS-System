@@ -12,9 +12,21 @@ type AttemptRow = { id: string; test_id: string; schedule_id: string; user_id: s
 
 async function loadQuestions(organizationId: string, testId: string): Promise<QuestionDefinition[]> {
   const client = getPrepziiAdmin();
-  const { data: links, error: linkError } = await client.from("institute_test_questions").select("question_id,question_order").eq("institute_id", organizationId).eq("institute_test_id", testId).order("question_order");
-  if (linkError) throw linkError;
-  const ids = (links ?? []).map((link) => link.question_id);
+  let ids: string[] = [];
+  try {
+    const { data: links } = await client.from("institute_test_questions").select("question_id,question_order").eq("institute_id", organizationId).eq("institute_test_id", testId).order("question_order");
+    ids = (links ?? []).map((link) => link.question_id);
+  } catch {
+    ids = [];
+  }
+  if (!ids.length) {
+    try {
+      const { data: legacyLinks } = await client.from("test_questions").select("question_id,question_order").eq("test_id", testId).order("question_order");
+      ids = (legacyLinks ?? []).map((link) => link.question_id);
+    } catch {
+      ids = [];
+    }
+  }
   if (!ids.length) return [];
   const { data, error } = await client.from("questions").select("id,exam,subject,topic,question_type,question_text,option_a,option_b,option_c,option_d,correct_option,marks,negative_marks").in("id", ids);
   if (error) throw error;
