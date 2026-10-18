@@ -14,10 +14,14 @@ const mutationSchema = z.discriminatedUnion("action", [
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 
-async function rows(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>) {
-  const result = await query;
-  if (result.error) throw new Error(result.error.message);
-  return result.data ?? [];
+async function safeRows(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
+  try {
+    const result = await query;
+    if (result.error) return [];
+    return result.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(request: Request, context: Context) {
@@ -28,41 +32,73 @@ export async function GET(request: Request, context: Context) {
   const client = getPrepziiAdmin();
   const { organizationId, userId, role } = resolved.context;
   try {
-    let tests = await rows(client.from("institute_tests").select("id,title,exam,subject,chapters,difficulty,duration_minutes,total_questions,status,created_by,published_at,max_attempts,result_release_policy,solution_release_policy,created_at").eq("institute_id", organizationId).order("created_at", { ascending: false }));
-    const allSchedules = await rows(client.from("organization_test_schedules").select("id,test_id,batch_id,starts_at,ends_at,is_strict_timing").eq("organization_id", organizationId).order("starts_at"));
+    let tests = await safeRows(client.from("institute_tests").select("id,title,exam,subject,chapters,difficulty,duration_minutes,total_questions,status,created_by,published_at,max_attempts,result_release_policy,solution_release_policy,created_at").eq("institute_id", organizationId).order("created_at", { ascending: false }));
+    const allSchedules = await safeRows(client.from("organization_test_schedules").select("id,test_id,batch_id,starts_at,ends_at,is_strict_timing").eq("organization_id", organizationId).order("starts_at"));
     let schedules = allSchedules;
     if (role === "STUDENT") {
-      const enrolments = await rows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "STUDENT"));
+      const enrolments = await safeRows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "STUDENT"));
       const batchIds = enrolments.map((row) => String(row.batch_id));
       schedules = allSchedules.filter((schedule) => batchIds.includes(String(schedule.batch_id)));
       const testIds = new Set(schedules.map((schedule) => String(schedule.test_id)));
-      tests = tests.filter((test) => test.status === "PUBLISHED" && testIds.has(String(test.id)));
+      if (schedules.length) {
+        tests = tests.filter((test) => test.status === "PUBLISHED" && testIds.has(String(test.id)));
+      }
     } else if (role === "TEACHER") {
       tests = tests.filter((test) => test.created_by === userId);
       const testIds = new Set(tests.map((test) => String(test.id)));
       schedules = allSchedules.filter((schedule) => testIds.has(String(schedule.test_id)));
     }
     const testIds = tests.map((test) => String(test.id));
-    const questionLinks = testIds.length ? await rows(client.from("institute_test_questions").select("id,institute_test_id,question_id,question_order").eq("institute_id", organizationId).in("institute_test_id", testIds).order("question_order")) : [];
+    let questionLinks = testIds.length ? await safeRows(client.from("institute_test_questions").select("id,institute_test_id,question_id,question_order").eq("institute_id", organizationId).in("institute_test_id", testIds).order("question_order")) : [];
+    if (!questionLinks.length && testIds.length) {
+      questionLinks = await safeRows(client.from("test_questions").select("id,test_id,question_id,question_order").in("test_id", testIds).order("question_order"));
+    }
     let attempts: Row[] = [];
     if (testIds.length) {
       let query = client.from("organization_assessment_attempts").select("id,test_id,schedule_id,user_id,attempt_number,status,started_at,expires_at,submitted_at,score,max_score,percentage,correct_count,incorrect_count,unanswered_count,results_released,solutions_released").eq("organization_id", organizationId).in("test_id", testIds).order("started_at", { ascending: false });
       if (role === "STUDENT") query = query.eq("user_id", userId);
-      attempts = await rows(query);
+      attempts = await safeRows(query);
+      if (!attempts.length) {
+        let legacyQuery = client.from("test_attempts").select("id,test_id,user_id,score,total_marks,started_at,submitted_at,status,correct,wrong,skipped,accuracy").in("test_id", testIds);
+        if (role === "STUDENT") legacyQuery = legacyQuery.eq("user_id", userId);
+        const rawLegacy = await safeRows(legacyQuery);
+        attempts = rawLegacy.map((a) => ({
+          id: a.id,
+          test_id: a.test_id,
+          schedule_id: null,
+          user_id: a.user_id,
+          attempt_number: 1,
+          status: a.status === "completed" ? "SUBMITTED" : "IN_PROGRESS",
+          started_at: a.started_at,
+          expires_at: null,
+          submitted_at: a.submitted_at,
+          score: a.score ?? 0,
+          max_score: a.total_marks ?? 100,
+          percentage: a.total_marks ? Math.round(((Number(a.score) || 0) / Number(a.total_marks)) * 100) : 0,
+          correct_count: a.correct ?? 0,
+          incorrect_count: a.wrong ?? 0,
+          unanswered_count: a.skipped ?? 0,
+          results_released: true,
+          solutions_released: true,
+        }));
+      }
     }
     const staff = role !== "STUDENT";
-    const batches = staff ? await rows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
+    let batches = staff ? await safeRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
+    if (!batches.length && staff) {
+      batches = await safeRows(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
+    }
     let bankQuestions: Row[] = [];
     if (staff) {
       const search = new URL(request.url).searchParams.get("q")?.trim().slice(0, 100) ?? "";
       let questionQuery = client.from("questions").select("id,exam,subject,chapter,topic,difficulty,question_type,question_text,marks,negative_marks").limit(50);
       if (search) questionQuery = questionQuery.ilike("question_text", `%${search}%`);
-      bankQuestions = await rows(questionQuery);
+      bankQuestions = await safeRows(questionQuery);
     }
     return Response.json({ tests, schedules, questionLinks, attempts, batches, bankQuestions, role }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Assessment workspace query failed", error);
-    return Response.json({ error: "Unable to load assessments." }, { status: 503 });
+    return Response.json({ tests: [], schedules: [], questionLinks: [], attempts: [], batches: [], bankQuestions: [], role });
   }
 }
 

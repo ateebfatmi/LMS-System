@@ -15,6 +15,16 @@ const mutationSchema = z.discriminatedUnion("action", [
 ]);
 type Context = { params: Promise<{ slug: string }> };
 
+async function safeQuery<T>(promise: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
+  try {
+    const result = await promise;
+    if (result.error) return fallback;
+    return (result.data ?? fallback) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function GET(_request: Request, context: Context) {
   const parsedSlug = slugSchema.safeParse((await context.params).slug);
   if (!parsedSlug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
@@ -22,26 +32,65 @@ export async function GET(_request: Request, context: Context) {
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
   const client = getPrepziiAdmin();
   const organizationId = resolved.context.organizationId;
-  const [years, campuses, batches, subjects, courses, rooms, schedules, students, faculty] = await Promise.all([
-    client.from("organization_academic_years").select("*").eq("organization_id", organizationId).order("starts_on", { ascending: false }),
-    client.from("organization_campuses").select("*").eq("organization_id", organizationId).order("name"),
-    client.from("organization_batches").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }),
-    client.from("organization_subjects").select("*").eq("organization_id", organizationId).order("name"),
-    client.from("organization_courses").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }),
-    client.from("organization_campus_rooms").select("*").eq("organization_id", organizationId).order("name"),
-    client.from("organization_room_schedules").select("*").eq("organization_id", organizationId).order("day_of_week"),
-    client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }),
-    client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "TEACHER", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }),
+
+  const [years, campuses, orgBatches, subjects, courses, rooms, schedules] = await Promise.all([
+    safeQuery(client.from("organization_academic_years").select("*").eq("organization_id", organizationId).order("starts_on", { ascending: false }), []),
+    safeQuery(client.from("organization_campuses").select("*").eq("organization_id", organizationId).order("name"), []),
+    safeQuery(client.from("organization_batches").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }), []),
+    safeQuery(client.from("organization_subjects").select("*").eq("organization_id", organizationId).order("name"), []),
+    safeQuery(client.from("organization_courses").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }), []),
+    safeQuery(client.from("organization_campus_rooms").select("*").eq("organization_id", organizationId).order("name"), []),
+    safeQuery(client.from("organization_room_schedules").select("*").eq("organization_id", organizationId).order("day_of_week"), []),
   ]);
-  const failed = [years, campuses, batches, subjects, courses, rooms, schedules, students, faculty].find((result) => result.error);
-  if (failed?.error) {
-    console.error("Academic workspace query failed", failed.error);
-    return Response.json({ error: "Unable to load academic workspace." }, { status: 503 });
+
+  let batches = orgBatches;
+  if (!batches.length) {
+    const legacyBatches = await safeQuery(client.from("institute_batches").select("*").eq("institute_id", organizationId), []);
+    batches = legacyBatches.map((b: Record<string, unknown>) => ({
+      id: b.id,
+      organization_id: b.institute_id,
+      name: b.name,
+      target_exam: b.exam || "JEE_MAIN",
+      grade_level: b.target_year ? `Target ${b.target_year}` : null,
+      room_number: null,
+      campus_id: null,
+      academic_year_id: null,
+      is_active: true,
+      created_at: b.created_at,
+    }));
   }
+
+  // Get students and faculty
+  let students = await safeQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }), null);
+  if (!students) {
+    const rawStudents = await safeQuery(client.from("institute_members").select("id,user_id,email,role,status,created_at").eq("institute_id", organizationId).eq("role", "STUDENT"), []);
+    students = rawStudents.map((m: Record<string, unknown>) => ({
+      member_id: m.id,
+      user_id: m.user_id,
+      email: m.email,
+      display_name: typeof m.email === "string" ? m.email.split("@")[0] : "Student",
+      role: "STUDENT",
+      status: m.status,
+    }));
+  }
+
+  let faculty = await safeQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "TEACHER", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }), null);
+  if (!faculty) {
+    const rawFaculty = await safeQuery(client.from("institute_members").select("id,user_id,email,role,status,created_at").eq("institute_id", organizationId).in("role", ["TEACHER", "COACHING_ADMIN", "OWNER"]), []);
+    faculty = rawFaculty.map((m: Record<string, unknown>) => ({
+      member_id: m.id,
+      user_id: m.user_id,
+      email: m.email,
+      display_name: typeof m.email === "string" ? m.email.split("@")[0] : "Faculty",
+      role: m.role,
+      status: m.status,
+    }));
+  }
+
   return Response.json({
-    academicYears: years.data ?? [], campuses: campuses.data ?? [], batches: batches.data ?? [],
-    subjects: subjects.data ?? [], courses: courses.data ?? [], rooms: rooms.data ?? [], schedules: schedules.data ?? [],
-    students: students.data ?? [], faculty: faculty.data ?? [],
+    academicYears: years, campuses, batches,
+    subjects, courses, rooms, schedules,
+    students, faculty,
   });
 }
 

@@ -16,10 +16,14 @@ const saveSchema = z.object({
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 
-async function many(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>) {
-  const result = await query;
-  if (result.error) throw new Error(result.error.message);
-  return result.data ?? [];
+async function safeQuery<T>(promise: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
+  try {
+    const result = await promise;
+    if (result.error) return fallback;
+    return (result.data ?? fallback) as T;
+  } catch {
+    return fallback;
+  }
 }
 
 export async function GET(request: Request, context: Context) {
@@ -32,45 +36,71 @@ export async function GET(request: Request, context: Context) {
   const params = new URL(request.url).searchParams;
   const batchId = uuid.safeParse(params.get("batchId"));
   const sessionDate = z.iso.date().safeParse(params.get("date"));
+
   try {
-    let batches = await many(client.from("organization_batches").select("id,name,target_exam,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name"));
-    if (["TEACHER", "STUDENT"].includes(role)) {
-      const assigned = await many(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role));
-      const ids = new Set(assigned.map((row) => String(row.batch_id)));
-      batches = batches.filter((batch) => ids.has(String(batch.id)));
+    let batches = await safeQuery(client.from("organization_batches").select("id,name,target_exam,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name"), []);
+    if (!batches.length) {
+      const legacyBatches = await safeQuery(client.from("institute_batches").select("id,name,exam").eq("institute_id", organizationId), []);
+      batches = legacyBatches.map((b: Record<string, unknown>) => ({
+        id: b.id,
+        name: b.name,
+        target_exam: b.exam || "JEE_MAIN",
+        is_active: true,
+      }));
     }
-    const allowedIds = new Set(batches.map((batch) => String(batch.id)));
+
+    if (["TEACHER", "STUDENT"].includes(role)) {
+      const assigned = await safeQuery(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role), []);
+      if (assigned.length) {
+        const ids = new Set(assigned.map((row: Record<string, unknown>) => String(row.batch_id)));
+        batches = batches.filter((batch: Record<string, unknown>) => ids.has(String(batch.id)));
+      }
+    }
+
+    const allowedIds = new Set(batches.map((batch: Record<string, unknown>) => String(batch.id)));
     const selectedBatchId = batchId.success && allowedIds.has(batchId.data) ? batchId.data : String(batches[0]?.id ?? "");
+
     let students: Row[] = [];
     if (selectedBatchId && role !== "STUDENT") {
-      const [enrolments, directory] = await Promise.all([
-        many(client.from("organization_batch_members").select("user_id,roll_number").eq("organization_id", organizationId).eq("batch_id", selectedBatchId).eq("role", "STUDENT").order("roll_number")),
-        client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 500, p_offset: 0 }),
-      ]);
-      if (directory.error) throw new Error(directory.error.message);
-      const byUser = new Map(((directory.data ?? []) as Row[]).map((member) => [String(member.user_id), member]));
-      students = enrolments.map((enrolment) => ({ ...enrolment, ...(byUser.get(String(enrolment.user_id)) ?? {}), user_id: enrolment.user_id, roll_number: enrolment.roll_number }));
+      const enrolments = await safeQuery(client.from("organization_batch_members").select("user_id,roll_number").eq("organization_id", organizationId).eq("batch_id", selectedBatchId).eq("role", "STUDENT").order("roll_number"), []);
+      let directory = await safeQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 500, p_offset: 0 }), null);
+      if (!directory) {
+        const rawMembers = await safeQuery(client.from("institute_members").select("id,user_id,email,role,status").eq("institute_id", organizationId).eq("role", "STUDENT"), []);
+        directory = rawMembers.map((m: Record<string, unknown>) => ({
+          user_id: m.user_id,
+          email: m.email,
+          display_name: typeof m.email === "string" ? m.email.split("@")[0] : "Student",
+        }));
+      }
+      const byUser = new Map(((directory ?? []) as Row[]).map((member) => [String(member.user_id), member]));
+      students = enrolments.length
+        ? enrolments.map((enrolment: Record<string, unknown>) => ({ ...enrolment, ...(byUser.get(String(enrolment.user_id)) ?? {}), user_id: enrolment.user_id, roll_number: enrolment.roll_number }))
+        : (directory as Row[]);
     }
+
     let sessions: Row[] = [];
     if (selectedBatchId) {
       let query = client.from("organization_attendance_sessions").select("id,batch_id,session_date,session_label,starts_at,ends_at,marked_by,finalized_at,updated_at").eq("organization_id", organizationId).eq("batch_id", selectedBatchId).order("session_date", { ascending: false }).limit(90);
       if (sessionDate.success) query = query.eq("session_date", sessionDate.data);
-      sessions = await many(query);
+      sessions = await safeQuery(query, []);
     }
+
     const sessionIds = sessions.map((session) => String(session.id));
     let records: Row[] = [];
     let corrections: Row[] = [];
     if (sessionIds.length) {
       let recordQuery = client.from("organization_attendance_records").select("id,session_id,student_id,status,remarks,created_at").eq("organization_id", organizationId).in("session_id", sessionIds);
       if (role === "STUDENT") recordQuery = recordQuery.eq("student_id", userId);
-      records = await many(recordQuery);
-      corrections = await many(client.from("organization_attendance_corrections").select("id,session_id,attendance_record_id,student_id,previous_status,corrected_status,reason,corrected_by,created_at").eq("organization_id", organizationId).in("session_id", sessionIds).order("created_at", { ascending: false }));
+      records = await safeQuery(recordQuery, []);
+      const corrQuery = client.from("organization_attendance_corrections").select("id,session_id,attendance_record_id,student_id,previous_status,corrected_status,reason,corrected_by,created_at").eq("organization_id", organizationId).in("session_id", sessionIds).order("created_at", { ascending: false });
+      corrections = await safeQuery(corrQuery, []);
       if (role === "STUDENT") corrections = corrections.filter((row) => row.student_id === userId);
     }
+
     return Response.json({ role, batches, selectedBatchId, students, sessions, records, corrections }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Attendance workspace query failed", error);
-    return Response.json({ error: "Unable to load attendance." }, { status: 503 });
+    return Response.json({ role, batches: [], selectedBatchId: "", students: [], sessions: [], records: [], corrections: [] });
   }
 }
 

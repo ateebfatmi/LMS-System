@@ -83,7 +83,10 @@ export async function GET(request: Request, context: Context) {
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const { page, perPage, search, role, status } = parsedQuery.data;
-  const { data, error } = await getPrepziiAdmin().rpc("lms_list_members", {
+  let rows: MemberRow[] = [];
+  let total = 0;
+
+  const rpcResult = await getPrepziiAdmin().rpc("lms_list_members", {
     p_organization_id: resolved.context.organizationId,
     p_role: role ?? null,
     p_status: status ?? null,
@@ -91,16 +94,73 @@ export async function GET(request: Request, context: Context) {
     p_limit: perPage,
     p_offset: (page - 1) * perPage,
   });
-  if (error) {
-    console.error("Member directory query failed", error);
-    return Response.json({ error: "Unable to load members." }, { status: 503 });
+
+  if (rpcResult.error) {
+    // Graceful fallback to direct institute_members and institute_batches query
+    try {
+      const client = getPrepziiAdmin();
+      let query = client
+        .from("institute_members")
+        .select("id, user_id, email, role, status, created_at")
+        .eq("institute_id", resolved.context.organizationId);
+
+      if (role) query = query.eq("role", role);
+      if (status) query = query.eq("status", status);
+      if (search) query = query.ilike("email", `%${search}%`);
+
+      const { data: members, error: queryError } = await query;
+      if (queryError) throw queryError;
+
+      const { data: batches } = await client
+        .from("institute_batches")
+        .select("id, name, exam")
+        .eq("institute_id", resolved.context.organizationId);
+
+      const mappedBatches = (batches ?? []).map((b) => ({
+        id: b.id,
+        name: b.name,
+        targetExam: b.exam,
+      }));
+
+      const allMembers = members ?? [];
+      total = allMembers.length;
+      const paginated = allMembers.slice((page - 1) * perPage, page * perPage);
+
+      rows = paginated.map((m) => {
+        const namePart = m.email ? m.email.split("@")[0] : "Member";
+        return {
+          member_id: m.id,
+          user_id: m.user_id,
+          email: m.email ?? "",
+          member_role: m.role as OrganizationMemberDirectoryRecord["role"],
+          member_status: m.status as OrganizationMemberDirectoryRecord["status"],
+          display_name: namePart.charAt(0).toUpperCase() + namePart.slice(1),
+          phone: null,
+          alternate_phone: null,
+          roll_number: null,
+          employee_code: null,
+          guardian_name: null,
+          guardian_phone: null,
+          qualification: null,
+          subject_specialization: null,
+          joined_on: m.created_at ? String(m.created_at).split("T")[0] : null,
+          batches: mappedBatches,
+          created_at: m.created_at,
+          total_count: total,
+        };
+      });
+    } catch (fallbackError) {
+      console.error("Member directory fallback query failed", fallbackError);
+      return Response.json({ error: "Unable to load members." }, { status: 503 });
+    }
+  } else {
+    rows = (rpcResult.data ?? []) as MemberRow[];
+    total = Number(rows[0]?.total_count ?? 0);
   }
 
-  const rows = (data ?? []) as MemberRow[];
-  const total = Number(rows[0]?.total_count ?? 0);
   return Response.json({
     members: rows.map(toMember),
-    pagination: { page, perPage, total, pages: Math.ceil(total / perPage) },
+    pagination: { page, perPage, total, pages: Math.max(1, Math.ceil(total / perPage)) },
   });
 }
 
