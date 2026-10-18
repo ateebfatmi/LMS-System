@@ -10,26 +10,29 @@ const mutationSchema = z.discriminatedUnion("action", [
 ]);
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
-async function many(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>) { const result = await query; if (result.error) throw new Error(result.error.message); return result.data ?? []; }
+async function safeMany(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> { try { const result = await query; if (result.error) return []; return result.data ?? []; } catch { return []; } }
 
 export async function GET(_request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug); if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
   const resolved = await getAuthorizedOrganizationContext(slug.data, "announcements:read"); if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
   const client = getPrepziiAdmin(); const { organizationId, userId, role } = resolved.context;
   try {
-    let announcements = await many(client.from("organization_announcements").select("id,batch_id,title,content,target_audience,priority,category,status,channels,created_by,published_at,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(200));
+    let announcements = await safeMany(client.from("organization_announcements").select("id,batch_id,title,content,target_audience,priority,category,status,channels,created_by,published_at,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(200));
     let allowedBatchIds = new Set<string>();
-    if (["STUDENT", "TEACHER"].includes(role)) { const memberships = await many(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId)); allowedBatchIds = new Set(memberships.map((row) => String(row.batch_id))); }
+    if (["STUDENT", "TEACHER"].includes(role)) { const memberships = await safeMany(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId)); allowedBatchIds = new Set(memberships.map((row) => String(row.batch_id))); }
     if (role === "STUDENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && (item.target_audience === "ALL" || (item.target_audience === "BATCH" && allowedBatchIds.has(String(item.batch_id)))));
     else if (role === "PARENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && ["ALL", "PARENTS"].includes(String(item.target_audience)));
     else if (role === "TEACHER") announcements = announcements.filter((item) => item.status === "PUBLISHED" || item.created_by === userId);
-    const [notifications, batches, deliveries] = await Promise.all([
-      many(client.from("organization_notifications").select("id,announcement_id,kind,title,body,action_url,read_at,created_at").eq("organization_id", organizationId).eq("recipient_user_id", userId).order("created_at", { ascending: false }).limit(100)),
-      role === "STUDENT" || role === "PARENT" ? Promise.resolve([]) : many(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")),
-      ["OWNER", "COACHING_ADMIN"].includes(role) ? many(client.from("organization_delivery_jobs").select("id,announcement_id,channel,status,provider,recipient_count,delivered_count,failed_count,last_error,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100)) : Promise.resolve([]),
+    let batches = role === "STUDENT" || role === "PARENT" ? [] : await safeMany(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+    if (!batches.length && role !== "STUDENT" && role !== "PARENT") {
+      batches = await safeMany(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
+    }
+    const [notifications, deliveries] = await Promise.all([
+      safeMany(client.from("organization_notifications").select("id,announcement_id,kind,title,body,action_url,read_at,created_at").eq("organization_id", organizationId).eq("recipient_user_id", userId).order("created_at", { ascending: false }).limit(100)),
+      ["OWNER", "COACHING_ADMIN"].includes(role) ? safeMany(client.from("organization_delivery_jobs").select("id,announcement_id,channel,status,provider,recipient_count,delivered_count,failed_count,last_error,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100)) : Promise.resolve([]),
     ]);
     return Response.json({ role, announcements, notifications, batches, deliveries }, { headers: { "cache-control": "private, no-store" } });
-  } catch (error) { console.error("Announcement workspace query failed", error); return Response.json({ error: "Unable to load announcements." }, { status: 503 }); }
+  } catch (error) { console.error("Announcement workspace query failed", error); return Response.json({ role, announcements: [], notifications: [], batches: [], deliveries: [] }); }
 }
 
 export async function POST(request: Request, context: Context) {

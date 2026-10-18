@@ -19,10 +19,14 @@ const mutationSchema = z.discriminatedUnion("action", [
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 
-async function rows(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>) {
-  const result = await query;
-  if (result.error) throw new Error(result.error.message);
-  return result.data ?? [];
+async function safeRows(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
+  try {
+    const result = await query;
+    if (result.error) return [];
+    return result.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(_request: Request, context: Context) {
@@ -35,11 +39,11 @@ export async function GET(_request: Request, context: Context) {
   try {
     let courseIds: string[] | null = null;
     if (role === "STUDENT" || role === "TEACHER") {
-      const enrolments = await rows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role));
+      const enrolments = await safeRows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role));
       const batchIds = enrolments.map((row) => String(row.batch_id));
       if (!batchIds.length) courseIds = [];
       else {
-        const links = await rows(client.from("organization_course_batches").select("course_id").eq("organization_id", organizationId).in("batch_id", batchIds));
+        const links = await safeRows(client.from("organization_course_batches").select("course_id").eq("organization_id", organizationId).in("batch_id", batchIds));
         courseIds = [...new Set(links.map((row) => String(row.course_id)))];
       }
     }
@@ -50,24 +54,33 @@ export async function GET(_request: Request, context: Context) {
       if (!courseIds.length) return Response.json({ courses: [], modules: [], lessons: [], resources: [], progress: [], batches: [], role }, { headers: { "cache-control": "private, no-store" } });
       courseQuery = courseQuery.in("id", courseIds);
     }
-    const courses = await rows(courseQuery);
+    const courses = await safeRows(courseQuery);
     const visibleCourseIds = courses.map((row) => String(row.id));
-    if (!visibleCourseIds.length) return Response.json({ courses: [], modules: [], lessons: [], resources: [], progress: [], batches: [], role }, { headers: { "cache-control": "private, no-store" } });
+    if (!visibleCourseIds.length) {
+      let batches = role === "STUDENT" ? [] : await safeRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+      if (!batches.length && role !== "STUDENT") {
+        batches = await safeRows(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
+      }
+      return Response.json({ courses: [], modules: [], lessons: [], resources: [], progress: [], batches, role }, { headers: { "cache-control": "private, no-store" } });
+    }
 
-    const allModules = await rows(client.from("organization_course_modules").select("id,course_id,title,description,order_index,is_published,release_at,updated_at").eq("organization_id", organizationId).in("course_id", visibleCourseIds).order("order_index"));
+    const allModules = await safeRows(client.from("organization_course_modules").select("id,course_id,title,description,order_index,is_published,release_at,updated_at").eq("organization_id", organizationId).in("course_id", visibleCourseIds).order("order_index"));
     const now = Date.now();
     const modules = role === "STUDENT" ? allModules.filter((row) => row.is_published && (!row.release_at || new Date(String(row.release_at)).getTime() <= now)) : allModules;
     const moduleIds = modules.map((row) => String(row.id));
-    const allLessons = moduleIds.length ? await rows(client.from("organization_course_lessons").select("id,module_id,title,kind,description,learning_objectives,duration_minutes,order_index,is_published,release_at,updated_at").eq("organization_id", organizationId).in("module_id", moduleIds).order("order_index")) : [];
+    const allLessons = moduleIds.length ? await safeRows(client.from("organization_course_lessons").select("id,module_id,title,kind,description,learning_objectives,duration_minutes,order_index,is_published,release_at,updated_at").eq("organization_id", organizationId).in("module_id", moduleIds).order("order_index")) : [];
     const lessons = role === "STUDENT" ? allLessons.filter((row) => row.is_published && (!row.release_at || new Date(String(row.release_at)).getTime() <= now)) : allLessons;
     const lessonIds = lessons.map((row) => String(row.id));
-    const resources = lessonIds.length ? await rows(client.from("organization_lesson_resources").select("id,lesson_id,name,resource_type,mime_type,byte_size,download_allowed,processing_status,created_at").eq("organization_id", organizationId).in("lesson_id", lessonIds).eq("processing_status", "READY").order("created_at")) : [];
-    const progress = lessonIds.length ? await rows(client.from("organization_lesson_progress").select("lesson_id,progress_percent,last_accessed_at,completed_at").eq("organization_id", organizationId).eq("user_id", userId).in("lesson_id", lessonIds)) : [];
-    const batches = role === "STUDENT" ? [] : await rows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+    const resources = lessonIds.length ? await safeRows(client.from("organization_lesson_resources").select("id,lesson_id,name,resource_type,mime_type,byte_size,download_allowed,processing_status,created_at").eq("organization_id", organizationId).in("lesson_id", lessonIds).eq("processing_status", "READY").order("created_at")) : [];
+    const progress = lessonIds.length ? await safeRows(client.from("organization_lesson_progress").select("lesson_id,progress_percent,last_accessed_at,completed_at").eq("organization_id", organizationId).eq("user_id", userId).in("lesson_id", lessonIds)) : [];
+    let batches = role === "STUDENT" ? [] : await safeRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+    if (!batches.length && role !== "STUDENT") {
+      batches = await safeRows(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
+    }
     return Response.json({ courses, modules, lessons, resources, progress, batches, role }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Learning workspace query failed", error);
-    return Response.json({ error: "Unable to load learning content." }, { status: 503 });
+    return Response.json({ courses: [], modules: [], lessons: [], resources: [], progress: [], batches: [], role });
   }
 }
 

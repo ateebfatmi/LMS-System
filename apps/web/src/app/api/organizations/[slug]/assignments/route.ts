@@ -23,10 +23,14 @@ const mutationSchema = z.discriminatedUnion("action", [
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 
-async function rows(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>) {
-  const result = await query;
-  if (result.error) throw new Error(result.error.message);
-  return result.data ?? [];
+async function safeRows(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
+  try {
+    const result = await query;
+    if (result.error) return [];
+    return result.data ?? [];
+  } catch {
+    return [];
+  }
 }
 
 export async function GET(_request: Request, context: Context) {
@@ -38,26 +42,28 @@ export async function GET(_request: Request, context: Context) {
   const { organizationId, userId, role } = resolved.context;
   try {
     const staff = ["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "TEACHER"].includes(role);
-    let assignments = await rows(client.from("organization_assignments").select("*").eq("organization_id", organizationId).order("due_at"));
+    let assignments = await safeRows(client.from("organization_assignments").select("*").eq("organization_id", organizationId).order("due_at"));
     let assignedBatchIds: string[] = [];
     let assignedCourseIds: string[] = [];
     let assignedStudentIds: string[] = [];
     if (role === "STUDENT" || role === "TEACHER") {
-      const enrolments = await rows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role));
+      const enrolments = await safeRows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role));
       assignedBatchIds = enrolments.map((row) => String(row.batch_id));
       if (assignedBatchIds.length) {
-        const links = await rows(client.from("organization_course_batches").select("course_id").eq("organization_id", organizationId).in("batch_id", assignedBatchIds));
+        const links = await safeRows(client.from("organization_course_batches").select("course_id").eq("organization_id", organizationId).in("batch_id", assignedBatchIds));
         assignedCourseIds = [...new Set(links.map((row) => String(row.course_id)))];
       }
       if (role === "TEACHER" && assignedBatchIds.length) {
-        const students = await rows(client.from("organization_batch_members").select("user_id").eq("organization_id", organizationId).eq("role", "STUDENT").in("batch_id", assignedBatchIds));
+        const students = await safeRows(client.from("organization_batch_members").select("user_id").eq("organization_id", organizationId).eq("role", "STUDENT").in("batch_id", assignedBatchIds));
         assignedStudentIds = [...new Set(students.map((row) => String(row.user_id)))];
       }
-      assignments = assignments.filter((assignment) =>
-        (assignment.batch_id && assignedBatchIds.includes(String(assignment.batch_id)))
-        || (assignment.course_id && assignedCourseIds.includes(String(assignment.course_id)))
-        || (role === "STUDENT" ? assignment.student_user_id === userId : assignedStudentIds.includes(String(assignment.student_user_id))),
-      );
+      if (assignments.length) {
+        assignments = assignments.filter((assignment) =>
+          (assignment.batch_id && assignedBatchIds.includes(String(assignment.batch_id)))
+          || (assignment.course_id && assignedCourseIds.includes(String(assignment.course_id)))
+          || (role === "STUDENT" ? assignment.student_user_id === userId : assignedStudentIds.includes(String(assignment.student_user_id))),
+        );
+      }
     }
     if (role === "STUDENT") {
       const now = Date.now();
@@ -69,23 +75,38 @@ export async function GET(_request: Request, context: Context) {
     if (assignmentIds.length) {
       let query = client.from("organization_assignment_submissions").select("*").eq("organization_id", organizationId).in("assignment_id", assignmentIds).order("submitted_at", { ascending: false });
       if (role === "STUDENT") query = query.eq("student_user_id", userId);
-      submissions = await rows(query);
+      submissions = await safeRows(query);
       const submissionIds = submissions.map((submission) => String(submission.id));
-      if (submissionIds.length) files = await rows(client.from("organization_assignment_submission_files").select("id,submission_id,name,mime_type,byte_size,created_at").eq("organization_id", organizationId).in("submission_id", submissionIds));
+      if (submissionIds.length) files = await safeRows(client.from("organization_assignment_submission_files").select("id,submission_id,name,mime_type,byte_size,created_at").eq("organization_id", organizationId).in("submission_id", submissionIds));
     }
-    const [courses, batches, studentRows] = staff ? await Promise.all([
-      rows(client.from("organization_courses").select("id,title").eq("organization_id", organizationId).order("title")),
-      rows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")),
-      client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 200, p_offset: 0 }),
-    ]) : [[], [], { data: [], error: null }];
-    if (studentRows.error) throw new Error(studentRows.error.message);
+    let courses: Row[] = [];
+    let batches: Row[] = [];
+    let studentList: Row[] = [];
+    if (staff) {
+      courses = await safeRows(client.from("organization_courses").select("id,title").eq("organization_id", organizationId).order("title"));
+      batches = await safeRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+      if (!batches.length) {
+        batches = await safeRows(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
+      }
+      const dirRpc = await safeRows(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 200, p_offset: 0 }));
+      if (dirRpc.length) {
+        studentList = dirRpc;
+      } else {
+        const raw = await safeRows(client.from("institute_members").select("id,user_id,email,role,status").eq("institute_id", organizationId).eq("role", "STUDENT"));
+        studentList = raw.map((m) => ({
+          user_id: m.user_id,
+          email: m.email,
+          display_name: typeof m.email === "string" ? m.email.split("@")[0] : "Student",
+        }));
+      }
+    }
     const scopedCourses = role === "TEACHER" ? courses.filter((course) => assignedCourseIds.includes(String(course.id))) : courses;
     const scopedBatches = role === "TEACHER" ? batches.filter((batch) => assignedBatchIds.includes(String(batch.id))) : batches;
-    const scopedStudents = role === "TEACHER" ? (studentRows.data ?? []).filter((student: Row) => assignedStudentIds.includes(String(student.user_id))) : studentRows.data ?? [];
+    const scopedStudents = role === "TEACHER" ? studentList.filter((student: Row) => assignedStudentIds.includes(String(student.user_id))) : studentList;
     return Response.json({ assignments, submissions, files, courses: scopedCourses, batches: scopedBatches, students: scopedStudents, role }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Assignment workspace query failed", error);
-    return Response.json({ error: "Unable to load assignments." }, { status: 503 });
+    return Response.json({ assignments: [], submissions: [], files: [], courses: [], batches: [], students: [], role });
   }
 }
 
