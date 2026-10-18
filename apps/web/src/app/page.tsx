@@ -224,7 +224,23 @@ export default function Home() {
           </a>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <Link
+            href="/sign-in"
+            style={{
+              fontSize: "12px",
+              color: "#0f172a",
+              textDecoration: "none",
+              padding: "7px 14px",
+              borderRadius: "999px",
+              border: "1px solid #facc15",
+              fontWeight: 700,
+              background: "#fef9c3",
+              transition: "all 0.2s ease",
+            }}
+          >
+            Institute Sign In
+          </Link>
           <Link
             href="/super-admin"
             style={{
@@ -239,7 +255,7 @@ export default function Home() {
               transition: "all 0.2s ease",
             }}
           >
-            Operator Login
+            Operator
           </Link>
           <Link
             className="primary-link"
