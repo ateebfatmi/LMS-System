@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge, Button, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
@@ -123,6 +123,7 @@ export default function QuestionBankPage() {
   const [difficultyFilter, setDifficultyFilter] = useState("ALL");
   const [kindFilter, setKindFilter] = useState("ALL");
   const [expandedExplanation, setExpandedExplanation] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   // New Question Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -140,6 +141,33 @@ export default function QuestionBankPage() {
   const [newCorrectOpt, setNewCorrectOpt] = useState("A");
   const [newCorrectNumber, setNewCorrectNumber] = useState("");
   const [newExplanation, setNewExplanation] = useState("");
+
+  // Load real database questions on mount
+  useEffect(() => {
+    async function fetchLiveQuestions() {
+      try {
+        const orgRes = await fetch("/api/organizations/active");
+        if (!orgRes.ok) return;
+        const orgData = await orgRes.json();
+        const slug = orgData.organization?.slug;
+        if (!slug) return;
+
+        setLoading(true);
+        const res = await fetch(`/api/organizations/${encodeURIComponent(slug)}/question-bank?limit=50`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.questions && data.questions.length > 0) {
+            setQuestions(data.questions);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch live questions", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    void fetchLiveQuestions();
+  }, []);
 
   const filteredQuestions = questions.filter((q) => {
     const matchesSearch =
