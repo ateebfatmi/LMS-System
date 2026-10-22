@@ -19,6 +19,10 @@ export interface TenantContext {
   organizationId: OrganizationId;
   userId: UserId;
   role: OrganizationRole;
+
+  organizationName?: string;
+  /** Existing Prepzii institute_members.id primary key (UUID). */
+  memberId?: string;
 }
 
 export interface OrganizationMemberDirectoryRecord {
@@ -152,13 +156,18 @@ export interface QuestionDefinition {
   subject?: string;
   topic?: string;
   text?: string;
-  options?: { id: string; text: string }[];
+  options?: QuestionOption[];
   correctOptionIds?: readonly string[];
   correctNumber?: number;
   numericalTolerance?: number;
   marks: number;
   negativeMarks?: number;
   partialMarking?: boolean;
+
+  imageUrl?: string;
+  numericalMin?: number;
+  numericalMax?: number;
+  questionContent?: unknown;
 }
 
 export interface AnswerSubmission {
@@ -284,7 +293,7 @@ export interface FeeInstallment {
   receiptNumber?: string;
 }
 
-export type FeePaymentMethod = "UPI" | "NET_BANKING" | "CARD" | "CHEQUE" | "CASH" | "DD";
+export type FeePaymentMethod = "UPI" | "NET_BANKING" | "CARD" | "CHEQUE" | "CASH" | "DD" | "NEFT_RTGS" | "ONLINE";
 
 export interface StudentFeeRecord {
   id: string;
@@ -362,14 +371,7 @@ export type LeadStage =
   | "CONVERTED"
   | "LOST";
 
-export type LeadSource =
-  | "WALK_IN"
-  | "WEBSITE"
-  | "REFERRAL"
-  | "SOCIAL_MEDIA"
-  | "NEWSPAPER"
-  | "CAMPAIGN"
-  | "OTHER";
+export type LeadSource =  | "WALK_IN" | "WEBSITE" | "REFERRAL" | "SOCIAL_MEDIA" | "NEWSPAPER" | "CAMPAIGN" | "OTHER" | "PHONE_ENQUIRY" | "STUDENT_REFERRAL" | "SEMINAR" | "NEWSPAPER_AD";
 
 export interface Lead {
   id: string;
@@ -458,4 +460,408 @@ export interface DemoRequest {
   notes?: string;
   status?: "PENDING" | "CONTACTED" | "DEMO_GIVEN" | "ONBOARDED" | "REJECTED";
   createdAt?: string;
+}
+
+
+
+export interface QuestionOption {
+  id: string;
+  text: string;
+  imageUrl?: string;
+}
+
+
+// ==========================================
+// Shared Prepzii Content & Question Bank Contracts
+// ==========================================
+
+export type QuestionDifficulty = "EASY" | "MEDIUM" | "HARD" | "ADVANCED";
+
+
+export interface QuestionFilterCriteria {
+  targetExam?: TargetExam;
+  subject?: string;
+  chapter?: string;
+  topic?: string;
+  difficulty?: QuestionDifficulty;
+  isPyq?: boolean;
+  pyqYear?: number;
+  kind?: QuestionKind;
+  searchQuery?: string;
+  limit?: number;
+  offset?: number;
+}
+
+
+export interface QuestionBankItem {
+  id: string;
+  kind: QuestionKind;
+  subject: string;
+  chapter: string;
+  topic: string;
+  difficulty: QuestionDifficulty;
+  targetExam: TargetExam;
+  isPyq: boolean;
+  pyqYear?: number;
+  text: string;
+  imageUrl?: string;
+  options?: QuestionOption[];
+  marks: number;
+  negativeMarks: number;
+  partialMarking?: boolean;
+  numericalMin?: number;
+  numericalMax?: number;
+  numericalAnswer?: number;
+  solutionExplanation?: string;
+  explanationImageUrl?: string;
+  questionContent?: unknown;
+  explanationContent?: unknown;
+  isInstituteOwned?: boolean;
+  organizationId?: OrganizationId;
+  paperCode?: string;
+  questionNumber?: number;
+  sourceType?: string;
+  status?: string;
+}
+
+
+export interface ChapterClassification {
+  subject: string;
+  chapter: string;
+  topics: string[];
+  totalQuestions: number;
+  pyqCount: number;
+}
+
+
+// ==========================================
+// CBT Real-Time Session & Attempt Contracts
+// ==========================================
+
+export type CbtSessionStatus =
+  | "NOT_STARTED"
+  | "IN_PROGRESS"
+  | "PAUSED"
+  | "SUBMITTED"
+  | "AUTO_SUBMITTED"
+  | "EVALUATED";
+
+
+export interface CbtSessionState {
+  attemptId: string;
+  scheduleId: string;
+  testId: string;
+  studentId: UserId;
+  status: CbtSessionStatus;
+  startedAt: string;
+  expiresAt: string;
+  durationMinutes: number;
+  remainingSeconds: number;
+  answers: Record<string, AnswerSubmission>;
+  markedForReview: readonly string[];
+  visitedQuestionIds: readonly string[];
+  lastAutosavedAt?: string;
+}
+
+
+export interface CbtAutosavePayload {
+  attemptId: string;
+  questionId: string;
+  answer?: AnswerSubmission;
+  timeSpentSeconds: number;
+  markedForReview?: boolean;
+}
+
+
+export interface CbtSubmissionReceipt {
+  attemptId: string;
+  testId: string;
+  studentId: UserId;
+  status: "SUBMITTED" | "AUTO_SUBMITTED";
+  submittedAt: string;
+  totalAnswered: number;
+  totalUnanswered: number;
+}
+
+
+export interface QuestionReviewDetail {
+  question: QuestionDefinition & {
+    text?: string;
+    options?: QuestionOption[];
+    solutionExplanation?: string;
+  };
+  submittedAnswer?: AnswerSubmission;
+  graded: GradedAnswer;
+}
+
+
+export interface ComprehensiveTestReview {
+  summary: TestResultSummary;
+  subjectBreakdown: Record<
+    string,
+    { score: number; maxScore: number; accuracy: number; timeSpentSeconds: number }
+  >;
+  questionReviews: QuestionReviewDetail[];
+  authorizedForReview: boolean;
+  reviewAvailableAt?: string;
+}
+
+
+// ==========================================
+// Parent-to-Student Link Contracts
+// ==========================================
+
+export interface ParentStudentRelation {
+  id: string;
+  organizationId: OrganizationId;
+  parentUserId: UserId;
+  studentUserId: UserId;
+  relationship: "FATHER" | "MOTHER" | "GUARDIAN";
+  studentName: string;
+  rollNumber: string;
+  batchId: string;
+  batchName: string;
+  isVerified: boolean;
+  linkedAt: string;
+}
+
+
+// ==========================================
+// Notification & Delivery Verification Contracts
+// ==========================================
+
+export type NotificationChannel = "WHATSAPP" | "SMS";
+
+export type NotificationDeliveryStatus = "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED";
+
+
+export interface NotificationDispatchLog {
+  id: string;
+  organizationId: OrganizationId;
+  batchId?: string;
+  recipientPhone: string;
+  recipientName: string;
+  recipientRole: "PARENT" | "STUDENT" | "FACULTY";
+  channel: NotificationChannel;
+  templateKey: "ABSENT_ALERT" | "LATE_WARNING" | "TEST_SCORE_CARD" | "INSTITUTE_NOTICE";
+  renderedContent: string;
+  status: NotificationDeliveryStatus;
+  provider: "GUPSHUP" | "FAST2SMS" | "TWILIO" | "INTERNAL_MOCK";
+  providerMessageId?: string;
+  sentAt?: string;
+  deliveredAt?: string;
+  failureReason?: string;
+  createdAt: string;
+}
+
+
+// ==========================================
+// Administrative Audit Log Contracts
+// ==========================================
+
+export type AuditEventType =
+  | "BATCH_CREATED"
+  | "BATCH_UPDATED"
+  | "STUDENT_ENROLLED"
+  | "STUDENT_ALLOCATED"
+  | "TEST_SCHEDULED"
+  | "ATTENDANCE_SUBMITTED"
+  | "PARENT_ALERT_DISPATCHED"
+  | "RESULT_PUBLISHED"
+  | "ROLE_INVITATION_SENT";
+
+
+export interface OrganizationAuditLog {
+  id: string;
+  organizationId: OrganizationId;
+  actorUserId: UserId;
+  actorRole: OrganizationRole;
+  eventType: AuditEventType;
+  resourceType: string;
+  resourceId: string;
+  details: Record<string, unknown>;
+  ipAddress?: string;
+  createdAt: string;
+}
+
+
+// ==========================================
+// Academic Progress & Mastery Contracts
+// ==========================================
+
+export interface ChapterMasteryProgress {
+  subject: string;
+  chapter: string;
+  accuracyPercentage: number;
+  status: "STRONG" | "MODERATE" | "NEEDS_FOCUS";
+}
+
+
+export interface StudentAcademicProgressReport {
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  batchName: string;
+  instituteName: string;
+  attendancePercentage: number;
+  totalPresent: number;
+  totalAbsent: number;
+  overallAverageScore: number;
+  overallPercentile: number;
+  projectedRankAIR: number;
+  subjectPerformance: Record<string, { averageScore: number; testsCount: number }>;
+  chapterMasteries: ChapterMasteryProgress[];
+  publishedTestResults: TestResultSummary[];
+  generatedAt: string;
+}
+
+
+// ==========================================
+// Institute Onboarding & Setup Contracts
+// ==========================================
+
+export interface InstituteSetupChecklist {
+  profileConfigured: boolean;
+  campusAdded: boolean;
+  academicYearSet: boolean;
+  programsConfigured: boolean;
+  firstBatchCreated: boolean;
+  teacherInvited: boolean;
+  studentsEnrolled: boolean;
+  overallCompletedPercentage: number;
+}
+
+
+export interface BulkStudentImportRow {
+  name: string;
+  phone: string;
+  email?: string;
+  rollNumber: string;
+  batchName: string;
+  targetExam: "JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "FOUNDATION" | "BOARDS";
+  parentName?: string;
+  parentPhone?: string;
+}
+
+
+export interface BulkImportResult {
+  totalProcessed: number;
+  successfulCount: number;
+  duplicateCount: number;
+  failedCount: number;
+  duplicates: Array<{ rollNumber: string; phone: string; reason: string }>;
+  enrolledStudents: Array<{ id: string; name: string; rollNumber: string; batchId: string }>;
+}
+
+export type StudentFeeStatus = "PENDING" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "WAIVED";
+
+export type InstallmentStatus = "DUE" | "PARTIALLY_PAID" | "PAID" | "OVERDUE" | "WAIVED";
+
+
+export interface FeePlan {
+  id: string;
+  organizationId: OrganizationId;
+  name: string;
+  targetExam: "JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "FOUNDATION" | "BOARDS";
+  totalAmountPaise: number; // e.g. 12000000 = Rs. 1,20,000.00
+  defaultInstallments: number;
+  description?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+
+export interface FeeInstallmentItem {
+  id: string;
+  studentFeeId: string;
+  installmentNumber: number;
+  dueDate: string;
+  amountPaise: number;
+  paidAmountPaise: number;
+  status: InstallmentStatus;
+}
+
+
+export interface StudentFeeLedger {
+  id: string;
+  organizationId: OrganizationId;
+  studentId: UserId;
+  studentName: string;
+  rollNumber: string;
+  batchName: string;
+  feePlanId: string;
+  feePlanName: string;
+  baseAmountPaise: number;
+  discountAmountPaise: number;
+  discountReason?: string;
+  finalAmountPaise: number;
+  totalPaidPaise: number;
+  outstandingBalancePaise: number;
+  status: StudentFeeStatus;
+  installments: FeeInstallmentItem[];
+  payments: FeeReceiptSummary[];
+  assignedAt: string;
+}
+
+
+export interface FeeReceiptSummary {
+  id: string;
+  receiptNumber: string;
+  studentFeeId: string;
+  studentId: string;
+  studentName: string;
+  rollNumber: string;
+  amountPaise: number;
+  paymentMethod: FeePaymentMethod;
+  referenceNumber?: string;
+  collectedBy: string;
+  notes?: string;
+  paidAt: string;
+}
+
+
+export type EnquiryStatus =
+  | "NEW"
+  | "CONTACTED"
+  | "COUNSELED"
+  | "DEMO_ATTENDED"
+  | "OFFER_EXTENDED"
+  | "ENROLLED"
+  | "LOST";
+
+
+export interface AdmissionsFollowupRecord {
+  id: string;
+  enquiryId: string;
+  counsellorId: string;
+  counsellorName: string;
+  interactionType: "PHONE_CALL" | "IN_PERSON_MEETING" | "WHATSAPP" | "EMAIL" | "CAMPUS_TOUR";
+  remarks: string;
+  nextFollowupDate?: string;
+  createdAt: string;
+}
+
+
+export interface AdmissionsEnquiryRecord {
+  id: string;
+  organizationId: OrganizationId;
+  studentName: string;
+  parentName?: string;
+  phone: string;
+  email?: string;
+  targetExam: "JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "FOUNDATION" | "BOARDS";
+  currentSchool?: string;
+  currentGrade?: string;
+  leadSource: LeadSource;
+  status: EnquiryStatus;
+  assignedCounsellorId?: string;
+  assignedCounsellorName?: string;
+  targetBatchId?: string;
+  targetBatchName?: string;
+  enrolledStudentId?: string;
+  enrolledAt?: string;
+  notes?: string;
+  followups: AdmissionsFollowupRecord[];
+  createdAt: string;
+  updatedAt: string;
 }

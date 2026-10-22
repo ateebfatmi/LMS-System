@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { adaptPrepziiQuestion, gradeAssessment, gradeAnswer, computeLeaderboard } from "./index.ts";
+import { adaptPrepziiQuestion, gradeAssessment, gradeAnswer, computeLeaderboard } from "./index.js";
 
 test("grades unordered multiple-choice selections", () => {
   const result = gradeAnswer(
@@ -107,3 +107,9 @@ test("adapts the existing PrepZii question schema without changing scoring signs
 });
 
 
+
+test("preserves legacy scoring when Supabase returns numeric marks as text", () => {
+  const question = adaptPrepziiQuestion({ id: "legacy-q", correct_option: "A", marks: 4, negative_marks: "-1" });
+  assert.equal(question.negativeMarks, 1);
+  assert.equal(gradeAnswer(question, { questionId: "legacy-q", selectedOptionIds: ["B"] }).score, -1);
+});

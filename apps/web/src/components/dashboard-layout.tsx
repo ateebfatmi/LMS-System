@@ -10,6 +10,8 @@ export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARE
 
 const roleNavItems: Record<AppRole, { href: string; label: string; icon: string }[]> = {
   DIRECTOR: [
+    { href: "/dashboard/admissions", label: "Student Enquiries", icon: "◎" },
+    { href: "/dashboard/onboarding", label: "Institute Setup", icon: "⚙" },
     { href: "/dashboard", label: "Executive Overview", icon: "❖" },
     { href: "/dashboard/crm", label: "Admissions CRM", icon: "◎" },
     { href: "/dashboard/batches", label: "Batches & Classrooms", icon: "⊞" },
@@ -28,6 +30,7 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
     { href: "/dashboard/billing", label: "Plan & Quotas", icon: "💎" },
   ],
   FACULTY: [
+    { href: "/dashboard/admissions", label: "Student Enquiries", icon: "◎" },
     { href: "/dashboard", label: "My Classes & Schedule", icon: "❖" },
     { href: "/dashboard/batches", label: "My Batches", icon: "⊞" },
     { href: "/dashboard/attendance", label: "Mark Attendance", icon: "✓" },
@@ -50,6 +53,9 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
     { href: "/dashboard/attendance", label: "My Attendance Log", icon: "✓" },
   ],
   PARENT: [
+    { href: "/dashboard/reports", label: "Test Rank Cards", icon: "📈" },
+    { href: "/dashboard/attendance", label: "Attendance Calendar", icon: "✓" },
+    { href: "/dashboard/fees", label: "Fee Status & Receipts", icon: "₹" },
     { href: "/dashboard", label: "Guardian Overview", icon: "❖" },
     { href: "/dashboard/announcements", label: "Circulars & Notices", icon: "🔔" },
   ],
@@ -73,7 +79,7 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: string 
   ],
 };
 
-function mapMembershipRole(role: string): AppRole {
+export function mapMembershipRole(role: string): AppRole {
   if (role === "TEACHER") return "FACULTY";
   if (role === "ACADEMIC_COORDINATOR") return "COORDINATOR";
   if (role === "STUDENT" || role === "PARENT" || role === "ACCOUNTANT") return role;
@@ -115,8 +121,8 @@ function LayoutContent({
   const navItems = roleNavItems[activeRole] || roleNavItems.DIRECTOR;
   return (
     <main className="app-shell">
-      <aside className={`sidebar ${isMobileMenuOpen ? "mobile-open" : ""}`}>
-        <div className="brand-row">
+      <aside className={`sidebar ${isMobileMenuOpen ? "mobile-open" : ""}`} suppressHydrationWarning>
+        <div className="brand-row" suppressHydrationWarning>
           <Link href="/">
             <PrepziiMark theme="dark" />
           </Link>
@@ -172,6 +178,13 @@ function LayoutContent({
           </div>
         </header>
 
+        {/^\/dashboard(?:\/(assessments|attendance|batches|fees|reports|students))?(?:\/workspace)?$/.test(pathname) && (
+          <nav aria-label="Module workflows" className="filter-bar">
+            <Link className="text-link" href={pathname.endsWith("/workspace") ? pathname.slice(0, -10) : `${pathname}/workspace`}>
+              {pathname.endsWith("/workspace") ? "Overview & operations" : "Institute workspace"}
+            </Link>
+          </nav>
+        )}
         {children}
 
         <footer className="workspace-footer">

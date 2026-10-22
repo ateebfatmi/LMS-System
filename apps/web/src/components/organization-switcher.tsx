@@ -1,12 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { setActiveOrganizationId } from "@/lib/client-org";
 
 type Organization = { id: string; name: string; slug: string; logoUrl: string | null; status: string };
 
 export function OrganizationSwitcher() {
-  const router = useRouter();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [activeSlug, setActiveSlug] = useState("");
   const [role, setRole] = useState("");
@@ -21,13 +20,14 @@ export function OrganizationSwitcher() {
     });
     if (response.ok) {
       const result = await response.json();
+      setActiveOrganizationId(result.organization.id);
       setActiveSlug(result.organization.slug);
       setRole(result.role);
       window.dispatchEvent(new CustomEvent("prepzii:organization-changed", { detail: { role: result.role } }));
-      if (refresh) router.refresh();
+      if (refresh) window.location.reload();
     }
     setBusy(false);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,6 +41,7 @@ export function OrganizationSwitcher() {
       const active = activeResponse.ok ? await activeResponse.json() : null;
       setOrganizations(list);
       if (active?.organization?.slug) {
+        setActiveOrganizationId(active.organization.id);
         setActiveSlug(active.organization.slug);
         setRole(active.role ?? "");
         setBusy(false);

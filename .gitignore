@@ -16,3 +16,12 @@ __pycache__/
 .pytest_cache/
 test-results/
 playwright-report/
+scripts/*.js
+
+# Environment secrets and private keys
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx

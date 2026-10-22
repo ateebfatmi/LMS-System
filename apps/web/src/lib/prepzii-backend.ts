@@ -1,9 +1,14 @@
 import "server-only";
 
+if (typeof (globalThis as any).WebSocket === "undefined") {
+  (globalThis as any).WebSocket = class {};
+}
+
 import { auth } from "@clerk/nextjs/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { AuthorizationError, authorizeTenantAction, type Permission } from "@prepzii/authorization";
-import { organizationRoles, type OrganizationRole, type TenantContext } from "@prepzii/contracts";
+import { type OrganizationRole, type TenantContext } from "@prepzii/contracts";
+import { normalizeOrganizationRole } from "@prepzii/assessment-core";
 
 type Institute = {
   id: string;
@@ -12,6 +17,7 @@ type Institute = {
   logo_url: string | null;
   owner_user_id: string;
   status: string;
+  userRole?: OrganizationRole;
 };
 
 type InstituteMember = {
@@ -40,26 +46,29 @@ export function getPrepziiAdmin(): SupabaseClient {
 }
 
 export async function getActingUserId(): Promise<string | null> {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    return process.env.DEMO_USER_ID || "usr_director_ateeb";
-  }
   try {
     const { userId } = await auth();
-    return userId || process.env.DEMO_USER_ID || "usr_director_ateeb";
-  } catch {
-    return process.env.DEMO_USER_ID || "usr_director_ateeb";
+    if (userId) return userId;
+  } catch {}
+
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      const { headers } = await import("next/headers");
+      const headerList = await headers();
+      const devHeaderUser = headerList.get("x-authenticated-user");
+      if (devHeaderUser) return devHeaderUser;
+    } catch {}
   }
+
+  return null;
 }
 
 export async function isPlatformSuperAdmin(): Promise<boolean> {
-  if (!process.env.PLATFORM_SUPER_ADMIN_USER_IDS && process.env.NODE_ENV !== "production") {
-    return true;
-  }
   const userId = await getActingUserId();
   if (!userId) return false;
 
   const allowedUserIds = new Set(
-    (process.env.PLATFORM_SUPER_ADMIN_USER_IDS ?? "usr_director_ateeb")
+    (process.env.PLATFORM_SUPER_ADMIN_USER_IDS ?? "")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
@@ -78,7 +87,7 @@ export async function listMyOrganizations(userId: string): Promise<Institute[]> 
         .eq("status", "ACTIVE"),
       supabase
         .from("institute_members")
-        .select("institutes!inner(id,name,slug,logo_url,owner_user_id,status)")
+        .select("role, institutes!inner(id,name,slug,logo_url,owner_user_id,status)")
         .eq("user_id", userId)
         .eq("status", "ACTIVE")
         .eq("institutes.status", "ACTIVE"),
@@ -88,10 +97,20 @@ export async function listMyOrganizations(userId: string): Promise<Institute[]> 
   if (membershipsError) throw membershipsError;
 
   const organizations = new Map<string, Institute>();
-  for (const institute of (owned ?? []) as Institute[]) organizations.set(institute.id, institute);
-  for (const row of memberships ?? []) {
-    const institute = row.institutes as unknown as Institute;
-    if (institute) organizations.set(institute.id, institute);
+  for (const institute of (owned ?? []) as Institute[]) {
+    organizations.set(institute.id, { ...institute, userRole: "OWNER" });
+  }
+  for (const row of (memberships ?? []) as any[]) {
+    const institute = row.institutes as Institute;
+    const memberRole = normalizeOrganizationRole(row.role);
+    if (institute) {
+      const existing = organizations.get(institute.id);
+      if (!existing) {
+        organizations.set(institute.id, { ...institute, userRole: memberRole });
+      } else if (existing.userRole !== "OWNER" && memberRole === "COACHING_ADMIN") {
+        organizations.set(institute.id, { ...institute, userRole: "COACHING_ADMIN" });
+      }
+    }
   }
   return [...organizations.values()];
 }
@@ -127,8 +146,8 @@ export async function getOrganizationContext(
 
   if (memberError) throw memberError;
   const rawRole = isOwner ? "OWNER" : member?.role ?? null;
-  if (!rawRole || !organizationRoles.includes(rawRole as OrganizationRole)) return null;
-  const role = rawRole as OrganizationRole;
+  if (!rawRole) return null;
+  const role = normalizeOrganizationRole(rawRole);
   if (!allowedRoles.includes(role)) return null;
 
   return {

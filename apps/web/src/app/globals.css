@@ -20,9 +20,13 @@
   --orange-soft: #fffbeb;
   --danger: #ef4444;
   --danger-soft: #fef2f2;
-  --font-body: "Avenir Next", Avenir, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-display: "Avenir Next", Avenir, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --font-prepzii-body: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-prepzii-display: "Rajdhani", "Space Grotesk", system-ui, sans-serif;
+  --font-prepzii-mono: "JetBrains Mono", "Courier New", monospace;
+  --font-body: var(--font-prepzii-body);
+  --font-display: var(--font-prepzii-display);
+  --font-mono: var(--font-prepzii-mono);
+
   --card-shadow: 0 1px 3px rgba(15, 23, 42, 0.03), 0 6px 20px -4px rgba(15, 23, 42, 0.04);
   --card-shadow-hover: 0 12px 32px -6px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(250, 204, 21, 0.25);
   --glass-header: rgba(255, 255, 255, 0.88);

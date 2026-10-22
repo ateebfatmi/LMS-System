@@ -21,6 +21,20 @@ export const metadata: Metadata = {
   },
 };
 
+function HeadContent() {
+  return (
+    <head>
+      <link rel="icon" href="/images/branding/prepzii-official-logo.png" type="image/png" />
+      <link rel="preconnect" href="https://fonts.googleapis.com" />
+      <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Rajdhani:wght@500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+      />
+    </head>
+  );
+}
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const hasClerk = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const fontClasses = "font-sans antialiased";
@@ -29,10 +43,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     return (
       <ClerkProvider>
         <html lang="en" className={fontClasses} data-scroll-behavior="smooth">
-          <head>
-            <link rel="icon" href="/images/branding/prepzii-official-logo.png" type="image/png" />
-          </head>
-          <body>{children}</body>
+          <HeadContent />
+          <body suppressHydrationWarning>{children}</body>
         </html>
       </ClerkProvider>
     );
@@ -40,10 +52,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
 
   return (
     <html lang="en" className={fontClasses} data-scroll-behavior="smooth">
-      <head>
-        <link rel="icon" href="/images/branding/prepzii-official-logo.png" type="image/png" />
-      </head>
-      <body>{children}</body>
+      <HeadContent />
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

@@ -20,6 +20,9 @@ export default function proxy(req: NextRequest, ev: NextFetchEvent) {
   }
 
   return clerkMiddleware(async (auth, request) => {
+    if (process.env.NODE_ENV !== "production" && request.headers.get("x-authenticated-user")) {
+      return;
+    }
     if (isProtectedRoute(request)) await auth.protect();
   })(req, ev);
 }

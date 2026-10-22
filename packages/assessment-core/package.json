@@ -6,7 +6,7 @@
   "exports": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "test": "node --experimental-strip-types --test src/index.test.ts",
+    "test": "tsc --target ES2022 --module ESNext --moduleResolution Bundler --outDir dist src/index.ts src/index.test.ts src/adapters.test.ts src/lifecycle.test.ts src/phase3.test.ts src/phase4.test.ts src/phase5.test.ts src/schema-reconciliation.test.ts && node --test dist/index.test.js dist/adapters.test.js dist/lifecycle.test.js dist/phase3.test.js dist/phase4.test.js dist/phase5.test.js dist/schema-reconciliation.test.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
