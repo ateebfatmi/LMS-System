@@ -5,8 +5,8 @@ import { getPrepziiAdmin } from "@/lib/prepzii-backend";
 import { mockBatches, mockStudents, type StudentRecord } from "@/lib/mock-data";
 
 // In-memory store for development/sandbox mode to allow dynamic additions without database reset
-let persistentBatches = [...mockBatches];
-let persistentStudents = [...mockStudents];
+const persistentBatches = [...mockBatches];
+const persistentStudents = [...mockStudents];
 
 export interface CreateBatchInput {
   organizationId: string;

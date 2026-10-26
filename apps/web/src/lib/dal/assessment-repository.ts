@@ -34,7 +34,7 @@ export interface CreateAssessmentInput {
 }
 
 // In-memory persistent stores for local/demo runs
-let persistentTests = [...mockTests];
+const persistentTests = [...mockTests];
 const persistentTestQuestions: Record<string, string[]> = {
   "tst-1": ["q-pyq-phy-01", "q-pyq-phy-02", "q-pyq-phy-03"],
   "tst-2": ["q-pyq-bio-01", "q-pyq-bio-02"],

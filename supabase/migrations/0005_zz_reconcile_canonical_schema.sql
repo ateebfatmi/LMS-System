@@ -34,6 +34,8 @@ alter table public.institute_batches
 create index if not exists institute_batches_campus_idx on public.institute_batches(campus_id);
 create index if not exists institute_batches_year_idx on public.institute_batches(academic_year_id);
 create index if not exists institute_batches_active_idx on public.institute_batches(is_active);
+alter table public.institute_batches
+  add constraint institute_batches_id_org_unique unique (id, institute_id);
 
 -- =================================================================
 -- 2. EXTEND CANONICAL institute_batch_members WITH B2B METADATA
@@ -292,12 +294,50 @@ create or replace view public.organization_batch_members as
 select
   bm.id,
   bm.batch_id,
+  bm.institute_id as organization_id,
   m.user_id,
   coalesce(bm.role, m.role, 'STUDENT') as role,
   bm.roll_number,
   bm.enrolled_at
 from public.institute_batch_members bm
 join public.institute_members m on m.id = bm.member_id;
+
+-- Keep legacy inserts working even though the compatibility view joins the
+-- canonical membership table to expose user_id.
+create or replace function public.insert_organization_batch_member_compat()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_member_id uuid;
+begin
+  select member.id into target_member_id
+  from public.institute_members member
+  where member.institute_id = new.organization_id
+    and member.user_id = new.user_id
+    and member.role = new.role;
+
+  if target_member_id is null then
+    raise exception 'Organization member not found for batch enrollment' using errcode = '23503';
+  end if;
+
+  insert into public.institute_batch_members (
+    id, institute_id, batch_id, member_id, roll_number, role, enrolled_at
+  ) values (
+    coalesce(new.id, gen_random_uuid()), new.organization_id, new.batch_id,
+    target_member_id, new.roll_number, new.role, coalesce(new.enrolled_at, now())
+  )
+  returning id into new.id;
+
+  return new;
+end;
+$$;
+
+create trigger organization_batch_members_compat_insert
+instead of insert on public.organization_batch_members
+for each row execute function public.insert_organization_batch_member_compat();
 
 -- =================================================================
 -- 7. ROW LEVEL SECURITY (RLS) POLICIES FOR RECONCILED TABLES

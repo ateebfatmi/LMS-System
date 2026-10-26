@@ -35,7 +35,7 @@ flowchart TD
     M0002["0002_coaching_lms_modules.sql\n- organization_course_modules\n- organization_course_lessons\n- organization_attendance_sessions\n- organization_test_schedules\n- organization_announcements"] --> M0003
     M0003["0003_institutional_operations.sql\n- organization_parent_students\n- organization_cbt_sessions\n- organization_cbt_answers\n- organization_notification_dispatches\n- organization_audit_logs"] --> M0004
     M0004["0004_business_operations.sql\n- organization_fee_plans\n- organization_student_fees\n- organization_fee_installments\n- organization_fee_payments\n- organization_admissions_enquiries\n- organization_admissions_followups"] --> M0005
-    M0005["0005_reconcile_canonical_schema.sql\n- Adds additive columns to institute_batches & institute_batch_members\n- Re-points all batch FKs to institute_batches(id)\n- Drops redundant batch tables & creates compatibility views\n- Adds institute_test_id and question_id FK constraints\n- Bi-directional session traceability"]
+    M0005["0005_zz_reconcile_canonical_schema.sql\n- Adds additive columns to institute_batches & institute_batch_members\n- Re-points all batch FKs to institute_batches(id)\n- Drops redundant batch tables & creates compatibility views\n- Adds institute_test_id and question_id FK constraints\n- Bi-directional session traceability"]
 ```
 
 ### Dependency Order & Execution Plan
@@ -54,7 +54,7 @@ flowchart TD
 4. **`0004_business_operations.sql`**:
    - Creates fee plans, student fee ledgers, installments, and receipts with paise precision.
    - Installs admissions enquiries CRM and counselor follow-up timeline.
-5. **`0005_reconcile_canonical_schema.sql`**:
+5. **`0005_zz_reconcile_canonical_schema.sql`**:
    - Extends canonical `public.institute_batches` additively with `campus_id`, `academic_year_id`, `grade_level`, `room_number`, and `is_active`.
    - Extends canonical `public.institute_batch_members` additively with `roll_number`, `role`, and `enrolled_at`.
    - Re-points all 6 dependent tables to `public.institute_batches(id)`.

@@ -35,6 +35,16 @@ create table if not exists public.organization_fee_plans (
   unique (organization_id, name)
 );
 
+-- Migration 0003_institutional_fees_and_campuses.sql introduced these
+-- ledgers first using rupee-denominated canonical columns. Keep this older
+-- Phase 4 migration additive when both histories are present.
+alter table public.organization_fee_plans
+  add column if not exists academic_year_id uuid references public.organization_academic_years(id) on delete set null,
+  add column if not exists total_amount_paise bigint,
+  add column if not exists default_installments integer,
+  add column if not exists description text,
+  add column if not exists updated_at timestamptz not null default now();
+
 create index if not exists org_fee_plans_org_idx on public.organization_fee_plans(organization_id);
 
 -- =================================================================
@@ -58,6 +68,17 @@ create table if not exists public.organization_student_fees (
   unique (organization_id, student_user_id, fee_plan_id)
 );
 
+alter table public.organization_student_fees
+  add column if not exists student_user_id text,
+  add column if not exists fee_plan_id uuid references public.organization_fee_plans(id) on delete restrict,
+  add column if not exists base_amount_paise bigint,
+  add column if not exists discount_amount_paise bigint,
+  add column if not exists discount_reason text,
+  add column if not exists final_amount_paise bigint,
+  add column if not exists total_paid_paise bigint,
+  add column if not exists assigned_by text,
+  add column if not exists created_at timestamptz not null default now();
+
 create index if not exists org_student_fees_org_idx on public.organization_student_fees(organization_id);
 create index if not exists org_student_fees_student_idx on public.organization_student_fees(student_user_id);
 create index if not exists org_student_fees_status_idx on public.organization_student_fees(status);
@@ -77,6 +98,12 @@ create table if not exists public.organization_fee_installments (
   created_at timestamptz not null default now(),
   unique (student_fee_id, installment_number)
 );
+
+alter table public.organization_fee_installments
+  add column if not exists installment_number integer,
+  add column if not exists amount_paise bigint,
+  add column if not exists paid_amount_paise bigint,
+  add column if not exists created_at timestamptz not null default now();
 
 create index if not exists org_fee_installments_org_idx on public.organization_fee_installments(organization_id);
 create index if not exists org_fee_installments_fee_idx on public.organization_fee_installments(student_fee_id);
@@ -163,6 +190,7 @@ alter table public.organization_admissions_followups enable row level security;
 -- Fee Plans: Viewable by staff and students, manageable by Admin/Owner
 create policy org_fee_plans_select on public.organization_fee_plans
   for select using (public.is_organization_member(organization_id));
+drop policy if exists org_fee_plans_manage on public.organization_fee_plans;
 create policy org_fee_plans_manage on public.organization_fee_plans
   for all using (public.has_organization_role(organization_id, array['OWNER', 'COACHING_ADMIN']))
   with check (public.has_organization_role(organization_id, array['OWNER', 'COACHING_ADMIN']));

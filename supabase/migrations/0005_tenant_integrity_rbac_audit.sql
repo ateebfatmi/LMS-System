@@ -127,6 +127,39 @@ create table if not exists public.organization_audit_logs (
   ip_address inet,
   created_at timestamptz not null default now()
 );
+
+-- Phase 2 introduced this table with event/resource column names. Keep that
+-- schema compatible while exposing the canonical action/entity audit shape
+-- used by all later LMS mutations.
+alter table public.organization_audit_logs add column if not exists action text;
+alter table public.organization_audit_logs add column if not exists entity_type text;
+alter table public.organization_audit_logs add column if not exists entity_id text;
+alter table public.organization_audit_logs add column if not exists before_state jsonb;
+alter table public.organization_audit_logs add column if not exists after_state jsonb;
+alter table public.organization_audit_logs add column if not exists request_id text;
+
+create or replace function public.normalize_organization_audit_log()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.action := coalesce(new.action, new.event_type);
+  new.event_type := coalesce(new.event_type, new.action);
+  new.entity_type := coalesce(new.entity_type, new.resource_type);
+  new.resource_type := coalesce(new.resource_type, new.entity_type);
+  new.entity_id := coalesce(new.entity_id, new.resource_id);
+  new.resource_id := coalesce(new.resource_id, new.entity_id, 'unknown');
+  new.details := coalesce(new.details, new.after_state, new.before_state, '{}'::jsonb);
+  return new;
+end;
+$$;
+
+drop trigger if exists normalize_organization_audit_log on public.organization_audit_logs;
+create trigger normalize_organization_audit_log
+before insert or update on public.organization_audit_logs
+for each row execute function public.normalize_organization_audit_log();
+
 create index if not exists organization_audit_logs_org_time_idx
   on public.organization_audit_logs(organization_id, created_at desc);
 
