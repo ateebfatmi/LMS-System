@@ -1,3 +1,5 @@
+-- HISTORICAL ONLY — superseded by the canonical organization finance and CRM migrations.
+-- This file is intentionally excluded from the active migration chain.
 -- Prepzii for Institutions: Phase 4 Additive Migration
 -- File: supabase/migrations/0004_business_operations.sql
 -- Prerequisites:

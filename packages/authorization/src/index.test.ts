@@ -4,14 +4,18 @@ import type { TenantContext } from "@prepzii/contracts";
 import {
   AuthorizationError,
   authorizeTenantAction,
+  canUseDevelopmentDemoTenant,
   canAccessAssignment,
   canAccessBatch,
+  canAccessGuardianStudent,
   canGrantRole,
   evaluateQuotaAvailability,
   hasPermission,
   isAnswerKeyReleased,
   isMembershipActive,
   isPaymentUnique,
+  isDevelopmentAuthOverrideEnabled,
+  isTrustedMutationRequest,
 } from "./index.ts";
 
 const teacherA: TenantContext = {
@@ -68,6 +72,13 @@ test("parents cannot read attendance or fees before guardian linking exists", ()
     () => authorizeTenantAction(parent, "organization-a", "fees:read"),
     (error) => error instanceof AuthorizationError && error.code === "FORBIDDEN",
   );
+});
+
+test("reviewed guardian scope allows only explicitly linked students in the same tenant", () => {
+  const parent = { organizationId: "organization-a", userId: "parent-1", role: "PARENT" } as const;
+  assert.equal(canAccessGuardianStudent(parent, "organization-a", "student-1", ["student-1"]), true);
+  assert.equal(canAccessGuardianStudent(parent, "organization-a", "student-2", ["student-1"]), false);
+  assert.equal(canAccessGuardianStudent(parent, "organization-b", "student-1", ["student-1"]), false);
 });
 
 test("teacher batch scope restricts teachers to assigned batches only", () => {
@@ -169,5 +180,28 @@ test("quota evaluation rejects negative increments and enforces plan limits", ()
   assert.deepEqual(evaluateQuotaAvailability(BigInt(100), BigInt(-5), BigInt(200)), { allowed: false, remaining: BigInt(100) });
   // Exact boundary match
   assert.deepEqual(evaluateQuotaAvailability(BigInt(150), BigInt(50), BigInt(200)), { allowed: true, remaining: BigInt(0) });
+});
+
+test("development identity override is explicit and never available outside development", () => {
+  assert.equal(isDevelopmentAuthOverrideEnabled("development", "true"), true);
+  assert.equal(isDevelopmentAuthOverrideEnabled("development", undefined), false);
+  assert.equal(isDevelopmentAuthOverrideEnabled("test", "true"), false);
+  assert.equal(isDevelopmentAuthOverrideEnabled("production", "true"), false);
+});
+
+test("demo tenancy fails closed for partial or deployed service configuration", () => {
+  assert.equal(canUseDevelopmentDemoTenant({ nodeEnv: "development", hasClerk: false, hasSupabase: false }), true);
+  assert.equal(canUseDevelopmentDemoTenant({ nodeEnv: "development", hasClerk: false, hasSupabase: true }), false);
+  assert.equal(canUseDevelopmentDemoTenant({ nodeEnv: "development", hasClerk: true, hasSupabase: false }), false);
+  assert.equal(canUseDevelopmentDemoTenant({ nodeEnv: "production", hasClerk: false, hasSupabase: false }), false);
+});
+
+test("mutation origin policy rejects cross-site browser requests", () => {
+  const allowedOrigins = ["https://institutes.prepzii.com"];
+  assert.equal(isTrustedMutationRequest({ method: "GET", origin: "https://evil.example", fetchSite: "cross-site", allowedOrigins }), true);
+  assert.equal(isTrustedMutationRequest({ method: "POST", origin: "https://institutes.prepzii.com", fetchSite: "same-origin", allowedOrigins }), true);
+  assert.equal(isTrustedMutationRequest({ method: "POST", origin: "https://evil.example", fetchSite: "cross-site", allowedOrigins }), false);
+  assert.equal(isTrustedMutationRequest({ method: "POST", origin: "not-a-url", fetchSite: "same-site", allowedOrigins }), false);
+  assert.equal(isTrustedMutationRequest({ method: "POST", origin: null, fetchSite: null, allowedOrigins }), true);
 });
 

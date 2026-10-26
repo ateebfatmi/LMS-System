@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { validateMemberCsv } from "@prepzii/membership";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { guardRateLimit } from "@/lib/rate-limit";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const idempotencySchema = z.uuid();
@@ -30,6 +31,15 @@ export async function POST(request: Request, context: Context) {
 
   const resolved = await getAuthorizedOrganizationContext(parsedSlug.data, "members:manage");
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
+
+  const limited = await guardRateLimit({
+    request,
+    scope: "member-imports",
+    subject: `${resolved.context.organizationId}:${resolved.context.userId}`,
+    limit: 20,
+    windowSeconds: 3600,
+  });
+  if (limited) return limited;
 
   const validation = validateMemberCsv(parsed.data.csvText, parsed.data.role);
   if (validation.fileErrors.length) {

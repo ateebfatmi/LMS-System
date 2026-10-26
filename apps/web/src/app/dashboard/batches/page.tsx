@@ -2,16 +2,23 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
+import { Badge, Button, MetricCard, ProgressBar } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { getActiveOrganizationId, useActiveOrganizationId } from "@/lib/client-org";
+import type { Batch } from "@prepzii/contracts";
+
+type DashboardBatch = Batch & {
+  facultyName: string;
+  attendanceRate: number;
+  syllabusProgress: number;
+};
 
 export default function BatchesPage() {
   const activeOrganizationId = useActiveOrganizationId();
   const [selectedFilter, setSelectedFilter] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [batchList, setBatchList] = useState<any[]>([]);
+  const [batchList, setBatchList] = useState<DashboardBatch[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,8 +56,8 @@ export default function BatchesPage() {
     const examMatch =
       selectedFilter === "ALL" ||
       b.targetExam === selectedFilter ||
-      (selectedFilter === "JEE_MAIN" && (b.targetExam === "JEE" || b.targetExam === "JEE_MAIN")) ||
-      (selectedFilter === "JEE_ADVANCED" && (b.targetExam === "JEE" || b.targetExam === "JEE_ADVANCED"));
+      (selectedFilter === "JEE_MAIN" && b.targetExam === "JEE_MAIN") ||
+      (selectedFilter === "JEE_ADVANCED" && b.targetExam === "JEE_ADVANCED");
     const searchMatch =
       !searchTerm.trim() ||
       b.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

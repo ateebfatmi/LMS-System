@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { AdmissionsRepository } from "@/lib/dal/admissions-repository";
 
 export async function GET(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "TEACHER"], orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN"], orgId);
     const enquiries = await AdmissionsRepository.listEnquiries(auth.organizationId);
 
     const stats = {
@@ -16,18 +16,18 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json({ enquiries, stats });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to load admissions enquiries" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to load admissions enquiries") }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "TEACHER"], orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN"], orgId);
     const body = await req.json();
 
     if (body.action === "CREATE_ENQUIRY") {
@@ -65,10 +65,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Admissions mutation failed" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Admissions mutation failed") }, { status: 500 });
   }
 }

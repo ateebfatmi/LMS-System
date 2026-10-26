@@ -108,17 +108,19 @@ create table if not exists public.organization_audit_logs (
   organization_id uuid not null references public.institutes(id) on delete cascade,
   actor_user_id text not null,
   actor_role text not null,
-  event_type text not null,
-  resource_type text not null,
-  resource_id text not null,
-  details jsonb not null default '{}'::jsonb,
-  ip_address text,
+  action text not null,
+  entity_type text not null,
+  entity_id text,
+  before_state jsonb,
+  after_state jsonb,
+  request_id text,
+  ip_address inet,
   created_at timestamptz not null default now()
 );
 
 create index if not exists org_audit_logs_org_idx on public.organization_audit_logs(organization_id);
 create index if not exists org_audit_logs_actor_idx on public.organization_audit_logs(actor_user_id);
-create index if not exists org_audit_logs_event_idx on public.organization_audit_logs(event_type);
+create index if not exists org_audit_logs_action_idx on public.organization_audit_logs(action);
 
 -- =================================================================
 -- 5. ROW LEVEL SECURITY (RLS) POLICIES

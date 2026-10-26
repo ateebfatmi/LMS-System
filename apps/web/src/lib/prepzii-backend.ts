@@ -1,12 +1,18 @@
 import "server-only";
 
-if (typeof (globalThis as any).WebSocket === "undefined") {
-  (globalThis as any).WebSocket = class {};
+const runtimeGlobal = globalThis as typeof globalThis & { WebSocket?: typeof WebSocket };
+if (typeof runtimeGlobal.WebSocket === "undefined") {
+  runtimeGlobal.WebSocket = class WebSocketStub {} as unknown as typeof WebSocket;
 }
 
 import { auth } from "@clerk/nextjs/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { AuthorizationError, authorizeTenantAction, type Permission } from "@prepzii/authorization";
+import {
+  AuthorizationError,
+  authorizeTenantAction,
+  isDevelopmentAuthOverrideEnabled,
+  type Permission,
+} from "@prepzii/authorization";
 import { type OrganizationRole, type TenantContext } from "@prepzii/contracts";
 import { normalizeOrganizationRole } from "@prepzii/assessment-core";
 
@@ -26,6 +32,11 @@ type InstituteMember = {
   user_id: string | null;
   role: string;
   status: string;
+};
+
+type MembershipInstituteRow = {
+  role: string;
+  institutes: Institute | null;
 };
 
 let adminClient: SupabaseClient | undefined;
@@ -51,7 +62,7 @@ export async function getActingUserId(): Promise<string | null> {
     if (userId) return userId;
   } catch {}
 
-  if (process.env.NODE_ENV !== "production") {
+  if (isDevelopmentAuthOverrideEnabled(process.env.NODE_ENV, process.env.ALLOW_INSECURE_DEV_AUTH)) {
     try {
       const { headers } = await import("next/headers");
       const headerList = await headers();
@@ -100,8 +111,8 @@ export async function listMyOrganizations(userId: string): Promise<Institute[]> 
   for (const institute of (owned ?? []) as Institute[]) {
     organizations.set(institute.id, { ...institute, userRole: "OWNER" });
   }
-  for (const row of (memberships ?? []) as any[]) {
-    const institute = row.institutes as Institute;
+  for (const row of (memberships ?? []) as unknown as MembershipInstituteRow[]) {
+    const institute = row.institutes;
     const memberRole = normalizeOrganizationRole(row.role);
     if (institute) {
       const existing = organizations.get(institute.id);

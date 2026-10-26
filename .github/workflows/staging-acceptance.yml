@@ -1,0 +1,32 @@
+name: Staging acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-staging-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Prepare authenticated browser state
+        env:
+          STORAGE_STATE_JSON: ${{ secrets.STAGING_OWNER_STORAGE_STATE_JSON }}
+        run: printf '%s' "$STORAGE_STATE_JSON" > "$RUNNER_TEMP/staging-storage-state.json"
+      - name: Run authenticated staging acceptance
+        env:
+          STAGING_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+          STAGING_STORAGE_STATE: ${{ runner.temp }}/staging-storage-state.json
+          STAGING_ORGANIZATION_SLUG: ${{ vars.STAGING_ORGANIZATION_SLUG }}
+          STAGING_FORBIDDEN_ORGANIZATION_SLUG: ${{ vars.STAGING_FORBIDDEN_ORGANIZATION_SLUG }}
+        run: npm run test:e2e:staging

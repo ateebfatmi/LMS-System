@@ -36,6 +36,12 @@ export interface StudentAttendanceSummary {
   attendancePercentage: number;
 }
 
+type AttendanceRecordRow = {
+  student_id: string;
+  status: AttendanceStatus;
+  remarks: string | null;
+};
+
 // In-memory persistent stores for local/demo runs
 const attendanceSessions = new Map<string, AttendanceSession>();
 const attendanceRecords = new Map<string, AttendanceRecord[]>(); // sessionId -> records
@@ -117,7 +123,8 @@ export class AttendanceRepository {
           throw new Error(`Failed to query attendance records: ${recErr.message}`);
         }
 
-        const recordsMap = new Map((dbRecords || []).map((r: any) => [r.student_id, r]));
+        const typedRecords = (dbRecords || []) as unknown as AttendanceRecordRow[];
+        const recordsMap = new Map(typedRecords.map((record) => [record.student_id, record]));
         const batchStudents = await BatchRepository.listStudents(organizationId, batchId);
 
         return {
@@ -128,8 +135,8 @@ export class AttendanceRepository {
             date: dbSession.session_date,
             markedBy: dbSession.marked_by,
             totalStudents: batchStudents.length,
-            presentCount: (dbRecords || []).filter((r: any) => r.status === "PRESENT").length,
-            absentCount: (dbRecords || []).filter((r: any) => r.status === "ABSENT").length,
+            presentCount: typedRecords.filter((record) => record.status === "PRESENT").length,
+            absentCount: typedRecords.filter((record) => record.status === "ABSENT").length,
             createdAt: dbSession.created_at,
           },
           records: batchStudents.map((s) => {
@@ -140,7 +147,7 @@ export class AttendanceRepository {
               rollNumber: s.rollNumber,
               parentPhone: s.parentPhone,
               status: (saved?.status as AttendanceStatus) || "PRESENT",
-              remarks: saved?.remarks,
+              remarks: saved?.remarks ?? undefined,
             };
           }),
           isMarked: true,
@@ -374,6 +381,8 @@ export class AttendanceRepository {
    * Retrieves notification logs.
    */
   public static async listNotificationLogs(organizationId: string): Promise<NotificationDispatchLog[]> {
-    return [...notificationLogs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return [...notificationLogs.values()]
+      .filter((log) => log.organizationId === organizationId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 }

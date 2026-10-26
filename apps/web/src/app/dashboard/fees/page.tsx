@@ -43,6 +43,8 @@ export default function FeesPage() {
   };
 
   useEffect(() => {
+    // The async loader owns the loading lifecycle for organization changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadFeeData();
   }, [activeOrganizationId]);
 
@@ -94,8 +96,8 @@ export default function FeesPage() {
       setShowPaymentModal(false);
       setActiveReceipt(data.receipt);
       await loadFeeData();
-    } catch (err: any) {
-      setPaymentError(err.message || "Failed to record payment");
+    } catch (err: unknown) {
+      setPaymentError(err instanceof Error ? err.message : "Failed to record payment");
     } finally {
       setPaymentSaving(false);
     }
@@ -315,7 +317,7 @@ export default function FeesPage() {
                 </label>
                 <select
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as any)}
+                  onChange={(e) => setPaymentMethod(e.target.value as FeePaymentMethod)}
                   className="select-input"
                   style={{ width: "100%" }}
                 >

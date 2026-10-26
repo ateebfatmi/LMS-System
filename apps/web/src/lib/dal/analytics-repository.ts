@@ -2,8 +2,6 @@ import "server-only";
 
 import { mockBatches, mockStudents, type StudentRecord } from "@/lib/mock-data";
 import { BatchRepository } from "./batch-repository";
-import { AssessmentRepository } from "./assessment-repository";
-import { AttendanceRepository } from "./attendance-repository";
 
 export interface AtRiskStudent {
   student: StudentRecord;

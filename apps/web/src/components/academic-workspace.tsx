@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Badge, Button, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
@@ -59,6 +60,10 @@ export function AcademicWorkspace({ view }: { view: View }) {
   const title = view === "BATCHES" ? "Batches & enrolments" : view === "COURSES" ? "Courses & subjects" : "Campuses & timetable";
   return (
     <DashboardLayout title={title} subtitle={`${organization?.name ?? "Institute"} · Authoritative academic operations`}>
+      <nav className="academic-workspace-nav" aria-label="Academic workspace sections">
+        <Link className={view === "BATCHES" ? "active" : ""} href="/dashboard/batches/workspace">Batches & enrolments</Link>
+        <Link className={view === "CAMPUSES" ? "active" : ""} href="/dashboard/campuses">Campuses & timetable</Link>
+      </nav>
       <div className="metrics-grid academic-metrics">
         <MetricCard label="Academic sessions" value={String(data.academicYears.length)} detail="Configured years" accent="yellow" />
         <MetricCard label="Campuses" value={String(data.campuses.length)} detail={`${data.rooms.length} rooms`} accent="navy" />

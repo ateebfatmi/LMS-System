@@ -84,7 +84,7 @@ export default function StudentCbtExamPage({ params }: { params: Promise<{ testI
       setRemainingSecs((prev) => {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
-          handleAutoSubmit();
+          void handleSubmitTest();
           return 0;
         }
         return prev - 1;
@@ -94,6 +94,8 @@ export default function StudentCbtExamPage({ params }: { params: Promise<{ testI
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
+  // The effect intentionally restarts only when the active session or tab changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, session]);
 
   const currentQ = questions[currentIndex];
@@ -196,7 +198,7 @@ export default function StudentCbtExamPage({ params }: { params: Promise<{ testI
   };
 
   // Submit test to server
-  const handleSubmitTest = async () => {
+  async function handleSubmitTest() {
     if (!session) return;
     try {
       setIsSubmitting(true);
@@ -218,11 +220,7 @@ export default function StudentCbtExamPage({ params }: { params: Promise<{ testI
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const handleAutoSubmit = () => {
-    handleSubmitTest();
-  };
+  }
 
   // Load Review & Solutions
   const handleLoadReview = async () => {
@@ -271,7 +269,7 @@ export default function StudentCbtExamPage({ params }: { params: Promise<{ testI
                 Candidate: <strong>{submissionResult.studentName}</strong> · Batch: <strong>{submissionResult.batchName}</strong>
               </p>
             </div>
-            <Link href="/dashboard/assessments" className="pz-button pz-button-outline">
+            <Link href="/dashboard/assessments/workspace" className="pz-button pz-button-outline">
               ← Return to Dashboard
             </Link>
           </div>

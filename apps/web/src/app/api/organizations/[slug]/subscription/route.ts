@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireDatabaseCount, requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -9,25 +10,6 @@ const mutationSchema = z.discriminatedUnion("action", [
 ]);
 type Context = { params: Promise<{ slug: string }> };
 
-async function safeQuery<T>(promise: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
-  try {
-    const result = await promise;
-    if (result.error) return fallback;
-    return (result.data ?? fallback) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-async function safeCount(promise: PromiseLike<{ count: number | null; error: unknown }>, fallback: number) {
-  try {
-    const result = await promise;
-    return result.error ? fallback : result.count ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
 export async function GET(_request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug);
   if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
@@ -35,32 +17,28 @@ export async function GET(_request: Request, context: Context) {
   if (!resolved || resolved.context.role !== "OWNER") return Response.json({ error: "Forbidden" }, { status: 403 });
   const client = getPrepziiAdmin();
   const organizationId = resolved.context.organizationId;
-  const [subscription, plans, usage, branding, overrides, memberCount, campusCount] = await Promise.all([
-    safeQuery(client.from("organization_subscriptions").select("*").eq("organization_id", organizationId).maybeSingle(), {
-      plan_id: "INSTITUTE_PRO",
-      status: "ACTIVE",
-      billing_interval: "monthly",
-      current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
-    }),
-    safeQuery(client.from("subscription_plans").select("id,name,monthly_price_paise,annual_price_paise,student_limit,branch_limit,storage_gb,ai_credits_per_month,features,entitlements,is_active").eq("is_active", true).order("monthly_price_paise"), [
-      { id: "INSTITUTE_STARTER", name: "Starter", monthly_price_paise: 299900, annual_price_paise: 2999000, student_limit: 100, branch_limit: 1, storage_gb: 20, ai_credits_per_month: 250, features: [], entitlements: {}, is_active: true },
-      { id: "INSTITUTE_PRO", name: "Growth Pro", monthly_price_paise: 799900, annual_price_paise: 7999000, student_limit: 500, branch_limit: 3, storage_gb: 100, ai_credits_per_month: 1000, features: [], entitlements: {}, is_active: true },
-      { id: "INSTITUTE_ENTERPRISE", name: "Enterprise Apex", monthly_price_paise: 1999900, annual_price_paise: 19999000, student_limit: 5000, branch_limit: 10, storage_gb: 500, ai_credits_per_month: 5000, features: [], entitlements: {}, is_active: true },
-    ]),
-    safeQuery(client.from("organization_usage_counters").select("metric,period_start,period_end,quantity").eq("organization_id", organizationId).order("period_start", { ascending: false }), []),
-    safeQuery(client.from("organization_branding").select("logo_url,primary_color,support_email,support_phone,subdomain,subdomain_verified_at").eq("organization_id", organizationId).maybeSingle(), null),
-    safeQuery(client.from("organization_feature_overrides").select("feature_key,enabled,reason").eq("organization_id", organizationId), []),
-    safeCount(client.from("institute_members").select("id", { count: "exact", head: true }).eq("institute_id", organizationId).eq("role", "STUDENT").eq("status", "ACTIVE"), 0),
-    safeCount(client.from("organization_campuses").select("id", { count: "exact", head: true }).eq("organization_id", organizationId), 1),
-  ]);
-  return Response.json({
-    subscription,
-    plans,
-    usage,
-    branding,
-    featureOverrides: overrides,
-    counts: { activeStudents: memberCount, campuses: campusCount },
-  }, { headers: { "cache-control": "private, no-store" } });
+  try {
+    const [subscription, plans, usage, branding, overrides, memberCount, campusCount] = await Promise.all([
+      requireDatabaseQuery(client.from("organization_subscriptions").select("*").eq("organization_id", organizationId).maybeSingle(), null, "Load subscription"),
+      requireDatabaseQuery(client.from("subscription_plans").select("id,name,monthly_price_paise,annual_price_paise,student_limit,branch_limit,storage_gb,ai_credits_per_month,features,entitlements,is_active").eq("is_active", true).order("monthly_price_paise"), [], "Load subscription plans"),
+      requireDatabaseQuery(client.from("organization_usage_counters").select("metric,period_start,period_end,quantity").eq("organization_id", organizationId).order("period_start", { ascending: false }), [], "Load subscription usage"),
+      requireDatabaseQuery(client.from("organization_branding").select("logo_url,primary_color,support_email,support_phone,subdomain,subdomain_verified_at").eq("organization_id", organizationId).maybeSingle(), null, "Load organization branding"),
+      requireDatabaseQuery(client.from("organization_feature_overrides").select("feature_key,enabled,reason").eq("organization_id", organizationId), [], "Load feature overrides"),
+      requireDatabaseCount(client.from("institute_members").select("id", { count: "exact", head: true }).eq("institute_id", organizationId).eq("role", "STUDENT").eq("status", "ACTIVE"), 0, "Count active students"),
+      requireDatabaseCount(client.from("organization_campuses").select("id", { count: "exact", head: true }).eq("organization_id", organizationId), 0, "Count campuses"),
+    ]);
+    return Response.json({
+      subscription,
+      plans,
+      usage,
+      branding,
+      featureOverrides: overrides,
+      counts: { activeStudents: memberCount, campuses: campusCount },
+    }, { headers: { "cache-control": "private, no-store" } });
+  } catch (error) {
+    console.error("Subscription workspace query failed", error);
+    return Response.json({ error: "Subscription data is temporarily unavailable." }, { status: 503 });
+  }
 }
 
 export async function POST(request: Request, context: Context) {

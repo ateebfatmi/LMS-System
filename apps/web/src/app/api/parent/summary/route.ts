@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { ParentRepository } from "@/lib/dal/parent-repository";
 
 export async function GET(req: NextRequest) {
@@ -10,10 +10,10 @@ export async function GET(req: NextRequest) {
 
     const profile = await ParentRepository.getChildAcademicSummary(auth.organizationId, auth.userId, studentId);
     return NextResponse.json(profile);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to load child profile" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to load child profile") }, { status: 500 });
   }
 }

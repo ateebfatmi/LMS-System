@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { FeeRepository } from "@/lib/dal/fee-repository";
 
 export async function GET(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "TEACHER", "STUDENT", "PARENT"], orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "ACCOUNTANT"], orgId);
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type");
     const studentId = searchParams.get("studentId");
@@ -37,11 +37,11 @@ export async function GET(req: NextRequest) {
         totalEnrolled: studentFees.length,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to load fee information" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to load fee information") }, { status: 500 });
   }
 }
 
@@ -90,10 +90,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Fee mutation failed" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Fee mutation failed") }, { status: 500 });
   }
 }

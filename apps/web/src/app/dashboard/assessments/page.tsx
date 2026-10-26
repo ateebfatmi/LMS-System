@@ -4,13 +4,18 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
-import type { QuestionBankItem, TestResultSummary } from "@prepzii/contracts";
+import type { InstituteTest, QuestionBankItem, TestPattern, TestResultSummary } from "@prepzii/contracts";
 import { getActiveOrganizationId, useActiveOrganizationId } from "@/lib/client-org";
 
 export default function AssessmentsPage() {
   const activeOrganizationId = useActiveOrganizationId();
-  const [tests, setTests] = useState<any[]>([]);
-  const [selectedTest, setSelectedTest] = useState<any | null>(null);
+  type AssessmentListItem = InstituteTest & {
+    scheduledBatches?: string[];
+    totalSubmissions?: number;
+    avgScorePercent?: number;
+  };
+  const [tests, setTests] = useState<AssessmentListItem[]>([]);
+  const [selectedTest, setSelectedTest] = useState<AssessmentListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [leaderboard, setLeaderboard] = useState<TestResultSummary[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -20,7 +25,7 @@ export default function AssessmentsPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newPattern, setNewPattern] = useState<"JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "CUSTOM">("JEE_ADVANCED");
   const [newSubject, setNewSubject] = useState("Full Syllabus (PCM)");
-  const [newTotalMarks, setNewTotalMarks] = useState(180);
+  const newTotalMarks = 180;
   const [newDuration, setNewDuration] = useState(180);
   const [newBatch, setNewBatch] = useState("jee 2028");
 
@@ -98,7 +103,7 @@ export default function AssessmentsPage() {
           setBankQuestions(data.items || []);
           // Auto-select initial 3 questions if none selected
           if (selectedQIds.length === 0 && data.items?.length > 0) {
-            setSelectedQIds(data.items.slice(0, 3).map((q: any) => q.id));
+            setSelectedQIds((data.items as QuestionBankItem[]).slice(0, 3).map((q) => q.id));
           }
         }
       } catch (err) {
@@ -108,7 +113,7 @@ export default function AssessmentsPage() {
       }
     }
     fetchQuestions();
-  }, [activeOrganizationId, showCreateModal]);
+  }, [activeOrganizationId, showCreateModal, selectedQIds.length]);
 
   const toggleQuestionSelection = (id: string) => {
     setSelectedQIds((prev) =>
@@ -425,7 +430,7 @@ export default function AssessmentsPage() {
                     </label>
                     <select
                       value={newPattern}
-                      onChange={(e) => setNewPattern(e.target.value as any)}
+                      onChange={(e) => setNewPattern(e.target.value as TestPattern)}
                       className="select-input"
                       style={{ width: "100%" }}
                     >
@@ -597,7 +602,7 @@ export default function AssessmentsPage() {
                           </p>
 
                           {q.imageUrl && (
-                            /* eslint-disable-next-html-element-for-img */
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={q.imageUrl}
                               alt="Question Figure"
@@ -621,7 +626,7 @@ export default function AssessmentsPage() {
                                 >
                                   <strong>({opt.id.toUpperCase()})</strong> {opt.text}
                                   {opt.imageUrl && (
-                                    /* eslint-disable-next-html-element-for-img */
+                                    // eslint-disable-next-line @next/next/no-img-element
                                     <img
                                       src={opt.imageUrl}
                                       alt={`Option ${opt.id}`}

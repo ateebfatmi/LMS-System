@@ -7,6 +7,7 @@ import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
 import { DashboardLayout, mapMembershipRole, type AppRole } from "@/components/dashboard-layout";
 import type { ChildAcademicProfile } from "@/lib/dal/parent-repository";
 import type { InstituteAnalyticsSummary } from "@/lib/dal/analytics-repository";
+import type { Batch, InstituteTest, OrganizationRole } from "@prepzii/contracts";
 import { getActiveOrganizationId, setActiveOrganizationId, useActiveOrganizationId } from "@/lib/client-org";
 
 function OverviewContent() {
@@ -16,9 +17,16 @@ function OverviewContent() {
   // Dynamic server data states
   const [parentProfile, setParentProfile] = useState<ChildAcademicProfile | null>(null);
   const [analytics, setAnalytics] = useState<InstituteAnalyticsSummary | null>(null);
-  const [tests, setTests] = useState<any[]>([]);
-  const [batches, setBatches] = useState<any[]>([]);
-  const [organizations, setOrganizations] = useState<any[]>([]);
+  type OrganizationSummary = { id: string; name: string; slug: string; userRole: OrganizationRole };
+  type DashboardTest = InstituteTest & { totalSubmissions?: number };
+  type DashboardBatch = Batch & {
+    facultyName?: string;
+    attendanceRate?: number;
+    syllabusProgress?: number;
+  };
+  const [tests, setTests] = useState<DashboardTest[]>([]);
+  const [batches, setBatches] = useState<DashboardBatch[]>([]);
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [showReportModal, setShowReportModal] = useState(false);
@@ -46,7 +54,7 @@ function OverviewContent() {
         }
 
         const orgsData = await resOrgs.json();
-        const orgsList = orgsData.organizations || [];
+        const orgsList: OrganizationSummary[] = orgsData.organizations || [];
         if (isMounted) setOrganizations(orgsList);
 
         if (orgsList.length === 0) {
@@ -56,12 +64,12 @@ function OverviewContent() {
 
         // Determine active institute
         const storedOrgId = getActiveOrganizationId();
-        let currentOrg = orgsList.find((o: any) => o.id === (activeOrganizationId || selectedOrgId || storedOrgId));
+        let currentOrg = orgsList.find((o) => o.id === (activeOrganizationId || selectedOrgId || storedOrgId));
         if (!currentOrg) {
           // Prioritize administrative roles if present
           currentOrg =
-            orgsList.find((o: any) => o.userRole === "OWNER" || o.userRole === "COACHING_ADMIN") ||
-            orgsList.find((o: any) => o.userRole === "TEACHER") ||
+            orgsList.find((o) => o.userRole === "OWNER" || o.userRole === "COACHING_ADMIN") ||
+            orgsList.find((o) => o.userRole === "TEACHER") ||
             orgsList[0];
         }
 
@@ -128,9 +136,9 @@ function OverviewContent() {
             setBatches([]);
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("Dashboard data load error:", err);
-        if (isMounted) setApiError(err.message || "Failed to load dashboard data");
+        if (isMounted) setApiError(err instanceof Error ? err.message : "Failed to load dashboard data");
       } finally {
         if (isMounted) setLoading(false);
       }

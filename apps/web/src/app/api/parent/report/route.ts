@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { ParentRepository } from "@/lib/dal/parent-repository";
 
 export async function GET(req: NextRequest) {
@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
       chapterMasteries: profile.chapterMasteries,
       downloadFilename: `Prepzii_Report_${profile.student.rollNumber}_${new Date().toISOString().split("T")[0]}.json`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to generate report" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to generate report") }, { status: 500 });
   }
 }

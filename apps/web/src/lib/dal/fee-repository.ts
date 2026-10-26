@@ -6,7 +6,6 @@ import type {
   FeePlan,
   FeeReceiptSummary,
   StudentFeeLedger,
-  StudentFeeStatus,
 } from "@prepzii/contracts";
 import { mockStudents } from "@/lib/mock-data";
 

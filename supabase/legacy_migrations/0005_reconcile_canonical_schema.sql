@@ -1,3 +1,6 @@
+-- HISTORICAL ONLY — this migration replaces tenant tables with views and is
+-- incompatible with the tenant-integrity constraints in the active chain.
+-- It is intentionally excluded from new deployments.
 -- Prepzii B2B LMS — Migration 0005: Canonical Schema Reconciliation
 -- Reconciles B2B LMS tables with verified consumer Prepzii Supabase backend.
 --

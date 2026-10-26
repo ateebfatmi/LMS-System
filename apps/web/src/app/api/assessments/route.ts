@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { AssessmentRepository } from "@/lib/dal/assessment-repository";
 
 export async function GET(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(undefined, orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "TEACHER"], orgId);
     const { searchParams } = new URL(req.url);
     const testId = searchParams.get("testId");
 
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
     const tests = await AssessmentRepository.listTests(auth.organizationId);
     return NextResponse.json({ tests });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "TEACHER"], orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "TEACHER"], orgId);
     const body = await req.json();
 
     if (!body.title || !body.pattern || !body.targetBatchName) {
@@ -46,10 +46,10 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ test: created }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to create assessment" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to create assessment") }, { status: 500 });
   }
 }

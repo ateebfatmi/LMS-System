@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -15,16 +16,6 @@ const mutationSchema = z.discriminatedUnion("action", [
 ]);
 type Context = { params: Promise<{ slug: string }> };
 
-async function safeQuery<T>(promise: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
-  try {
-    const result = await promise;
-    if (result.error) return fallback;
-    return (result.data ?? fallback) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 export async function GET(_request: Request, context: Context) {
   const parsedSlug = slugSchema.safeParse((await context.params).slug);
   if (!parsedSlug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
@@ -33,19 +24,20 @@ export async function GET(_request: Request, context: Context) {
   const client = getPrepziiAdmin();
   const organizationId = resolved.context.organizationId;
 
-  const [years, campuses, orgBatches, subjects, courses, rooms, schedules] = await Promise.all([
-    safeQuery(client.from("organization_academic_years").select("*").eq("organization_id", organizationId).order("starts_on", { ascending: false }), []),
-    safeQuery(client.from("organization_campuses").select("*").eq("organization_id", organizationId).order("name"), []),
-    safeQuery(client.from("organization_batches").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }), []),
-    safeQuery(client.from("organization_subjects").select("*").eq("organization_id", organizationId).order("name"), []),
-    safeQuery(client.from("organization_courses").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }), []),
-    safeQuery(client.from("organization_campus_rooms").select("*").eq("organization_id", organizationId).order("name"), []),
-    safeQuery(client.from("organization_room_schedules").select("*").eq("organization_id", organizationId).order("day_of_week"), []),
-  ]);
+  try {
+    const [years, campuses, orgBatches, subjects, courses, rooms, schedules] = await Promise.all([
+      requireDatabaseQuery(client.from("organization_academic_years").select("*").eq("organization_id", organizationId).order("starts_on", { ascending: false }), [], "Load academic years"),
+      requireDatabaseQuery(client.from("organization_campuses").select("*").eq("organization_id", organizationId).order("name"), [], "Load campuses"),
+      requireDatabaseQuery(client.from("organization_batches").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }), [], "Load academic batches"),
+      requireDatabaseQuery(client.from("organization_subjects").select("*").eq("organization_id", organizationId).order("name"), [], "Load subjects"),
+      requireDatabaseQuery(client.from("organization_courses").select("*").eq("organization_id", organizationId).order("created_at", { ascending: false }), [], "Load courses"),
+      requireDatabaseQuery(client.from("organization_campus_rooms").select("*").eq("organization_id", organizationId).order("name"), [], "Load rooms"),
+      requireDatabaseQuery(client.from("organization_room_schedules").select("*").eq("organization_id", organizationId).order("day_of_week"), [], "Load schedules"),
+    ]);
 
   let batches = orgBatches;
   if (!batches.length) {
-    const legacyBatches = await safeQuery(client.from("institute_batches").select("*").eq("institute_id", organizationId), []);
+    const legacyBatches = await requireDatabaseQuery(client.from("institute_batches").select("*").eq("institute_id", organizationId), [], "Load legacy academic batches");
     batches = legacyBatches.map((b: Record<string, unknown>) => ({
       id: b.id,
       organization_id: b.institute_id,
@@ -61,9 +53,9 @@ export async function GET(_request: Request, context: Context) {
   }
 
   // Get students and faculty
-  let students = await safeQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }), null);
+  let students = await requireDatabaseQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }), null, "Load student directory");
   if (!students) {
-    const rawStudents = await safeQuery(client.from("institute_members").select("id,user_id,email,role,status,created_at").eq("institute_id", organizationId).eq("role", "STUDENT"), []);
+    const rawStudents = await requireDatabaseQuery(client.from("institute_members").select("id,user_id,email,role,status,created_at").eq("institute_id", organizationId).eq("role", "STUDENT"), [], "Load legacy student directory");
     students = rawStudents.map((m: Record<string, unknown>) => ({
       member_id: m.id,
       user_id: m.user_id,
@@ -74,9 +66,9 @@ export async function GET(_request: Request, context: Context) {
     }));
   }
 
-  let faculty = await safeQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "TEACHER", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }), null);
+  let faculty = await requireDatabaseQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "TEACHER", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }), null, "Load faculty directory");
   if (!faculty) {
-    const rawFaculty = await safeQuery(client.from("institute_members").select("id,user_id,email,role,status,created_at").eq("institute_id", organizationId).in("role", ["TEACHER", "COACHING_ADMIN", "OWNER"]), []);
+    const rawFaculty = await requireDatabaseQuery(client.from("institute_members").select("id,user_id,email,role,status,created_at").eq("institute_id", organizationId).in("role", ["TEACHER", "COACHING_ADMIN", "OWNER"]), [], "Load legacy faculty directory");
     faculty = rawFaculty.map((m: Record<string, unknown>) => ({
       member_id: m.id,
       user_id: m.user_id,
@@ -87,11 +79,15 @@ export async function GET(_request: Request, context: Context) {
     }));
   }
 
-  return Response.json({
-    academicYears: years, campuses, batches,
-    subjects, courses, rooms, schedules,
-    students, faculty,
-  });
+    return Response.json({
+      academicYears: years, campuses, batches,
+      subjects, courses, rooms, schedules,
+      students, faculty,
+    });
+  } catch (error) {
+    console.error("Academic workspace query failed", error);
+    return Response.json({ error: "Academic data is temporarily unavailable." }, { status: 503 });
+  }
 }
 
 export async function POST(request: Request, context: Context) {

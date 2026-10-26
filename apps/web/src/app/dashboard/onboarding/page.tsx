@@ -1,14 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
-import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
+import { Badge, Button, Panel, ProgressBar } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { BulkImportResult, InstituteSetupChecklist } from "@prepzii/contracts";
 
 export default function OnboardingPage() {
   const [checklist, setChecklist] = useState<InstituteSetupChecklist | null>(null);
-  const [loading, setLoading] = useState(true);
 
   // Profile Form State
   const [instituteName, setInstituteName] = useState("Apex JEE & NEET Academy");
@@ -41,7 +39,6 @@ Kabir Verma,+919833445566,APX-2026-1217,JEE 11B - Nucleus,JEE_MAIN,M. Verma,+919
   useEffect(() => {
     async function loadChecklist() {
       try {
-        setLoading(true);
         const res = await fetch("/api/onboarding");
         if (res.ok) {
           const data = await res.json();
@@ -49,8 +46,6 @@ Kabir Verma,+919833445566,APX-2026-1217,JEE 11B - Nucleus,JEE_MAIN,M. Verma,+919
         }
       } catch (err) {
         console.error("Failed to load onboarding checklist:", err);
-      } finally {
-        setLoading(false);
       }
     }
     loadChecklist();
@@ -92,7 +87,7 @@ Kabir Verma,+919833445566,APX-2026-1217,JEE 11B - Nucleus,JEE_MAIN,M. Verma,+919
             phone: parts[1],
             rollNumber: parts[2],
             batchName: parts[3],
-            targetExam: parts[4] as any,
+            targetExam: parts[4] as "JEE_MAIN" | "JEE_ADVANCED" | "NEET" | "FOUNDATION" | "BOARDS",
             parentName: parts[5] || parts[0] + " Parent",
             parentPhone: parts[6] || parts[1],
           });

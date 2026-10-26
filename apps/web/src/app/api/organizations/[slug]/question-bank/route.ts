@@ -52,7 +52,6 @@ export async function GET(request: Request, context: Context) {
   const rawQuestions = await safeRows(query);
 
   const questions = rawQuestions.map((q) => {
-    const isSingle = q.question_type === "single_choice";
     const isMulti = q.question_type === "multiple_choice";
     const isNumerical = q.question_type === "numerical";
 

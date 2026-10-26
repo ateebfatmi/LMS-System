@@ -1,4 +1,4 @@
--- Prepzii B2B LMS Migration 0003: Fee Management & Smart Campus Room Allocation
+-- Prepzii B2B LMS Migration 000301: Fee Management & Smart Campus Room Allocation
 -- Tenant-owned records strictly include organization_id and row-level security.
 
 -- =================================================================

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { guardRateLimit } from "@/lib/rate-limit";
 
 const demoRequestSchema = z.object({
   fullName: z.string().trim().min(2).max(120),
@@ -14,6 +15,9 @@ const demoRequestSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const limited = await guardRateLimit({ request, scope: "demo-request", limit: 5, windowSeconds: 3600 });
+  if (limited) return limited;
+
   const parsed = demoRequestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json(

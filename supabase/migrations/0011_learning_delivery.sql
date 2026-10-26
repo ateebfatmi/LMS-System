@@ -18,7 +18,7 @@ create table if not exists public.organization_course_batches (
   created_at timestamptz not null default now(),
   primary key (organization_id, course_id, batch_id),
   foreign key (course_id, organization_id) references public.organization_courses(id, organization_id) on delete cascade,
-  foreign key (batch_id, organization_id) references public.institute_batches(id, institute_id) on delete cascade
+  foreign key (batch_id, organization_id) references public.organization_batches(id, organization_id) on delete cascade
 );
 
 create table if not exists public.organization_lesson_resources (

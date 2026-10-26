@@ -256,7 +256,7 @@ export default function OfficePage() {
         </Link>
 
         <Link
-          href="/dashboard/fees"
+          href="/dashboard/fees/workspace"
           style={{
             padding: "20px",
             background: "white",
