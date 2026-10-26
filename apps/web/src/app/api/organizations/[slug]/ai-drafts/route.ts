@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { guardRateLimit } from "@/lib/rate-limit";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const requestSchema = z.object({ requestId: z.uuid(), feature: z.enum(["ANNOUNCEMENT_DRAFT", "QUESTION_DRAFTS", "LESSON_SUMMARY"]), brief: z.string().trim().min(10).max(12_000) });
@@ -32,6 +33,8 @@ export async function POST(request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug); const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!slug.success || !parsed.success) return Response.json({ error: "Invalid AI draft request." }, { status: 400 });
   const resolved = await getAuthorizedOrganizationContext(slug.data, "content:manage"); if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
+  const limited = await guardRateLimit({ request, scope: "ai-drafts", subject: `${resolved.context.organizationId}:${resolved.context.userId}`, limit: 20, windowSeconds: 3600 });
+  if (limited) return limited;
   const apiKey = process.env.GEMINI_API_KEY; if (!apiKey) return Response.json({ error: "AI drafting is not configured." }, { status: 503 });
   const client = getPrepziiAdmin(); const { requestId, feature, brief } = parsed.data; const organizationId = resolved.context.organizationId;
   const existing = await client.from("organization_ai_drafts").select("id,status,output,error_message").eq("organization_id", organizationId).eq("request_id", requestId).maybeSingle();

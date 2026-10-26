@@ -3,6 +3,10 @@ import "server-only";
 import { auth } from "@clerk/nextjs/server";
 import type { OrganizationRole, TenantContext } from "@prepzii/contracts";
 import { normalizeOrganizationRole } from "@prepzii/assessment-core";
+import {
+  canUseDevelopmentDemoTenant,
+  isDevelopmentAuthOverrideEnabled,
+} from "@prepzii/authorization";
 import { getPrepziiAdmin, getOrganizationContext } from "@/lib/prepzii-backend";
 
 export class AuthorizationError extends Error {
@@ -10,6 +14,16 @@ export class AuthorizationError extends Error {
     super(message);
     this.name = "AuthorizationError";
   }
+}
+
+export function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function getRelatedInstituteName(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const name = Reflect.get(value, "name");
+  return typeof name === "string" ? name : undefined;
 }
 
 /**
@@ -25,11 +39,23 @@ export async function requireAuthContext(
   const hasClerk = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
   const hasSupabase = Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
-  // In production, authentication and database must be real; fail immediately if missing
-  if (isProduction && (!hasClerk || !hasSupabase)) {
+  // Authentication and database configuration is atomic. A partial setup must
+  // never combine a synthetic identity with a real service-role database.
+  if (!hasClerk || !hasSupabase) {
+    if (canUseDevelopmentDemoTenant({ nodeEnv: process.env.NODE_ENV, hasClerk, hasSupabase })) {
+      const demoRole: OrganizationRole = requiredRoles?.[0] ?? "OWNER";
+      return {
+        organizationId: requestedOrgId || "demo-institute-apex",
+        userId: `dev_user_${demoRole.toLowerCase()}`,
+        role: demoRole,
+      };
+    }
+
     throw new AuthorizationError(
-      "Production deployment requires configured Clerk and Supabase credentials.",
-      500
+      isProduction
+        ? "Production deployment requires configured Clerk and Supabase credentials."
+        : "Clerk and Supabase must either both be configured or both be absent in local development.",
+      503
     );
   }
 
@@ -41,7 +67,7 @@ export async function requireAuthContext(
       userId = clerkAuth.userId;
     } catch {}
 
-    if (!userId && process.env.NODE_ENV !== "production") {
+    if (!userId && isDevelopmentAuthOverrideEnabled(process.env.NODE_ENV, process.env.ALLOW_INSECURE_DEV_AUTH)) {
       try {
         const { headers } = await import("next/headers");
         const headerList = await headers();
@@ -54,10 +80,6 @@ export async function requireAuthContext(
 
     if (!userId) {
       throw new AuthorizationError("Unauthenticated: Please log in.", 401);
-    }
-
-    if (!hasSupabase) {
-      throw new AuthorizationError("Shared database is not configured.", 503);
     }
 
     const supabase = getPrepziiAdmin();
@@ -149,7 +171,7 @@ export async function requireAuthContext(
 
       return {
         organizationId: member.institute_id,
-        organizationName: (member.institutes as any)?.name || "Institute",
+        organizationName: getRelatedInstituteName(member.institutes) || "Institute",
         userId,
         role,
         memberId: member.id,
@@ -202,7 +224,7 @@ export async function requireAuthContext(
       if (!existing) {
         candidateAffiliations.push({
           organizationId: mem.institute_id,
-          organizationName: (mem.institutes as any)?.name || "Institute",
+          organizationName: getRelatedInstituteName(mem.institutes) || "Institute",
           role,
           memberId: mem.id,
         });
@@ -257,14 +279,5 @@ export async function requireAuthContext(
     };
   }
 
-  // Local Development Sandbox Mode (Permitted strictly when NODE_ENV !== "production")
-  // Clearly tagged demo context that never touches production tables
-  const demoOrgId = requestedOrgId || "demo-institute-apex";
-  const demoRole = (requiredRoles && requiredRoles.length > 0) ? requiredRoles[0] : "DIRECTOR" as any;
-
-  return {
-    organizationId: demoOrgId,
-    userId: `dev_user_${String(demoRole).toLowerCase()}`,
-    role: demoRole,
-  };
+  throw new AuthorizationError("Authentication context could not be resolved.", 503);
 }

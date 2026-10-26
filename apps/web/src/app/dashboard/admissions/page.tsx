@@ -45,6 +45,8 @@ export default function AdmissionsPage() {
   };
 
   useEffect(() => {
+    // The async loader owns the loading lifecycle for the initial fetch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadEnquiries();
   }, []);
 
@@ -87,8 +89,8 @@ export default function AdmissionsPage() {
       setEmail("");
       setNotes("");
       await loadEnquiries();
-    } catch (err: any) {
-      setFormError(err.message || "Failed to create enquiry");
+    } catch (err: unknown) {
+      setFormError(err instanceof Error ? err.message : "Failed to create enquiry");
     } finally {
       setSaving(false);
     }
@@ -381,7 +383,7 @@ export default function AdmissionsPage() {
                   </label>
                   <select
                     value={targetExam}
-                    onChange={(e) => setTargetExam(e.target.value as any)}
+                    onChange={(e) => setTargetExam(e.target.value as typeof targetExam)}
                     className="select-input"
                     style={{ width: "100%" }}
                   >
@@ -397,7 +399,7 @@ export default function AdmissionsPage() {
                   </label>
                   <select
                     value={leadSource}
-                    onChange={(e) => setLeadSource(e.target.value as any)}
+                    onChange={(e) => setLeadSource(e.target.value as LeadSource)}
                     className="select-input"
                     style={{ width: "100%" }}
                   >
@@ -491,7 +493,7 @@ export default function AdmissionsPage() {
                   </label>
                   <select
                     value={interactionType}
-                    onChange={(e) => setInteractionType(e.target.value as any)}
+                    onChange={(e) => setInteractionType(e.target.value as typeof interactionType)}
                     className="select-input"
                     style={{ width: "100%" }}
                   >
@@ -506,7 +508,7 @@ export default function AdmissionsPage() {
                   </label>
                   <select
                     value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as any)}
+                    onChange={(e) => setNewStatus(e.target.value as EnquiryStatus)}
                     className="select-input"
                     style={{ width: "100%" }}
                   >
@@ -529,6 +531,19 @@ export default function AdmissionsPage() {
                   value={followupRemarks}
                   onChange={(e) => setFollowupRemarks(e.target.value)}
                   style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid var(--line)", fontSize: "12px" }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
+                  Next follow-up date
+                </label>
+                <input
+                  type="date"
+                  value={nextDate}
+                  onChange={(event) => setNextDate(event.target.value)}
+                  className="select-input"
+                  style={{ width: "100%" }}
                 />
               </div>
 

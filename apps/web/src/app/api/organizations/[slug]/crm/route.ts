@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -27,16 +28,6 @@ const mutationSchema = z.discriminatedUnion("action", [
 
 type Context = { params: Promise<{ slug: string }> };
 
-async function safeQuery<T>(promise: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
-  try {
-    const result = await promise;
-    if (result.error) return fallback;
-    return (result.data ?? fallback) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 export async function GET(_request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug);
   if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
@@ -45,24 +36,29 @@ export async function GET(_request: Request, context: Context) {
   const client = getPrepziiAdmin();
   const organizationId = resolved.context.organizationId;
 
-  const [leads, orgBatches] = await Promise.all([
-    safeQuery(client.from("organization_leads")
-      .select("id,name,email,phone,guardian_name,guardian_phone,target_exam,target_batch_id,source,assigned_counsellor_name,stage,follow_up_date,estimated_fee,notes,converted_student_id,converted_at,created_at,updated_at")
-      .eq("organization_id", organizationId).order("updated_at", { ascending: false }), []),
-    safeQuery(client.from("organization_batches").select("id,name,target_exam").eq("organization_id", organizationId).eq("is_active", true).order("name"), []),
-  ]);
+  try {
+    const [leads, orgBatches] = await Promise.all([
+      requireDatabaseQuery(client.from("organization_leads")
+        .select("id,name,email,phone,guardian_name,guardian_phone,target_exam,target_batch_id,source,assigned_counsellor_name,stage,follow_up_date,estimated_fee,notes,converted_student_id,converted_at,created_at,updated_at")
+        .eq("organization_id", organizationId).order("updated_at", { ascending: false }), [], "Load admissions leads"),
+      requireDatabaseQuery(client.from("organization_batches").select("id,name,target_exam").eq("organization_id", organizationId).eq("is_active", true).order("name"), [], "Load admissions batches"),
+    ]);
 
-  let batches = orgBatches;
-  if (!batches.length) {
-    const legacyBatches = await safeQuery(client.from("institute_batches").select("id,name,exam").eq("institute_id", organizationId), []);
-    batches = legacyBatches.map((b: Record<string, unknown>) => ({
-      id: b.id,
-      name: b.name,
-      target_exam: b.exam || "JEE_MAIN",
-    }));
+    let batches = orgBatches;
+    if (!batches.length) {
+      const legacyBatches = await requireDatabaseQuery(client.from("institute_batches").select("id,name,exam").eq("institute_id", organizationId), [], "Load legacy admissions batches");
+      batches = legacyBatches.map((b: Record<string, unknown>) => ({
+        id: b.id,
+        name: b.name,
+        target_exam: b.exam || "JEE_MAIN",
+      }));
+    }
+
+    return Response.json({ leads, batches }, { headers: { "cache-control": "private, no-store" } });
+  } catch (error) {
+    console.error("CRM workspace query failed", error);
+    return Response.json({ error: "Admissions data is temporarily unavailable." }, { status: 503 });
   }
-
-  return Response.json({ leads, batches }, { headers: { "cache-control": "private, no-store" } });
 }
 
 export async function POST(request: Request, context: Context) {

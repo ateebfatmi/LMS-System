@@ -37,8 +37,6 @@ export default function AttendancePage() {
 
   useEffect(() => {
     let cancelled = false;
-    setRecords([]);
-    setSelectedBatch("");
     void fetch("/api/batches").then(async (response) => {
       if (!response.ok) return;
       const result = await response.json();
@@ -325,7 +323,7 @@ export default function AttendancePage() {
                 </label>
                 <select
                   value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value as any)}
+                  onChange={(e) => setSelectedTemplate(e.target.value as typeof selectedTemplate)}
                   className="select-input"
                   style={{ width: "100%" }}
                 >
@@ -369,22 +367,22 @@ export default function AttendancePage() {
                 <div style={{ padding: "14px", background: "#f8fafc", border: "1px solid var(--line)", borderRadius: "10px", fontSize: "13px", lineHeight: "1.6" }}>
                   {selectedTemplate === "ABSENT" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, <strong>Aarav Sharma</strong> was marked <strong>ABSENT</strong> for lectures at <strong>Apex Academy</strong> on {attendanceDate}. Please contact institute if unexpected."
+                      &ldquo;Dear Parent, <strong>Aarav Sharma</strong> was marked <strong>ABSENT</strong> for lectures at <strong>Apex Academy</strong> on {attendanceDate}. Please contact institute if unexpected.&rdquo;
                     </p>
                   )}
                   {selectedTemplate === "LATE" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, <strong>Aarav Sharma</strong> arrived 20 minutes LATE for class today on {attendanceDate}."
+                      &ldquo;Dear Parent, <strong>Aarav Sharma</strong> arrived 20 minutes LATE for class today on {attendanceDate}.&rdquo;
                     </p>
                   )}
                   {selectedTemplate === "PTM" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, All India Mock Test 04 score for <strong>Aarav Sharma</strong> is published. Batch Rank: #2, Score: 156/180 (98.5%ile)."
+                      &ldquo;Dear Parent, All India Mock Test 04 score for <strong>Aarav Sharma</strong> is published. Batch Rank: #2, Score: 156/180 (98.5%ile).&rdquo;
                     </p>
                   )}
                   {selectedTemplate === "NOTICE" && (
                     <p style={{ margin: 0 }}>
-                      "Dear Parent, Institute will remain closed on Tuesday for celebrations. Regular classes resume Wednesday."
+                      &ldquo;Dear Parent, Institute will remain closed on Tuesday for celebrations. Regular classes resume Wednesday.&rdquo;
                     </p>
                   )}
                 </div>

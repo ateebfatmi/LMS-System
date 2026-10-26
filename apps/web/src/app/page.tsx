@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PrepziiMark, Badge } from "@prepzii/ui";
+import { Navbar1 } from "@/components/ui/navbar-1";
 
 // Mock CBT Question Data
 const CBT_QUESTIONS = [
@@ -200,80 +201,7 @@ export default function Home() {
       {/* Background Ambient Glow */}
       <div className="hero-glow" />
 
-      {/* Top Floating Glassmorphic Header */}
-      <nav className="landing-nav">
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <PrepziiMark theme="light" />
-          <span className="product-chip">
-            <span style={{ color: "#EAB308", fontSize: "14px" }}>★</span> FOR INSTITUTES
-          </span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "28px" }} className="nav-links-desktop">
-          <a href="#interactive-suite" className="text-link">
-            Live Simulator
-          </a>
-          <a href="#features" className="text-link">
-            Core Modules
-          </a>
-          <a href="#pricing" className="text-link">
-            Pricing
-          </a>
-          <a href="#faqs" className="text-link">
-            FAQs
-          </a>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <Link
-            href="/sign-in"
-            style={{
-              fontSize: "12px",
-              color: "#0f172a",
-              textDecoration: "none",
-              padding: "7px 14px",
-              borderRadius: "999px",
-              border: "1px solid #facc15",
-              fontWeight: 700,
-              background: "#fef9c3",
-              transition: "all 0.2s ease",
-            }}
-          >
-            Institute Sign In
-          </Link>
-          <Link
-            href="/super-admin"
-            style={{
-              fontSize: "12px",
-              color: "#64748b",
-              textDecoration: "none",
-              padding: "7px 14px",
-              borderRadius: "999px",
-              border: "1px solid rgba(203, 213, 225, 0.8)",
-              fontWeight: 600,
-              background: "rgba(255,255,255,0.7)",
-              transition: "all 0.2s ease",
-            }}
-          >
-            Operator
-          </Link>
-          <Link
-            className="primary-link"
-            href="/dashboard"
-            style={{
-              padding: "8px 20px",
-              fontSize: "13px",
-              borderRadius: "999px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
-          >
-            <span>Open Workspace</span>
-            <span style={{ fontWeight: 800 }}>→</span>
-          </Link>
-        </div>
-      </nav>
+      <Navbar1 />
 
       {/* Hero Section */}
       <section className="hero" style={{ textAlign: "center" }}>

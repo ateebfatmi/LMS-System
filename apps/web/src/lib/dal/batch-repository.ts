@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { Batch, BatchMember, TargetExam } from "@prepzii/contracts";
+import type { Batch, TargetExam } from "@prepzii/contracts";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
 import { mockBatches, mockStudents, type StudentRecord } from "@/lib/mock-data";
 
@@ -26,6 +26,22 @@ export interface EnrollStudentInput {
   rollNumber?: string;
 }
 
+type InstituteBatchRow = {
+  id: string;
+  institute_id: string;
+  name: string;
+  exam: TargetExam | null;
+  target_year: number | null;
+  created_at: string | null;
+};
+
+type BatchStudentRow = {
+  member_id: string;
+  batch_id: string;
+  institute_members: { email: string; status: StudentRecord["status"] } | null;
+  institute_batches: { name: string; exam: string | null } | null;
+};
+
 export class BatchRepository {
   /**
    * Retrieves all batches for an organization.
@@ -47,7 +63,7 @@ export class BatchRepository {
         throw new Error(`Failed to query canonical institute batches: ${instErr.message}`);
       }
 
-      return (instBatches || []).map((b: any) => ({
+      return ((instBatches || []) as unknown as InstituteBatchRow[]).map((b) => ({
         id: b.id,
         organizationId: b.institute_id,
         name: b.name,
@@ -207,7 +223,7 @@ export class BatchRepository {
       }
 
       if (rows && rows.length > 0) {
-        return rows.map((r: any) => ({
+        return (rows as unknown as BatchStudentRow[]).map((r) => ({
           id: r.member_id,
           name: r.institute_members?.email ? r.institute_members.email.split("@")[0] : `Student ${r.member_id.slice(0, 6)}`,
           rollNumber: `STD-${r.member_id.slice(0, 8).toUpperCase()}`,
@@ -218,7 +234,7 @@ export class BatchRepository {
           parentPhone: "+91 98000 00000",
           attendancePercentage: 100,
           averageScore: 0,
-          status: (r.institute_members?.status as any) || "ACTIVE",
+          status: r.institute_members?.status || "ACTIVE",
         }));
       }
       return [];

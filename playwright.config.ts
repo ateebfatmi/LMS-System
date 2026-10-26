@@ -18,6 +18,16 @@ export default defineConfig({
     url: "http://localhost:3005/api/health",
     reuseExistingServer: true,
     timeout: 60000,
+    env: {
+      ...process.env,
+      DEPLOYMENT_ENV: "development",
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "",
+      CLERK_SECRET_KEY: "",
+      NEXT_PUBLIC_SUPABASE_URL: "",
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "",
+      SUPABASE_SERVICE_ROLE_KEY: "",
+      ALLOW_INSECURE_DEV_AUTH: "false",
+    },
   },
   projects: [
     {

@@ -3,6 +3,7 @@ import { invitationRoles, normalizeInvitationEmail } from "@prepzii/membership";
 import { z } from "zod";
 import { deriveInvitationToken, hashInvitationToken } from "@/lib/invitation-token";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { guardRateLimit } from "@/lib/rate-limit";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const invitationSchema = z.object({
@@ -51,6 +52,15 @@ export async function POST(request: Request, context: Context) {
 
   const resolved = await getAuthorizedOrganizationContext(parsedSlug.data, "members:manage");
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
+
+  const limited = await guardRateLimit({
+    request,
+    scope: "organization-invitations",
+    subject: `${resolved.context.organizationId}:${resolved.context.userId}`,
+    limit: 30,
+    windowSeconds: 3600,
+  });
+  if (limited) return limited;
 
   const parsed = invitationSchema.safeParse(await request.json().catch(() => null));
   const idempotency = idempotencySchema.safeParse(request.headers.get("idempotency-key"));

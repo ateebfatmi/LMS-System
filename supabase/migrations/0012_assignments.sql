@@ -21,7 +21,7 @@ create table if not exists public.organization_assignments (
   check (num_nonnulls(course_id, batch_id, student_user_id) = 1),
   check (available_from is null or due_at > available_from),
   foreign key (course_id, organization_id) references public.organization_courses(id, organization_id) on delete cascade,
-  foreign key (batch_id, organization_id) references public.institute_batches(id, institute_id) on delete cascade,
+  foreign key (batch_id, organization_id) references public.organization_batches(id, organization_id) on delete cascade,
   unique (id, organization_id)
 );
 

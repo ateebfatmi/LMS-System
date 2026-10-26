@@ -1,5 +1,7 @@
 # PrepZii LMS codebase audit
 
+> Historical snapshot. For the current 2026-10-26 findings and validation results, see `PHASE_0_AUDIT_2026-10-26.md`.
+
 Audit date: 2026-10-17
 Repositories inspected:
 

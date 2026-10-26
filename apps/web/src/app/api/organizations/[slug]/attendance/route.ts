@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -16,16 +17,6 @@ const saveSchema = z.object({
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 
-async function safeQuery<T>(promise: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
-  try {
-    const result = await promise;
-    if (result.error) return fallback;
-    return (result.data ?? fallback) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 export async function GET(request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug);
   if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
@@ -38,9 +29,9 @@ export async function GET(request: Request, context: Context) {
   const sessionDate = z.iso.date().safeParse(params.get("date"));
 
   try {
-    let batches = await safeQuery(client.from("organization_batches").select("id,name,target_exam,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name"), []);
+    let batches = await requireDatabaseQuery(client.from("organization_batches").select("id,name,target_exam,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name"), [], "Load attendance batches");
     if (!batches.length) {
-      const legacyBatches = await safeQuery(client.from("institute_batches").select("id,name,exam").eq("institute_id", organizationId), []);
+      const legacyBatches = await requireDatabaseQuery(client.from("institute_batches").select("id,name,exam").eq("institute_id", organizationId), [], "Load legacy attendance batches");
       batches = legacyBatches.map((b: Record<string, unknown>) => ({
         id: b.id,
         name: b.name,
@@ -50,7 +41,7 @@ export async function GET(request: Request, context: Context) {
     }
 
     if (["TEACHER", "STUDENT"].includes(role)) {
-      const assigned = await safeQuery(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role), []);
+      const assigned = await requireDatabaseQuery(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role), [], "Load assigned attendance batches");
       if (assigned.length) {
         const ids = new Set(assigned.map((row: Record<string, unknown>) => String(row.batch_id)));
         batches = batches.filter((batch: Record<string, unknown>) => ids.has(String(batch.id)));
@@ -62,10 +53,10 @@ export async function GET(request: Request, context: Context) {
 
     let students: Row[] = [];
     if (selectedBatchId && role !== "STUDENT") {
-      const enrolments = await safeQuery(client.from("organization_batch_members").select("user_id,roll_number").eq("organization_id", organizationId).eq("batch_id", selectedBatchId).eq("role", "STUDENT").order("roll_number"), []);
-      let directory = await safeQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 500, p_offset: 0 }), null);
+      const enrolments = await requireDatabaseQuery(client.from("organization_batch_members").select("user_id,roll_number").eq("organization_id", organizationId).eq("batch_id", selectedBatchId).eq("role", "STUDENT").order("roll_number"), [], "Load batch enrolments");
+      let directory = await requireDatabaseQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 500, p_offset: 0 }), null, "Load attendance student directory");
       if (!directory) {
-        const rawMembers = await safeQuery(client.from("institute_members").select("id,user_id,email,role,status").eq("institute_id", organizationId).eq("role", "STUDENT"), []);
+        const rawMembers = await requireDatabaseQuery(client.from("institute_members").select("id,user_id,email,role,status").eq("institute_id", organizationId).eq("role", "STUDENT"), [], "Load legacy attendance students");
         directory = rawMembers.map((m: Record<string, unknown>) => ({
           user_id: m.user_id,
           email: m.email,
@@ -82,7 +73,7 @@ export async function GET(request: Request, context: Context) {
     if (selectedBatchId) {
       let query = client.from("organization_attendance_sessions").select("id,batch_id,session_date,session_label,starts_at,ends_at,marked_by,finalized_at,updated_at").eq("organization_id", organizationId).eq("batch_id", selectedBatchId).order("session_date", { ascending: false }).limit(90);
       if (sessionDate.success) query = query.eq("session_date", sessionDate.data);
-      sessions = await safeQuery(query, []);
+      sessions = await requireDatabaseQuery(query, [], "Load attendance sessions");
     }
 
     const sessionIds = sessions.map((session) => String(session.id));
@@ -91,16 +82,16 @@ export async function GET(request: Request, context: Context) {
     if (sessionIds.length) {
       let recordQuery = client.from("organization_attendance_records").select("id,session_id,student_id,status,remarks,created_at").eq("organization_id", organizationId).in("session_id", sessionIds);
       if (role === "STUDENT") recordQuery = recordQuery.eq("student_id", userId);
-      records = await safeQuery(recordQuery, []);
+      records = await requireDatabaseQuery(recordQuery, [], "Load attendance records");
       const corrQuery = client.from("organization_attendance_corrections").select("id,session_id,attendance_record_id,student_id,previous_status,corrected_status,reason,corrected_by,created_at").eq("organization_id", organizationId).in("session_id", sessionIds).order("created_at", { ascending: false });
-      corrections = await safeQuery(corrQuery, []);
+      corrections = await requireDatabaseQuery(corrQuery, [], "Load attendance corrections");
       if (role === "STUDENT") corrections = corrections.filter((row) => row.student_id === userId);
     }
 
     return Response.json({ role, batches, selectedBatchId, students, sessions, records, corrections }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Attendance workspace query failed", error);
-    return Response.json({ role, batches: [], selectedBatchId: "", students: [], sessions: [], records: [], corrections: [] });
+    return Response.json({ error: "Attendance data is temporarily unavailable." }, { status: 503 });
   }
 }
 

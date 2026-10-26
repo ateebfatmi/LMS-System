@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { StudentRecord } from "@/lib/mock-data";
 import { getActiveOrganizationId, useActiveOrganizationId } from "@/lib/client-org";
+import type { Batch } from "@prepzii/contracts";
 
 export default function StudentsPage() {
   const activeOrganizationId = useActiveOrganizationId();
@@ -12,7 +13,7 @@ export default function StudentsPage() {
   const [selectedBatch, setSelectedBatch] = useState("ALL");
   const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null);
   const [students, setStudents] = useState<StudentRecord[]>([]);
-  const [batches, setBatches] = useState<any[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

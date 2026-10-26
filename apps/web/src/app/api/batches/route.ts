@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { BatchRepository } from "@/lib/dal/batch-repository";
 
 export async function GET(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(undefined, orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "TEACHER"], orgId);
     const batches = await BatchRepository.listBatches(auth.organizationId);
     return NextResponse.json({ batches });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
@@ -36,10 +36,10 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ batch: created }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to create batch" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to create batch") }, { status: 500 });
   }
 }

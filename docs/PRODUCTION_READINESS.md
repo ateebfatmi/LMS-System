@@ -1,5 +1,7 @@
 # Production-readiness report
 
+> Historical snapshot. For the current release decision and validation results, see `RELEASE_STATUS_2026-10-27.md`.
+
 As of 2026-10-17, PrepZii LMS is **not ready for paying customers or a controlled pilot**.
 
 ## Passing local gates

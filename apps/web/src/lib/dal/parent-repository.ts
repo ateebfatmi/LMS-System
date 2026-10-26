@@ -33,6 +33,39 @@ export interface ChildAcademicProfile {
   academicProgressReport: StudentAcademicProgressReport;
 }
 
+type GuardianLinkRow = {
+  id: string;
+  organization_id: string;
+  guardian_user_id: string;
+  student_user_id: string;
+  relationship: "FATHER" | "MOTHER" | "LEGAL_GUARDIAN" | "OTHER";
+  status: "APPROVED";
+  created_at: string;
+};
+
+type StudentMemberRow = {
+  id: string;
+  user_id: string;
+  email: string;
+};
+
+type StudentProfileRow = {
+  membership_id: string;
+  display_name: string;
+  roll_number: string | null;
+};
+
+type StudentBatchMembershipRow = {
+  user_id: string;
+  batch_id: string;
+  roll_number: string | null;
+};
+
+type StudentBatchRow = {
+  id: string;
+  name: string;
+};
+
 // In-memory verified parent-student links for sandbox/local dev
 const parentStudentLinks = new Map<string, ParentStudentRelation>();
 
@@ -65,32 +98,84 @@ export class ParentRepository {
     if (hasSupabase) {
       const supabase = getPrepziiAdmin();
       const { data, error } = await supabase
-        .from("organization_parent_students")
-        .select("id, organization_id, parent_user_id, student_user_id, relationship, is_verified, created_at")
+        .from("organization_guardian_links")
+        .select("id, organization_id, guardian_user_id, student_user_id, relationship, status, created_at")
         .eq("organization_id", organizationId)
-        .eq("parent_user_id", parentUserId)
-        .eq("is_verified", true);
+        .eq("guardian_user_id", parentUserId)
+        .eq("status", "APPROVED");
 
       if (error) {
         throw new Error(`Failed to query parent linkages: ${error.message}`);
       }
 
       if (data && data.length > 0) {
-        return data.map((d: any) => {
-          const student = mockStudents.find((s) => s.id === d.student_user_id);
-          return {
-            id: d.id,
-            organizationId: d.organization_id,
-            parentUserId: d.parent_user_id,
-            studentUserId: d.student_user_id,
-            relationship: d.relationship,
-            studentName: student?.name || "Student",
-            rollNumber: student?.rollNumber || "APX-ROLL",
-            batchId: student?.batchId || "batch-1",
-            batchName: student?.batchName || "Assigned Batch",
-            isVerified: d.is_verified,
-            linkedAt: d.created_at,
-          };
+        const links = data as unknown as GuardianLinkRow[];
+        const studentUserIds = links.map((link) => link.student_user_id);
+        const { data: memberData, error: memberError } = await supabase
+          .from("institute_members")
+          .select("id, user_id, email")
+          .eq("institute_id", organizationId)
+          .eq("role", "STUDENT")
+          .eq("status", "ACTIVE")
+          .in("user_id", studentUserIds);
+
+        if (memberError) throw new Error(`Failed to query linked students: ${memberError.message}`);
+
+        const members = (memberData || []) as unknown as StudentMemberRow[];
+        const membershipIds = members.map((member) => member.id);
+        const [{ data: profileData, error: profileError }, { data: batchMemberData, error: batchMemberError }] =
+          await Promise.all([
+            membershipIds.length > 0
+              ? supabase
+                  .from("organization_member_profiles")
+                  .select("membership_id, display_name, roll_number")
+                  .eq("organization_id", organizationId)
+                  .in("membership_id", membershipIds)
+              : Promise.resolve({ data: [], error: null }),
+            supabase
+              .from("organization_batch_members")
+              .select("user_id, batch_id, roll_number")
+              .eq("organization_id", organizationId)
+              .eq("role", "STUDENT")
+              .in("user_id", studentUserIds),
+          ]);
+
+        if (profileError) throw new Error(`Failed to query linked student profiles: ${profileError.message}`);
+        if (batchMemberError) throw new Error(`Failed to query linked student batches: ${batchMemberError.message}`);
+
+        const profiles = (profileData || []) as unknown as StudentProfileRow[];
+        const batchMemberships = (batchMemberData || []) as unknown as StudentBatchMembershipRow[];
+        const batchIds = [...new Set(batchMemberships.map((membership) => membership.batch_id))];
+        const { data: batchData, error: batchError } = batchIds.length > 0
+          ? await supabase
+              .from("organization_batches")
+              .select("id, name")
+              .eq("organization_id", organizationId)
+              .in("id", batchIds)
+          : { data: [], error: null };
+
+        if (batchError) throw new Error(`Failed to query linked student batch names: ${batchError.message}`);
+        const batches = (batchData || []) as unknown as StudentBatchRow[];
+
+        return links.flatMap((link) => {
+          const member = members.find((candidate) => candidate.user_id === link.student_user_id);
+          if (!member) return [];
+          const profile = profiles.find((candidate) => candidate.membership_id === member.id);
+          const batchMembership = batchMemberships.find((candidate) => candidate.user_id === member.user_id);
+          const batch = batches.find((candidate) => candidate.id === batchMembership?.batch_id);
+          return [{
+            id: link.id,
+            organizationId: link.organization_id,
+            parentUserId: link.guardian_user_id,
+            studentUserId: link.student_user_id,
+            relationship: link.relationship === "FATHER" || link.relationship === "MOTHER" ? link.relationship : "GUARDIAN",
+            studentName: profile?.display_name || member.email,
+            rollNumber: profile?.roll_number || batchMembership?.roll_number || "Not assigned",
+            batchId: batchMembership?.batch_id || "",
+            batchName: batch?.name || "Not assigned",
+            isVerified: true,
+            linkedAt: link.created_at,
+          } satisfies ParentStudentRelation];
         });
       }
     }

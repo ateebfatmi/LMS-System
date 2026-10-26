@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { OnboardingRepository } from "@/lib/dal/onboarding-repository";
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "TEACHER"]);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN"]);
     const checklist = await OnboardingRepository.getChecklist(auth.organizationId);
     return NextResponse.json({ checklist });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to load onboarding checklist" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to load onboarding checklist") }, { status: 500 });
   }
 }
 
@@ -46,10 +46,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Onboarding operation failed" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Onboarding operation failed") }, { status: 500 });
   }
 }

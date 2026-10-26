@@ -152,6 +152,17 @@ export function canAccessAssignment(
   return false;
 }
 
+export function canAccessGuardianStudent(
+  context: TenantContext,
+  resourceOrganizationId: string,
+  studentUserId: string,
+  approvedStudentUserIds: readonly string[],
+): boolean {
+  return context.role === "PARENT"
+    && context.organizationId === resourceOrganizationId
+    && approvedStudentUserIds.includes(studentUserId);
+}
+
 export function isMembershipActive(status: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED"): boolean {
   return status === "ACTIVE";
 }
@@ -180,5 +191,46 @@ export function evaluateQuotaAvailability(
     return { allowed: false, remaining: max > current ? max - current : zero };
   }
   return { allowed: true, remaining: max - projected };
+}
+
+export function isDevelopmentAuthOverrideEnabled(
+  nodeEnv: string | undefined,
+  allowInsecureDevAuth: string | undefined,
+): boolean {
+  return nodeEnv === "development" && allowInsecureDevAuth === "true";
+}
+
+export function canUseDevelopmentDemoTenant(input: {
+  nodeEnv: string | undefined;
+  hasClerk: boolean;
+  hasSupabase: boolean;
+}): boolean {
+  return input.nodeEnv === "development" && !input.hasClerk && !input.hasSupabase;
+}
+
+export function isTrustedMutationRequest(input: {
+  method: string;
+  origin?: string | null;
+  fetchSite?: string | null;
+  allowedOrigins: readonly string[];
+}): boolean {
+  if (["GET", "HEAD", "OPTIONS"].includes(input.method.toUpperCase())) return true;
+  if (input.fetchSite === "cross-site") return false;
+  if (!input.origin) return true;
+
+  let normalizedOrigin: string;
+  try {
+    normalizedOrigin = new URL(input.origin).origin;
+  } catch {
+    return false;
+  }
+
+  return input.allowedOrigins.some((allowedOrigin) => {
+    try {
+      return new URL(allowedOrigin).origin === normalizedOrigin;
+    } catch {
+      return false;
+    }
+  });
 }
 

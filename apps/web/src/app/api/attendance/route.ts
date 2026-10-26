@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { AttendanceRepository } from "@/lib/dal/attendance-repository";
 
 export async function GET(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(undefined, orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "TEACHER"], orgId);
     const { searchParams } = new URL(req.url);
     const type = searchParams.get("type");
 
@@ -19,18 +19,18 @@ export async function GET(req: NextRequest) {
 
     const register = await AttendanceRepository.getRegister(auth.organizationId, batchId, date);
     return NextResponse.json(register);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Internal server error") }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const orgId = req.nextUrl.searchParams.get("organizationId") || undefined;
-    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "TEACHER"], orgId);
+    const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "TEACHER"], orgId);
     const body = await req.json();
 
     if (!body.batchId || !body.sessionDate || !Array.isArray(body.records)) {
@@ -46,10 +46,10 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to save attendance" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to save attendance") }, { status: 500 });
   }
 }

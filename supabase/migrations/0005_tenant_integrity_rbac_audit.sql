@@ -131,6 +131,10 @@ create table if not exists public.organization_audit_logs (
 -- Phase 2 introduced this table with event/resource column names. Keep that
 -- schema compatible while exposing the canonical action/entity audit shape
 -- used by all later LMS mutations.
+alter table public.organization_audit_logs add column if not exists event_type text;
+alter table public.organization_audit_logs add column if not exists resource_type text;
+alter table public.organization_audit_logs add column if not exists resource_id text;
+alter table public.organization_audit_logs add column if not exists details jsonb;
 alter table public.organization_audit_logs add column if not exists action text;
 alter table public.organization_audit_logs add column if not exists entity_type text;
 alter table public.organization_audit_logs add column if not exists entity_id text;

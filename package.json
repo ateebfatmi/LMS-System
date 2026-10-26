@@ -17,6 +17,8 @@
     "test": "npm run test --workspaces --if-present",
     "test:db": "./scripts/run_database_tests.sh",
     "test:e2e": "playwright test",
+    "test:e2e:staging": "playwright test --config=playwright.staging.config.ts",
+    "audit:migrations": "node scripts/audit-migration-history.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:sql": "python3 scripts/test-sql-schema-integration.py",
     "preflight": "tsc scripts/check-backend-compatibility.ts --target ES2022 --module ESNext --moduleResolution Bundler --skipLibCheck --outDir scripts/dist && node --env-file-if-exists=apps/web/.env.local --env-file-if-exists=.env.local scripts/dist/check-backend-compatibility.js"

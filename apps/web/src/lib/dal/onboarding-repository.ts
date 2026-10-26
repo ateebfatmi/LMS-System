@@ -5,8 +5,7 @@ import type {
   BulkStudentImportRow,
   InstituteSetupChecklist,
 } from "@prepzii/contracts";
-import { getPrepziiAdmin } from "@/lib/prepzii-backend";
-import { mockBatches, mockStudents, type StudentRecord } from "@/lib/mock-data";
+import { mockStudents, type StudentRecord } from "@/lib/mock-data";
 import { BatchRepository } from "./batch-repository";
 
 // In-memory store for onboarding state

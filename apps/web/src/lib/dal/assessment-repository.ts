@@ -14,9 +14,7 @@ import type {
 import {
   gradeAssessment,
   computeLeaderboard,
-  bridgePyqToQuestionPayload,
   type StudentSubmissionData,
-  type PrepziiPyqRow,
 } from "@prepzii/assessment-core";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
 import { QuestionBankRepository } from "./question-bank-repository";
@@ -32,6 +30,24 @@ export interface CreateAssessmentInput {
   targetBatchName: string;
   questionIds: string[];
 }
+
+type InstituteTestRow = {
+  id: string;
+  institute_id: string;
+  title: string;
+  status: InstituteTest["status"];
+  created_at: string;
+  institute_test_questions?: Array<{ id: string; question_id: string }>;
+  institute_test_attempts?: Array<{ id: string; status: string }>;
+};
+
+type InstituteTestAttemptRow = {
+  id: string;
+  institute_test_id: string;
+  user_id: string;
+  started_at: string;
+  submitted_at: string | null;
+};
 
 // In-memory persistent stores for local/demo runs
 const persistentTests = [...mockTests];
@@ -88,7 +104,7 @@ export class AssessmentRepository {
       }
 
       if (dbTests && dbTests.length > 0) {
-        return dbTests.map((t: any) => ({
+        return (dbTests as unknown as InstituteTestRow[]).map((t) => ({
           id: t.id,
           organizationId: t.institute_id,
           title: t.title,
@@ -521,7 +537,7 @@ export class AssessmentRepository {
         .order("submitted_at", { ascending: false });
 
       if (!error && attempts && attempts.length > 0) {
-        return attempts.map((a: any, index: number) => ({
+        return (attempts as unknown as InstituteTestAttemptRow[]).map((a, index) => ({
           attemptId: a.id,
           testId: a.institute_test_id,
           studentId: a.user_id,

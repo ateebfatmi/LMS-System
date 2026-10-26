@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { NextResponse } from "next/server";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     const auth = await requireAuthContext(["OWNER", "COACHING_ADMIN"]);
 
@@ -17,10 +17,10 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString(),
       organizationId: auth.organizationId,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "Failed to reset demo environment" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "Failed to reset demo environment") }, { status: 500 });
   }
 }

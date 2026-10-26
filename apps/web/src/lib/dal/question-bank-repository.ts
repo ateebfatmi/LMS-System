@@ -580,8 +580,9 @@ export class QuestionBankRepository {
             subject: pyqRow.subject,
           },
         });
-      } catch (err: any) {
-        result.errors.push(`Unhandled error syncing PYQ '${pyqId}': ${err.message}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Unknown synchronization error";
+        result.errors.push(`Unhandled error syncing PYQ '${pyqId}': ${message}`);
       }
     }
 

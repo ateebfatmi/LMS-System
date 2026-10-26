@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuthContext, AuthorizationError } from "@/lib/dal/auth-context";
+import { requireAuthContext, AuthorizationError, getErrorMessage } from "@/lib/dal/auth-context";
 import { AssessmentRepository } from "@/lib/dal/assessment-repository";
 
 export async function POST(req: NextRequest) {
@@ -72,10 +72,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ error: `Unknown CBT action: ${action}` }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof AuthorizationError) {
       return NextResponse.json({ error: error.message }, { status: error.statusCode });
     }
-    return NextResponse.json({ error: error.message || "CBT operation failed" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error, "CBT operation failed") }, { status: 500 });
   }
 }

@@ -3,79 +3,90 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type PropsWithChildren, useEffect, useState, Suspense } from "react";
-import { PrepziiMark, ZiAssistantBadge } from "@prepzii/ui";
-import { OrganizationSwitcher } from "@/components/organization-switcher";
+import { motion } from "motion/react";
+import {
+  BarChart3,
+  Bell,
+  BookOpen,
+  CalendarCheck2,
+  ClipboardCheck,
+  ClipboardPenLine,
+  ContactRound,
+  Gem,
+  GraduationCap,
+  IndianRupee,
+  LayoutDashboard,
+  Menu,
+  School,
+  UserCog,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
+import { PrepziiMark } from "@prepzii/ui";
+import { DashboardSidebar } from "@/components/ui/dashboard-sidebar";
 
 export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT" | "ACCOUNTANT";
 
-const roleNavItems: Record<AppRole, { href: string; label: string; icon: string }[]> = {
+let rememberedSidebarCollapsed = false;
+let rememberedMembershipRole: AppRole = "DIRECTOR";
+let rememberedOrganizationStatus: "checking" | "available" | "missing" = "checking";
+
+const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideIcon }[]> = {
   DIRECTOR: [
-    { href: "/dashboard/admissions", label: "Student Enquiries", icon: "◎" },
-    { href: "/dashboard/onboarding", label: "Institute Setup", icon: "⚙" },
-    { href: "/dashboard", label: "Executive Overview", icon: "❖" },
-    { href: "/dashboard/crm", label: "Admissions CRM", icon: "◎" },
-    { href: "/dashboard/batches", label: "Batches & Classrooms", icon: "⊞" },
-    { href: "/dashboard/students", label: "Student Directory", icon: "⚑" },
-    { href: "/dashboard/teachers", label: "Faculty Directory", icon: "◈" },
-    { href: "/dashboard/members", label: "Members & Invites", icon: "♙" },
-    { href: "/dashboard/courses", label: "Courses & DPPs", icon: "▤" },
-    { href: "/dashboard/assignments", label: "Assignments", icon: "✎" },
-    { href: "/dashboard/assessments", label: "Assessments & PYQs", icon: "⏱" },
-    { href: "/dashboard/question-bank", label: "Question Bank", icon: "⌗" },
-    { href: "/dashboard/attendance", label: "Daily Attendance", icon: "✓" },
-    { href: "/dashboard/fees", label: "Fee Management", icon: "₹" },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
-    { href: "/dashboard/campuses", label: "Campus Rooms", icon: "🏛" },
-    { href: "/dashboard/reports", label: "Reports & Analytics", icon: "📈" },
-    { href: "/dashboard/billing", label: "Plan & Quotas", icon: "💎" },
+    { href: "/dashboard/workspace", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/crm", label: "Admissions", icon: ContactRound },
+    { href: "/dashboard/students/workspace", label: "Students", icon: GraduationCap },
+    { href: "/dashboard/teachers", label: "Faculty", icon: UserCog },
+    { href: "/dashboard/batches/workspace", label: "Batches & Academics", icon: School },
+    { href: "/dashboard/courses", label: "Courses", icon: BookOpen },
+    { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
+    { href: "/dashboard/assessments/workspace", label: "Assessments", icon: ClipboardCheck },
+    { href: "/dashboard/attendance/workspace", label: "Attendance", icon: CalendarCheck2 },
+    { href: "/dashboard/fees/workspace", label: "Fees", icon: IndianRupee },
+    { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
+    { href: "/dashboard/reports/workspace", label: "Reports", icon: BarChart3 },
+    { href: "/dashboard/members", label: "Members & Access", icon: UsersRound },
+    { href: "/dashboard/billing", label: "Subscription", icon: Gem },
   ],
   FACULTY: [
-    { href: "/dashboard/admissions", label: "Student Enquiries", icon: "◎" },
-    { href: "/dashboard", label: "My Classes & Schedule", icon: "❖" },
-    { href: "/dashboard/batches", label: "My Batches", icon: "⊞" },
-    { href: "/dashboard/attendance", label: "Mark Attendance", icon: "✓" },
-    { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: "▤" },
-    { href: "/dashboard/assignments", label: "Assignments & Grading", icon: "✎" },
-    { href: "/dashboard/assessments", label: "Create & Evaluate Tests", icon: "⏱" },
-    { href: "/dashboard/question-bank", label: "Question Bank & PYQs", icon: "⌗" },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
-    { href: "/dashboard/campuses", label: "Room Allocations", icon: "🏛" },
-    { href: "/dashboard/reports", label: "Batch Performance", icon: "📈" },
+    { href: "/dashboard/workspace", label: "My Overview", icon: LayoutDashboard },
+    { href: "/dashboard/batches/workspace", label: "My Batches", icon: School },
+    { href: "/dashboard/attendance/workspace", label: "Mark Attendance", icon: CalendarCheck2 },
+    { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: BookOpen },
+    { href: "/dashboard/assignments", label: "Assignments & Grading", icon: ClipboardPenLine },
+    { href: "/dashboard/assessments/workspace", label: "Create & Evaluate Tests", icon: ClipboardCheck },
+    { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
+    { href: "/dashboard/reports/workspace", label: "Batch Performance", icon: BarChart3 },
   ],
   STUDENT: [
-    { href: "/dashboard", label: "My Learning Dashboard", icon: "❖" },
-    { href: "/dashboard/assessments", label: "CBT Mock Tests & PYQs", icon: "⏱" },
-    { href: "/dashboard/courses", label: "My Courses & DPPs", icon: "▤" },
-    { href: "/dashboard/assignments", label: "My Assignments", icon: "✎" },
-    { href: "/dashboard/fees", label: "My Fee Installments", icon: "₹" },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
-    { href: "/dashboard/reports", label: "Weak Chapter Analytics", icon: "📈" },
-    { href: "/dashboard/attendance", label: "My Attendance Log", icon: "✓" },
+    { href: "/dashboard/workspace", label: "My Learning Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/assessments/workspace", label: "CBT Mock Tests & PYQs", icon: ClipboardCheck },
+    { href: "/dashboard/courses", label: "My Courses & DPPs", icon: BookOpen },
+    { href: "/dashboard/assignments", label: "My Assignments", icon: ClipboardPenLine },
+    { href: "/dashboard/fees/workspace", label: "My Fee Installments", icon: IndianRupee },
+    { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
+    { href: "/dashboard/attendance/workspace", label: "My Attendance Log", icon: CalendarCheck2 },
   ],
   PARENT: [
-    { href: "/dashboard/reports", label: "Test Rank Cards", icon: "📈" },
-    { href: "/dashboard/attendance", label: "Attendance Calendar", icon: "✓" },
-    { href: "/dashboard/fees", label: "Fee Status & Receipts", icon: "₹" },
-    { href: "/dashboard", label: "Guardian Overview", icon: "❖" },
-    { href: "/dashboard/announcements", label: "Circulars & Notices", icon: "🔔" },
+    { href: "/dashboard/workspace", label: "Guardian Overview", icon: LayoutDashboard },
+    { href: "/dashboard/announcements", label: "Circulars & Notices", icon: Bell },
   ],
   COORDINATOR: [
-    { href: "/dashboard", label: "Academic Overview", icon: "❖" },
-    { href: "/dashboard/batches", label: "Batches & Classrooms", icon: "⊞" },
-    { href: "/dashboard/students", label: "Student Directory", icon: "⚑" },
-    { href: "/dashboard/teachers", label: "Faculty Directory", icon: "◈" },
-    { href: "/dashboard/courses", label: "Courses & DPPs", icon: "▤" },
-    { href: "/dashboard/assignments", label: "Assignments", icon: "✎" },
-    { href: "/dashboard/assessments", label: "Assessments & PYQs", icon: "⏱" },
-    { href: "/dashboard/attendance", label: "Daily Attendance", icon: "✓" },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: "🔔" },
-    { href: "/dashboard/campuses", label: "Campus Rooms", icon: "🏛" },
-    { href: "/dashboard/reports", label: "Reports & Analytics", icon: "📈" },
+    { href: "/dashboard/workspace", label: "Academic Overview", icon: LayoutDashboard },
+    { href: "/dashboard/batches/workspace", label: "Batches & Classrooms", icon: School },
+    { href: "/dashboard/students/workspace", label: "Student Directory", icon: GraduationCap },
+    { href: "/dashboard/teachers", label: "Faculty Directory", icon: UserCog },
+    { href: "/dashboard/courses", label: "Courses & DPPs", icon: BookOpen },
+    { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
+    { href: "/dashboard/assessments/workspace", label: "Assessments & PYQs", icon: ClipboardCheck },
+    { href: "/dashboard/attendance/workspace", label: "Daily Attendance", icon: CalendarCheck2 },
+    { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
+    { href: "/dashboard/reports/workspace", label: "Reports & Analytics", icon: BarChart3 },
   ],
   ACCOUNTANT: [
-    { href: "/dashboard", label: "Finance Overview", icon: "❖" },
-    { href: "/dashboard/fees", label: "Fee Management", icon: "₹" },
-    { href: "/dashboard/reports", label: "Financial Reports", icon: "📈" },
+    { href: "/dashboard/workspace", label: "Finance Overview", icon: LayoutDashboard },
+    { href: "/dashboard/fees/workspace", label: "Fee Management", icon: IndianRupee },
+    { href: "/dashboard/reports/workspace", label: "Financial Reports", icon: BarChart3 },
   ],
 };
 
@@ -97,99 +108,115 @@ function LayoutContent({
   subtitle?: string;
   action?: React.ReactNode;
   currentRole?: AppRole;
-  onRoleChange?: (role: AppRole) => void;
 }>) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [membershipRole, setMembershipRole] = useState<AppRole>("DIRECTOR");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(rememberedSidebarCollapsed);
+  const [membershipRole, setMembershipRole] = useState<AppRole>(rememberedMembershipRole);
+  const [organizationStatus, setOrganizationStatus] = useState<"checking" | "available" | "missing">(rememberedOrganizationStatus);
 
   useEffect(() => {
     let cancelled = false;
     const handleOrganizationChange = (event: Event) => {
       const role = (event as CustomEvent<{ role?: string }>).detail?.role ?? "";
-      setMembershipRole(mapMembershipRole(role));
+      rememberedMembershipRole = mapMembershipRole(role);
+      rememberedOrganizationStatus = "available";
+      setMembershipRole(rememberedMembershipRole);
+      setOrganizationStatus("available");
     };
     window.addEventListener("prepzii:organization-changed", handleOrganizationChange);
     void fetch("/api/organizations/active", { cache: "no-store" }).then(async (response) => {
-      if (!cancelled && response.ok) setMembershipRole(mapMembershipRole(String((await response.json()).role ?? "")));
+      const result = await response.json().catch(() => null);
+      if (cancelled) return;
+      if (result?.organization) {
+        rememberedMembershipRole = mapMembershipRole(String(result.role ?? ""));
+        rememberedOrganizationStatus = "available";
+        setMembershipRole(rememberedMembershipRole);
+        setOrganizationStatus("available");
+      } else {
+        rememberedOrganizationStatus = "missing";
+        setOrganizationStatus("missing");
+      }
+    }).catch(() => {
+      if (!cancelled) setOrganizationStatus("checking");
     });
     return () => { cancelled = true; window.removeEventListener("prepzii:organization-changed", handleOrganizationChange); };
-  }, [pathname]);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsMobileMenuOpen(false);
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isMobileMenuOpen]);
 
   const activeRole: AppRole = propRole || membershipRole;
 
-  const navItems = roleNavItems[activeRole] || roleNavItems.DIRECTOR;
+  const navItems = organizationStatus === "available" ? (roleNavItems[activeRole] || roleNavItems.DIRECTOR) : [];
   return (
-    <main className="app-shell">
-      <aside className={`sidebar ${isMobileMenuOpen ? "mobile-open" : ""}`} suppressHydrationWarning>
-        <div className="brand-row" suppressHydrationWarning>
-          <Link href="/">
-            <PrepziiMark theme="dark" />
-          </Link>
-          <span className="inst-pill">INSTITUTIONS</span>
-        </div>
-
-        <OrganizationSwitcher />
-
-        <nav className="side-nav">
-          {navItems.map((item) => {
-            const isActive = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
-
-            return (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={isActive ? "active" : ""}
-                onClick={() => setIsMobileMenuOpen(false)}
-              >
-                <span>{item.icon}</span>
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="sidebar-bottom">
-          <a href="#settings">Institute Settings</a>
-          <a href="#support">Help & Support</a>
-        </div>
-      </aside>
+    <main className={`app-shell ${isSidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      <DashboardSidebar
+        activeRole={organizationStatus === "available" ? activeRole : organizationStatus === "missing" ? "GET STARTED" : "CHECKING"}
+        collapsed={isSidebarCollapsed}
+        isOpen={isMobileMenuOpen}
+        items={navItems}
+        pathname={pathname}
+        onClose={() => setIsMobileMenuOpen(false)}
+        onToggleCollapsed={() => {
+          const nextValue = !isSidebarCollapsed;
+          rememberedSidebarCollapsed = nextValue;
+          setIsSidebarCollapsed(nextValue);
+        }}
+      />
 
       <section className="workspace">
         <header className="workspace-header">
           <div>
-            <span className="mobile-brand">
-              <PrepziiMark compact theme="light" />
-            </span>
-            <p className="header-subtitle">{subtitle || "Saturday, 10 October 2026"}</p>
-            <h1>{title || "Institute Overview"}</h1>
+            <div className="mobile-nav-row">
+              <motion.button
+                type="button"
+                className="dashboard-menu-button"
+                onClick={() => setIsMobileMenuOpen(true)}
+                whileTap={{ scale: 0.9 }}
+                aria-label="Open dashboard navigation"
+                aria-expanded={isMobileMenuOpen}
+              >
+                <Menu aria-hidden="true" />
+              </motion.button>
+              <span className="mobile-brand">
+                <PrepziiMark compact theme="light" />
+              </span>
+            </div>
+            {organizationStatus !== "missing" && subtitle && <p className="header-subtitle">{subtitle}</p>}
+            <h1>{organizationStatus === "missing" ? "Get started" : title || "Institute Overview"}</h1>
           </div>
 
-          <div className="header-actions">
-            <button aria-label="Search" title="Quick Search">⌕</button>
-            <button aria-label="Notifications" title="Announcements">◉</button>
-            <ZiAssistantBadge text="Ask Zi AI" />
-
-            {action || (
-              <Link href="/dashboard/assessments" className="create-button pz-button pz-button-primary">
-                ＋ Create Assessment
-              </Link>
-            )}
-          </div>
+          {organizationStatus === "available" && action && <div className="header-actions">{action}</div>}
         </header>
 
-        {/^\/dashboard(?:\/(assessments|attendance|batches|fees|reports|students))?(?:\/workspace)?$/.test(pathname) && (
-          <nav aria-label="Module workflows" className="filter-bar">
-            <Link className="text-link" href={pathname.endsWith("/workspace") ? pathname.slice(0, -10) : `${pathname}/workspace`}>
-              {pathname.endsWith("/workspace") ? "Overview & operations" : "Institute workspace"}
-            </Link>
-          </nav>
-        )}
-        {children}
-
-        <footer className="workspace-footer">
-          PrepZii JEE & NEET Coaching LMS · Multi-Tenant Platform
-        </footer>
+        {organizationStatus === "missing" ? (
+          <section className="no-organization-state" aria-labelledby="no-organization-title">
+            <span className="no-organization-icon"><School aria-hidden="true" /></span>
+            <p className="eyebrow">Institute access required</p>
+            <h2 id="no-organization-title">Create your institute to open the workspace</h2>
+            <p>Set up an institute, or open the invitation link sent by an institute owner to join an existing workspace.</p>
+            <div>
+              <Link className="pz-button pz-button-primary" href="/onboarding">Create institute</Link>
+              <Link className="pz-button pz-button-secondary" href="/">Return home</Link>
+            </div>
+          </section>
+        ) : organizationStatus === "checking" ? (
+          <p className="empty-state dashboard-shell-loading">Checking institute access…</p>
+        ) : children}
       </section>
     </main>
   );
@@ -200,7 +227,6 @@ export function DashboardLayout(props: PropsWithChildren<{
   subtitle?: string;
   action?: React.ReactNode;
   currentRole?: AppRole;
-  onRoleChange?: (role: AppRole) => void;
 }>) {
   return (
     <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "var(--muted)" }}>Loading workspace...</div>}>

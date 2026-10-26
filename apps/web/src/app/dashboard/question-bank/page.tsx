@@ -123,7 +123,6 @@ export default function QuestionBankPage() {
   const [difficultyFilter, setDifficultyFilter] = useState("ALL");
   const [kindFilter, setKindFilter] = useState("ALL");
   const [expandedExplanation, setExpandedExplanation] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
 
   // New Question Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -152,7 +151,6 @@ export default function QuestionBankPage() {
         const slug = orgData.organization?.slug;
         if (!slug) return;
 
-        setLoading(true);
         const res = await fetch(`/api/organizations/${encodeURIComponent(slug)}/question-bank?limit=50`);
         if (res.ok) {
           const data = await res.json();
@@ -162,8 +160,6 @@ export default function QuestionBankPage() {
         }
       } catch (err) {
         console.error("Failed to fetch live questions", err);
-      } finally {
-        setLoading(false);
       }
     }
     void fetchLiveQuestions();
@@ -243,7 +239,7 @@ export default function QuestionBankPage() {
       subtitle="Curated library of 25,000+ JEE, NEET & Foundation questions with step-by-step LaTeX solutions and partial marking"
       action={
         <div style={{ display: "flex", gap: "10px" }}>
-          <Link href="/dashboard/assessments" className="pz-button pz-button-outline" style={{ textDecoration: "none" }}>
+          <Link href="/dashboard/assessments/workspace" className="pz-button pz-button-outline" style={{ textDecoration: "none" }}>
             ← Back to Assessments
           </Link>
           <Button variant="primary" onClick={() => setShowAddModal(true)}>
@@ -542,7 +538,7 @@ export default function QuestionBankPage() {
                   </button>
 
                   <Link
-                    href="/dashboard/assessments"
+                    href="/dashboard/assessments/workspace"
                     style={{
                       border: "1px solid #facc15",
                       background: "#fefce8",

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -13,16 +14,6 @@ const mutationSchema = z.discriminatedUnion("action", [
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 
-async function safeQuery<T>(promise: PromiseLike<{ data: T | null; error: unknown }>, fallback: T): Promise<T> {
-  try {
-    const result = await promise;
-    if (result.error) return fallback;
-    return (result.data ?? fallback) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 export async function GET(_request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug);
   if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
@@ -33,25 +24,25 @@ export async function GET(_request: Request, context: Context) {
   const staff = role !== "STUDENT";
   try {
     const [plans, planInstallments, orgBatches, years] = staff ? await Promise.all([
-      safeQuery(client.from("organization_fee_plans").select("id,name,target_exam,total_amount,installment_count,currency,is_active,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }), []),
-      safeQuery(client.from("organization_fee_plan_installments").select("id,fee_plan_id,sequence_number,title,amount,due_date").eq("organization_id", organizationId).order("sequence_number"), []),
-      safeQuery(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"), []),
-      safeQuery(client.from("organization_academic_years").select("id,name,is_active").eq("organization_id", organizationId).order("starts_on", { ascending: false }), []),
+      requireDatabaseQuery(client.from("organization_fee_plans").select("id,name,target_exam,total_amount,installment_count,currency,is_active,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }), [], "Load fee plans"),
+      requireDatabaseQuery(client.from("organization_fee_plan_installments").select("id,fee_plan_id,sequence_number,title,amount,due_date").eq("organization_id", organizationId).order("sequence_number"), [], "Load fee plan installments"),
+      requireDatabaseQuery(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"), [], "Load finance batches"),
+      requireDatabaseQuery(client.from("organization_academic_years").select("id,name,is_active").eq("organization_id", organizationId).order("starts_on", { ascending: false }), [], "Load academic years"),
     ]) : [[], [], [], []];
 
     let batches = orgBatches;
     if (!batches.length && staff) {
-      const legacyBatches = await safeQuery(client.from("institute_batches").select("id,name").eq("institute_id", organizationId), []);
+      const legacyBatches = await requireDatabaseQuery(client.from("institute_batches").select("id,name").eq("institute_id", organizationId), [], "Load legacy finance batches");
       batches = legacyBatches;
     }
 
     let students: Row[] = [];
     if (staff) {
-      const directory = await safeQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 500, p_offset: 0 }), null);
+      const directory = await requireDatabaseQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 500, p_offset: 0 }), null, "Load finance student directory");
       if (directory) {
         students = directory as Row[];
       } else {
-        const rawMembers = await safeQuery(client.from("institute_members").select("id,user_id,email,role,status").eq("institute_id", organizationId).eq("role", "STUDENT"), []);
+        const rawMembers = await requireDatabaseQuery(client.from("institute_members").select("id,user_id,email,role,status").eq("institute_id", organizationId).eq("role", "STUDENT"), [], "Load legacy finance students");
         students = rawMembers.map((m: Record<string, unknown>) => ({
           member_id: m.id,
           user_id: m.user_id,
@@ -63,20 +54,20 @@ export async function GET(_request: Request, context: Context) {
 
     let ledgerQuery = client.from("organization_student_fees").select("id,student_id,batch_id,fee_plan_id,academic_year_id,total_course_fee,concession_amount,concession_reason,net_payable,status,assigned_at,updated_at").eq("organization_id", organizationId).order("updated_at", { ascending: false });
     if (!staff) ledgerQuery = ledgerQuery.eq("student_id", userId);
-    const ledgers = await safeQuery(ledgerQuery, []);
+    const ledgers = await requireDatabaseQuery(ledgerQuery, [], "Load student fee ledgers");
     const ledgerIds = ledgers.map((row: Record<string, unknown>) => String(row.id));
     let installments: Row[] = [], transactions: Row[] = [], invoices: Row[] = [];
     if (ledgerIds.length) {
       [installments, transactions, invoices] = await Promise.all([
-        safeQuery(client.from("organization_fee_installments").select("id,student_fee_id,title,amount,due_date,status,paid_amount,paid_at,receipt_number").eq("organization_id", organizationId).in("student_fee_id", ledgerIds).order("due_date"), []),
-        safeQuery(client.from("organization_fee_transactions").select("id,student_fee_id,installment_id,student_id,amount,method,reference_number,receipt_number,installment_title,recorded_by,transaction_type,reversed_transaction_id,notes,created_at").eq("organization_id", organizationId).in("student_fee_id", ledgerIds).order("created_at", { ascending: false }), []),
-        safeQuery(client.from("organization_fee_invoices").select("id,student_fee_id,student_id,invoice_number,currency,amount,due_date,status,issued_at").eq("organization_id", organizationId).in("student_fee_id", ledgerIds).order("issued_at", { ascending: false }), []),
+        requireDatabaseQuery(client.from("organization_fee_installments").select("id,student_fee_id,title,amount,due_date,status,paid_amount,paid_at,receipt_number").eq("organization_id", organizationId).in("student_fee_id", ledgerIds).order("due_date"), [], "Load fee installments"),
+        requireDatabaseQuery(client.from("organization_fee_transactions").select("id,student_fee_id,installment_id,student_id,amount,method,reference_number,receipt_number,installment_title,recorded_by,transaction_type,reversed_transaction_id,notes,created_at").eq("organization_id", organizationId).in("student_fee_id", ledgerIds).order("created_at", { ascending: false }), [], "Load fee transactions"),
+        requireDatabaseQuery(client.from("organization_fee_invoices").select("id,student_fee_id,student_id,invoice_number,currency,amount,due_date,status,issued_at").eq("organization_id", organizationId).in("student_fee_id", ledgerIds).order("issued_at", { ascending: false }), [], "Load fee invoices"),
       ]);
     }
     return Response.json({ role, plans, planInstallments, batches, academicYears: years, students, ledgers, installments, transactions, invoices }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Finance workspace query failed", error);
-    return Response.json({ role, plans: [], planInstallments: [], batches: [], academicYears: [], students: [], ledgers: [], installments: [], transactions: [], invoices: [] });
+    return Response.json({ error: "Finance data is temporarily unavailable." }, { status: 503 });
   }
 }
 
