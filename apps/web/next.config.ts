@@ -32,6 +32,9 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  experimental: {
+    agentUpgrade: "security",
+  },
   transpilePackages: [
     "@prepzii/contracts",
     "@prepzii/assessment-core",
