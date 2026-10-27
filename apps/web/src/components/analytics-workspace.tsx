@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
 import { DashboardLayout, type AppRole } from "@/components/dashboard-layout";
+import { resolveActiveOrganization } from "@/lib/client-org";
 
 type Organization = { name: string; slug: string };
 type Summary = { students: number | null; activeBatches: number; attendanceRate: number | null; assessmentAverage: number | null; assignments: number; submittedAssignments: number; feeCollectedPaise: number | null; feeOutstandingPaise: number | null };
@@ -27,9 +28,9 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
   useEffect(() => {
     let cancelled = false;
     async function fetchActive() {
-      const response = await fetch("/api/organizations/active", { cache: "no-store" });
+      const result = await resolveActiveOrganization();
       if (cancelled) return;
-      const active = response.ok ? (await response.json()).organization as Organization | null : null;
+      const active = result?.organization ?? null;
       setOrganization(active);
       if (active) {
         await load(active);
@@ -51,7 +52,12 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
     void fetchActive();
 
     const handleOrgChange = () => {
-      void fetchActive();
+      void resolveActiveOrganization().then((result) => {
+        if (cancelled) return;
+        const active = result?.organization ?? null;
+        setOrganization(active);
+        if (active) void load(active);
+      });
     };
     window.addEventListener("prepzii:organization-changed", handleOrgChange);
     return () => {

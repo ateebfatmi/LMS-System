@@ -33,7 +33,7 @@ export default function SignInPage() {
           Sign In to Your Institute Workspace
         </h1>
         <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
-          Enter your faculty, student, or administrative credentials to continue.
+          Sign in once. PrepZii will open your platform admin or institute workspace automatically.
         </p>
       </div>
 
@@ -63,7 +63,7 @@ export default function SignInPage() {
           routing="path"
           path="/sign-in"
           signUpUrl="/sign-up"
-          fallbackRedirectUrl="/dashboard"
+          fallbackRedirectUrl="/auth/resolve"
         />
       </div>
 

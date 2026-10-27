@@ -3,6 +3,7 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PrepziiMark } from "@prepzii/ui";
+import { rememberActiveOrganization } from "@/lib/client-org";
 
 function slugify(value: string) {
   return value
@@ -44,14 +45,14 @@ export default function InstituteOnboardingPage() {
       setSubmitting(false);
       return;
     }
-    router.push("/dashboard");
-    router.refresh();
+    rememberActiveOrganization({ organization: result.organization, role: "OWNER" });
+    router.replace("/dashboard/workspace");
   }
 
   return (
     <main className="onboarding-page">
       <section className="onboarding-card">
-        <PrepziiMark />
+        <PrepziiMark theme="light" />
         <div className="onboarding-step">STEP 1 OF 4 · INSTITUTE</div>
         <h1>Create your institute workspace</h1>
         <p>Start with the essentials. Branches, courses, staff, and students come next.</p>

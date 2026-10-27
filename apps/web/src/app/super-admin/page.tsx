@@ -1,5 +1,5 @@
-import { PlatformAdminWorkspace } from "@/components/platform-admin-workspace";
+import { redirect } from "next/navigation";
 
 export default function SuperAdminPage() {
-  return <PlatformAdminWorkspace />;
+  redirect("/admin");
 }

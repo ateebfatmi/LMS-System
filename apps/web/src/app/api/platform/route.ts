@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getActingUserId, getPrepziiAdmin, isPlatformSuperAdmin } from "@/lib/prepzii-backend";
+import { getActingUserId, getPrepziiAdmin, isPlatformAdmin } from "@/lib/prepzii-backend";
 
 const mutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("SET_ORGANIZATION_STATUS"), payload: z.object({ organizationId: z.uuid(), status: z.enum(["ACTIVE", "SUSPENDED"]) }) }),
@@ -15,7 +15,7 @@ async function many(query: PromiseLike<{ data: Row[] | null; error: { message: s
 }
 
 export async function GET() {
-  if (!await isPlatformSuperAdmin()) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!await isPlatformAdmin()) return Response.json({ error: "Forbidden" }, { status: 403 });
   const client = getPrepziiAdmin();
   try {
     const [institutes, subscriptions, plans, flags, audits, members, batches] = await Promise.all([
@@ -36,7 +36,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!await isPlatformSuperAdmin()) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!await isPlatformAdmin()) return Response.json({ error: "Forbidden" }, { status: 403 });
   const actorUserId = await getActingUserId();
   const parsed = mutationSchema.safeParse(await request.json().catch(() => null));
   if (!actorUserId || !parsed.success) return Response.json({ error: "Invalid platform operation." }, { status: 400 });

@@ -31,7 +31,7 @@ export default function AcceptInvitationPage() {
   return (
     <main className="onboarding-page">
       <section className="onboarding-card invite-card">
-        <PrepziiMark />
+        <PrepziiMark theme="light" />
         <div className="onboarding-step">SECURE INSTITUTE INVITATION</div>
         <h1>Join your PrepZii workspace</h1>
         <p>Your verified sign-in email must match the address that received this invitation.</p>

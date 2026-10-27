@@ -10,6 +10,7 @@ const mutationSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("SCHEDULE_TEST"), payload: z.object({ testId: uuid, batchId: uuid, startsAt: z.iso.datetime({ offset: true }), endsAt: z.iso.datetime({ offset: true }) }) }),
   z.object({ action: z.literal("PUBLISH_TEST"), payload: z.object({ testId: uuid, published: z.boolean() }) }),
   z.object({ action: z.enum(["RELEASE_RESULTS", "RELEASE_SOLUTIONS"]), payload: z.object({ testId: uuid }) }),
+  z.object({ action: z.literal("GRADE_DESCRIPTIVE"), payload: z.object({ submissionId: uuid, awardedMarks: z.number().min(0).max(100000), feedback: z.string().trim().min(1).max(10000), isModeration: z.boolean().default(false) }) }),
 ]);
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
@@ -54,6 +55,7 @@ export async function GET(request: Request, context: Context) {
       questionLinks = await safeRows(client.from("test_questions").select("id,test_id,question_id,question_order").in("test_id", testIds).order("question_order"));
     }
     let attempts: Row[] = [];
+    let descriptiveSubmissions: Row[] = [];
     if (testIds.length) {
       let query = client.from("organization_assessment_attempts").select("id,test_id,schedule_id,user_id,attempt_number,status,started_at,expires_at,submitted_at,score,max_score,percentage,correct_count,incorrect_count,unanswered_count,results_released,solutions_released").eq("organization_id", organizationId).in("test_id", testIds).order("started_at", { ascending: false });
       if (role === "STUDENT") query = query.eq("user_id", userId);
@@ -82,6 +84,9 @@ export async function GET(request: Request, context: Context) {
           solutions_released: true,
         }));
       }
+      let descriptiveQuery = client.from("organization_descriptive_submissions").select("id,attempt_id,test_id,question_id,student_user_id,answer_text,file_url,max_marks,awarded_marks,feedback,evaluator_user_id,status,moderator_user_id,moderator_notes,graded_at,moderated_at,created_at").eq("organization_id", organizationId).in("test_id", testIds).order("created_at");
+      if (role === "STUDENT") descriptiveQuery = descriptiveQuery.eq("student_user_id", userId);
+      descriptiveSubmissions = await safeRows(descriptiveQuery);
     }
     const staff = role !== "STUDENT";
     let batches = staff ? await safeRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
@@ -95,10 +100,10 @@ export async function GET(request: Request, context: Context) {
       if (search) questionQuery = questionQuery.ilike("question_text", `%${search}%`);
       bankQuestions = await safeRows(questionQuery);
     }
-    return Response.json({ tests, schedules, questionLinks, attempts, batches, bankQuestions, role }, { headers: { "cache-control": "private, no-store" } });
+    return Response.json({ tests, schedules, questionLinks, attempts, descriptiveSubmissions, batches, bankQuestions, role }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Assessment workspace query failed", error);
-    return Response.json({ tests: [], schedules: [], questionLinks: [], attempts: [], batches: [], bankQuestions: [], role });
+    return Response.json({ tests: [], schedules: [], questionLinks: [], attempts: [], descriptiveSubmissions: [], batches: [], bankQuestions: [], role });
   }
 }
 
@@ -111,10 +116,20 @@ export async function POST(request: Request, context: Context) {
   if (parsed.data.action === "SCHEDULE_TEST" && parsed.data.payload.endsAt <= parsed.data.payload.startsAt) {
     return Response.json({ error: "Assessment end must be after its start." }, { status: 400 });
   }
-  const { data, error } = await getPrepziiAdmin().rpc("lms_assessment_mutation", {
-    p_organization_id: resolved.context.organizationId, p_actor_user_id: resolved.context.userId,
-    p_actor_role: resolved.context.role, p_action: parsed.data.action, p_payload: parsed.data.payload,
-  });
+  const { data, error } = parsed.data.action === "GRADE_DESCRIPTIVE"
+    ? await getPrepziiAdmin().rpc("lms_grade_descriptive_submission", {
+        p_organization_id: resolved.context.organizationId,
+        p_submission_id: parsed.data.payload.submissionId,
+        p_actor_user_id: resolved.context.userId,
+        p_actor_role: resolved.context.role,
+        p_awarded_marks: parsed.data.payload.awardedMarks,
+        p_feedback: parsed.data.payload.feedback,
+        p_is_moderation: parsed.data.payload.isModeration,
+      })
+    : await getPrepziiAdmin().rpc("lms_assessment_mutation", {
+        p_organization_id: resolved.context.organizationId, p_actor_user_id: resolved.context.userId,
+        p_actor_role: resolved.context.role, p_action: parsed.data.action, p_payload: parsed.data.payload,
+      });
   if (error) {
     if (error.code === "42501") return Response.json({ error: "You cannot manage this assessment." }, { status: 403 });
     if (["22023", "23514"].includes(error.code ?? "")) return Response.json({ error: error.message }, { status: 400 });

@@ -1685,8 +1685,8 @@ export default function Home() {
                 <Link href="/dashboard" style={{ color: "#facc15", textDecoration: "none", fontWeight: 600 }}>
                   Institutional Workspace →
                 </Link>
-                <Link href="/super-admin" style={{ color: "inherit", textDecoration: "none" }}>
-                  Platform Super-Admin
+                <Link href="/admin" style={{ color: "inherit", textDecoration: "none" }}>
+                  Platform Admin
                 </Link>
                 <a href="#demo-request" style={{ color: "inherit", textDecoration: "none" }}>
                   Schedule Technical Demo

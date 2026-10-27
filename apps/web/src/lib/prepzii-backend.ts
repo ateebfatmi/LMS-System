@@ -74,18 +74,23 @@ export async function getActingUserId(): Promise<string | null> {
   return null;
 }
 
-export async function isPlatformSuperAdmin(): Promise<boolean> {
-  const userId = await getActingUserId();
+export async function isPlatformAdmin(authenticatedUserId?: string | null): Promise<boolean> {
+  const userId = authenticatedUserId ?? await getActingUserId();
   if (!userId) return false;
 
   const allowedUserIds = new Set(
-    (process.env.PLATFORM_SUPER_ADMIN_USER_IDS ?? "")
+    [process.env.PLATFORM_ADMIN_USER_IDS, process.env.PLATFORM_SUPER_ADMIN_USER_IDS]
+      .filter(Boolean)
+      .join(",")
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
   );
   return allowedUserIds.has(userId);
 }
+
+/** @deprecated Use isPlatformAdmin. Kept for compatibility with older imports. */
+export const isPlatformSuperAdmin = isPlatformAdmin;
 
 export async function listMyOrganizations(userId: string): Promise<Institute[]> {
   const supabase = getPrepziiAdmin();

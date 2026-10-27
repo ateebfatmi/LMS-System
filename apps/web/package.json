@@ -17,6 +17,7 @@
     "@prepzii/contracts": "*",
     "@prepzii/learning": "*",
     "@prepzii/membership": "*",
+    "@prepzii/student-success": "*",
     "@prepzii/ui": "*",
     "@supabase/supabase-js": "^2.110.1",
     "lucide-react": "^1.61.0",

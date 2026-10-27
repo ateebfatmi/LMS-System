@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { useClerk } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "motion/react";
-import { PanelLeftClose, PanelLeftOpen, X, type LucideIcon } from "lucide-react";
+import { LogOut, PanelLeftClose, PanelLeftOpen, X, type LucideIcon } from "lucide-react";
 import { PrepziiMark } from "@prepzii/ui";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
+import { clearRememberedActiveOrganization } from "@/lib/client-org";
 
 export type DashboardSidebarItem = {
   href: string;
@@ -21,6 +24,38 @@ type DashboardSidebarProps = {
   onClose: () => void;
   onToggleCollapsed: () => void;
 };
+
+function ClerkLogoutButton({ collapsed, onClose }: { collapsed: boolean; onClose: () => void }) {
+  const { signOut } = useClerk();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function logout() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "DELETE" });
+    } catch {
+      // Clerk sign-out remains authoritative if local workspace cleanup is unavailable.
+    }
+    clearRememberedActiveOrganization();
+    onClose();
+    await signOut({ redirectUrl: "/" });
+  }
+
+  return (
+    <button
+      type="button"
+      className="sidebar-sign-out"
+      onClick={() => void logout()}
+      disabled={signingOut}
+      aria-label={signingOut ? "Logging out" : "Log out"}
+      title={collapsed ? "Log out" : undefined}
+    >
+      <span className="side-nav-icon"><LogOut aria-hidden="true" strokeWidth={1.8} /></span>
+      <span className="side-nav-label">{signingOut ? "Logging out…" : "Log out"}</span>
+    </button>
+  );
+}
 
 export function DashboardSidebar({
   activeRole,
@@ -112,6 +147,17 @@ export function DashboardSidebar({
             );
           })}
         </nav>
+
+        <div className="sidebar-footer">
+          {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+            <ClerkLogoutButton collapsed={collapsed} onClose={onClose} />
+          ) : (
+            <Link className="sidebar-sign-out" href="/" onClick={onClose} title={collapsed ? "Exit workspace" : undefined}>
+              <span className="side-nav-icon"><LogOut aria-hidden="true" strokeWidth={1.8} /></span>
+              <span className="side-nav-label">Exit workspace</span>
+            </Link>
+          )}
+        </div>
 
       </aside>
     </>

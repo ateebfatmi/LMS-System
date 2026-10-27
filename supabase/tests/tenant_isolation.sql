@@ -427,6 +427,71 @@ begin
   end;
 end $$;
 
+-- Student-success records remain tenant and student scoped.
+insert into public.organization_student_interventions (
+  id, organization_id, student_user_id, batch_id, risk_score, risk_level,
+  reasons, recommended_actions, action_plan, owner_user_id, next_review_on, created_by
+) values
+  (
+    '10000000-0000-0000-0000-0000000000e1', '10000000-0000-0000-0000-000000000001',
+    'student-a', '10000000-0000-0000-0000-000000000051', 52, 'HIGH',
+    '[{"code":"LOW_ATTENDANCE","label":"60% attendance","contribution":20}]'::jsonb,
+    '["Schedule a reviewed check-in"]'::jsonb, 'Meet the student and agree a two-week recovery plan.',
+    'user-owner-a', current_date + 7, 'user-owner-a'
+  ),
+  (
+    '20000000-0000-0000-0000-0000000000e2', '20000000-0000-0000-0000-000000000002',
+    'student-b', '20000000-0000-0000-0000-000000000052', 24, 'WATCH',
+    '[{"code":"MISSED_ASSIGNMENTS","label":"70% completion","contribution":10}]'::jsonb,
+    '["Review the next submission"]'::jsonb, 'Review assignment workload with the student.',
+    'user-owner-b', current_date + 7, 'user-owner-b'
+  );
+
+insert into public.organization_revision_plans (
+  id, organization_id, student_user_id, intervention_id, title, goal,
+  starts_on, target_date, items, status, reviewed_by
+) values
+  (
+    '10000000-0000-0000-0000-0000000000e3', '10000000-0000-0000-0000-000000000001',
+    'student-a', '10000000-0000-0000-0000-0000000000e1', 'Mechanics recovery',
+    'Complete the reviewed practice sequence.', current_date, current_date + 14,
+    '[{"title":"Complete mechanics practice","kind":"PRACTICE","dueOn":"2030-01-01"}]'::jsonb,
+    'ACTIVE', 'user-owner-a'
+  ),
+  (
+    '20000000-0000-0000-0000-0000000000e4', '20000000-0000-0000-0000-000000000002',
+    'student-b', '20000000-0000-0000-0000-0000000000e2', 'Biology recovery',
+    'Complete the reviewed practice sequence.', current_date, current_date + 14,
+    '[{"title":"Complete biology practice","kind":"PRACTICE","dueOn":"2030-01-01"}]'::jsonb,
+    'ACTIVE', 'user-owner-b'
+  );
+
+insert into public.organization_doubt_threads (
+  id, organization_id, student_user_id, batch_id, subject, title, description
+) values
+  (
+    '10000000-0000-0000-0000-0000000000e5', '10000000-0000-0000-0000-000000000001',
+    'student-a', '10000000-0000-0000-0000-000000000051', 'Physics',
+    'Tenant A doubt', 'Please explain the final derivation.'
+  ),
+  (
+    '20000000-0000-0000-0000-0000000000e6', '20000000-0000-0000-0000-000000000002',
+    'student-b', '20000000-0000-0000-0000-000000000052', 'Biology',
+    'Tenant B doubt', 'Please explain the cell cycle.'
+  );
+
+insert into public.organization_doubt_messages (
+  organization_id, thread_id, author_user_id, author_role, body
+) values
+  (
+    '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000000e5',
+    'student-a', 'STUDENT', 'Please explain the final derivation.'
+  ),
+  (
+    '20000000-0000-0000-0000-000000000002', '20000000-0000-0000-0000-0000000000e6',
+    'student-b', 'STUDENT', 'Please explain the cell cycle.'
+  );
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"user-owner-a","role":"authenticated"}', true);
 
@@ -464,6 +529,14 @@ begin
   end if;
   if (select count(*) from public.organization_leads) <> 1 then
     raise exception 'CRM RLS failure: owner can see another tenant lead';
+  end if;
+  if (select count(*) from public.organization_student_interventions) <> 1
+    or (select count(*) from public.organization_revision_plans) <> 1 then
+    raise exception 'Student-success RLS failure: owner can see another tenant intervention or plan';
+  end if;
+  if (select count(*) from public.organization_doubt_threads) <> 1
+    or (select count(*) from public.organization_doubt_messages) <> 1 then
+    raise exception 'Doubt RLS failure: owner can see another tenant discussion';
   end if;
 end $$;
 
@@ -547,6 +620,14 @@ begin
   if (select count(*) from public.organization_leads) <> 0 then
     raise exception 'CRM RLS failure: student can read admissions leads';
   end if;
+  if (select count(*) from public.organization_student_interventions) <> 1
+    or (select count(*) from public.organization_revision_plans) <> 1 then
+    raise exception 'Student-success RLS failure: student cannot see exactly their intervention and plan';
+  end if;
+  if (select count(*) from public.organization_doubt_threads) <> 1
+    or (select count(*) from public.organization_doubt_messages) <> 1 then
+    raise exception 'Doubt RLS failure: student cannot see exactly their discussion';
+  end if;
 end $$;
 
 reset role;
@@ -600,6 +681,14 @@ begin
   if exists (select 1 from public.organization_student_fees where student_id <> 'student-a') then
     raise exception 'Guardian RLS failure: parent saw another student fee ledger';
   end if;
+  if (select count(*) from public.organization_student_interventions) <> 1
+    or (select count(*) from public.organization_revision_plans) <> 1 then
+    raise exception 'Guardian RLS failure: approved guardian should see exactly their child success plan';
+  end if;
+  if (select count(*) from public.organization_doubt_threads) <> 0
+    or (select count(*) from public.organization_doubt_messages) <> 0 then
+    raise exception 'Guardian RLS failure: guardian must not see student doubt discussions';
+  end if;
 end $$;
 
 -- Test parent-b access (pending review guardian)
@@ -612,6 +701,10 @@ begin
   end if;
   if (select count(*) from public.organization_student_fees) <> 0 then
     raise exception 'Guardian RLS failure: unapproved guardian cannot view fee ledger';
+  end if;
+  if (select count(*) from public.organization_student_interventions) <> 0
+    or (select count(*) from public.organization_revision_plans) <> 0 then
+    raise exception 'Guardian RLS failure: unapproved guardian cannot view success plans';
   end if;
 end $$;
 

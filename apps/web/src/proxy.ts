@@ -11,6 +11,8 @@ const protectedPathPrefixes = [
   "/api/invitations",
   "/api/organizations",
   "/api/platform",
+  "/admin",
+  "/auth/resolve",
   "/super-admin",
   "/office",
 ] as const;

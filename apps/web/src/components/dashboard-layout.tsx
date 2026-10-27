@@ -16,7 +16,9 @@ import {
   GraduationCap,
   IndianRupee,
   LayoutDashboard,
+  LifeBuoy,
   Menu,
+  MessagesSquare,
   School,
   UserCog,
   UsersRound,
@@ -24,6 +26,7 @@ import {
 } from "lucide-react";
 import { PrepziiMark } from "@prepzii/ui";
 import { DashboardSidebar } from "@/components/ui/dashboard-sidebar";
+import { resolveActiveOrganization } from "@/lib/client-org";
 
 export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT" | "ACCOUNTANT";
 
@@ -40,11 +43,13 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideI
     { href: "/dashboard/batches/workspace", label: "Batches & Academics", icon: School },
     { href: "/dashboard/courses", label: "Courses", icon: BookOpen },
     { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
+    { href: "/dashboard/doubts", label: "Doubt Desk", icon: MessagesSquare },
     { href: "/dashboard/assessments/workspace", label: "Assessments", icon: ClipboardCheck },
     { href: "/dashboard/attendance/workspace", label: "Attendance", icon: CalendarCheck2 },
     { href: "/dashboard/fees/workspace", label: "Fees", icon: IndianRupee },
     { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
     { href: "/dashboard/reports/workspace", label: "Reports", icon: BarChart3 },
+    { href: "/dashboard/student-success", label: "Student Success", icon: LifeBuoy },
     { href: "/dashboard/members", label: "Members & Access", icon: UsersRound },
     { href: "/dashboard/billing", label: "Subscription", icon: Gem },
   ],
@@ -54,21 +59,26 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideI
     { href: "/dashboard/attendance/workspace", label: "Mark Attendance", icon: CalendarCheck2 },
     { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: BookOpen },
     { href: "/dashboard/assignments", label: "Assignments & Grading", icon: ClipboardPenLine },
+    { href: "/dashboard/doubts", label: "Doubt Desk", icon: MessagesSquare },
     { href: "/dashboard/assessments/workspace", label: "Create & Evaluate Tests", icon: ClipboardCheck },
     { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
     { href: "/dashboard/reports/workspace", label: "Batch Performance", icon: BarChart3 },
+    { href: "/dashboard/student-success", label: "Student Success", icon: LifeBuoy },
   ],
   STUDENT: [
     { href: "/dashboard/workspace", label: "My Learning Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/assessments/workspace", label: "CBT Mock Tests & PYQs", icon: ClipboardCheck },
     { href: "/dashboard/courses", label: "My Courses & DPPs", icon: BookOpen },
     { href: "/dashboard/assignments", label: "My Assignments", icon: ClipboardPenLine },
+    { href: "/dashboard/doubts", label: "Ask a Doubt", icon: MessagesSquare },
     { href: "/dashboard/fees/workspace", label: "My Fee Installments", icon: IndianRupee },
     { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
     { href: "/dashboard/attendance/workspace", label: "My Attendance Log", icon: CalendarCheck2 },
+    { href: "/dashboard/student-success", label: "My Success Plan", icon: LifeBuoy },
   ],
   PARENT: [
     { href: "/dashboard/workspace", label: "Guardian Overview", icon: LayoutDashboard },
+    { href: "/dashboard/student-success", label: "Success Plans", icon: LifeBuoy },
     { href: "/dashboard/announcements", label: "Circulars & Notices", icon: Bell },
   ],
   COORDINATOR: [
@@ -78,10 +88,12 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideI
     { href: "/dashboard/teachers", label: "Faculty Directory", icon: UserCog },
     { href: "/dashboard/courses", label: "Courses & DPPs", icon: BookOpen },
     { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
+    { href: "/dashboard/doubts", label: "Doubt Desk", icon: MessagesSquare },
     { href: "/dashboard/assessments/workspace", label: "Assessments & PYQs", icon: ClipboardCheck },
     { href: "/dashboard/attendance/workspace", label: "Daily Attendance", icon: CalendarCheck2 },
     { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
     { href: "/dashboard/reports/workspace", label: "Reports & Analytics", icon: BarChart3 },
+    { href: "/dashboard/student-success", label: "Student Success", icon: LifeBuoy },
   ],
   ACCOUNTANT: [
     { href: "/dashboard/workspace", label: "Finance Overview", icon: LayoutDashboard },
@@ -125,8 +137,7 @@ function LayoutContent({
       setOrganizationStatus("available");
     };
     window.addEventListener("prepzii:organization-changed", handleOrganizationChange);
-    void fetch("/api/organizations/active", { cache: "no-store" }).then(async (response) => {
-      const result = await response.json().catch(() => null);
+    void resolveActiveOrganization().then((result) => {
       if (cancelled) return;
       if (result?.organization) {
         rememberedMembershipRole = mapMembershipRole(String(result.role ?? ""));
@@ -137,8 +148,6 @@ function LayoutContent({
         rememberedOrganizationStatus = "missing";
         setOrganizationStatus("missing");
       }
-    }).catch(() => {
-      if (!cancelled) setOrganizationStatus("checking");
     });
     return () => { cancelled = true; window.removeEventListener("prepzii:organization-changed", handleOrganizationChange); };
   }, []);

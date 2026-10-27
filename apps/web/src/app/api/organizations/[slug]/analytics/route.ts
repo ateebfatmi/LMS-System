@@ -36,27 +36,38 @@ export async function GET(_request: Request, context: Context) {
   const financeViewer = ["OWNER", "COACHING_ADMIN", "ACCOUNTANT", "STUDENT"].includes(role);
 
   try {
-    let allBatches = (leadership || teacher || student) ? await rows(client.from("organization_batches").select("id,name,target_exam,grade_level,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
-    
-    // Fallback to institute_batches if organization_batches has no records yet
-    if (!allBatches.length && (leadership || teacher || student)) {
+    const batchesPromise = (async () => {
+      if (!(leadership || teacher || student)) return [];
+      const canonical = await rows(client.from("organization_batches").select("id,name,target_exam,grade_level,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+      if (canonical.length) return canonical;
       const legacy = await rows(client.from("institute_batches").select("id,name,exam,target_year").eq("institute_id", organizationId));
-      allBatches = legacy.map((b) => ({
-        id: b.id,
-        name: b.name,
-        target_exam: b.exam || "JEE_MAIN",
-        grade_level: b.target_year ? `Target ${b.target_year}` : null,
+      return legacy.map((batch) => ({
+        id: batch.id,
+        name: batch.name,
+        target_exam: batch.exam || "JEE_MAIN",
+        grade_level: batch.target_year ? `Target ${batch.target_year}` : null,
         is_active: true,
       }));
-    }
+    })();
+
+    const leadershipMembershipsPromise = leadership
+      ? (async () => {
+          const canonical = await rows(client.from("organization_batch_members").select("id,batch_id,user_id,role,roll_number").eq("organization_id", organizationId));
+          return canonical.length
+            ? canonical
+            : rows(client.from("institute_batch_members").select("id,batch_id,member_id").eq("institute_id", organizationId));
+        })()
+      : Promise.resolve([] as Row[]);
+
+    const [allBatches, leadershipMemberships] = await Promise.all([
+      batchesPromise,
+      leadershipMembershipsPromise,
+    ]);
 
     let memberships: Row[] = [];
     let visibleBatchIds: string[] = [];
     if (leadership) {
-      memberships = await rows(client.from("organization_batch_members").select("id,batch_id,user_id,role,roll_number").eq("organization_id", organizationId));
-      if (!memberships.length) {
-        memberships = await rows(client.from("institute_batch_members").select("id,batch_id,member_id").eq("institute_id", organizationId));
-      }
+      memberships = leadershipMemberships;
       visibleBatchIds = allBatches.map((batch) => String(batch.id));
     } else if (teacher) {
       const own = await rows(client.from("organization_batch_members").select("id,batch_id,user_id,role,roll_number").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "TEACHER"));
@@ -68,67 +79,81 @@ export async function GET(_request: Request, context: Context) {
     }
     const batches = allBatches.filter((batch) => visibleBatchIds.includes(String(batch.id))).map((batch) => ({ ...batch, student_count: memberships.filter((member) => (member.role === "STUDENT" || !member.role) && member.batch_id === batch.id).length }));
 
-    let sessions: Row[] = [];
-    let attendance: Row[] = [];
-    if (visibleBatchIds.length) {
-      sessions = await rows(client.from("organization_attendance_sessions").select("id,batch_id,session_date,session_label").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).order("session_date", { ascending: false }).limit(60));
+    const attendancePromise = (async () => {
+      if (!visibleBatchIds.length) return { sessions: [] as Row[], attendance: [] as Row[] };
+      const sessions = await rows(client.from("organization_attendance_sessions").select("id,batch_id,session_date,session_label").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).order("session_date", { ascending: false }).limit(60));
       const sessionIds = sessions.map((session) => String(session.id));
-      if (sessionIds.length) {
-        let query = client.from("organization_attendance_records").select("id,session_id,student_id,status").eq("organization_id", organizationId).in("session_id", sessionIds);
-        if (student) query = query.eq("student_id", userId);
-        attendance = await rows(query);
-      }
-    }
+      if (!sessionIds.length) return { sessions, attendance: [] as Row[] };
+      let query = client.from("organization_attendance_records").select("id,session_id,student_id,status").eq("organization_id", organizationId).in("session_id", sessionIds);
+      if (student) query = query.eq("student_id", userId);
+      return { sessions, attendance: await rows(query) };
+    })();
 
-    let attempts: Row[] = [];
-    if (leadership) {
-      attempts = await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).order("started_at", { ascending: false }).limit(100));
-      if (!attempts.length) {
+    const attemptsPromise = (async () => {
+      if (leadership) {
+        const canonical = await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).order("started_at", { ascending: false }).limit(100));
+        if (canonical.length) return canonical;
         const legacy = await rows(client.from("test_attempts").select("id,user_id,status,score,total_marks,submitted_at").order("started_at", { ascending: false }).limit(20));
-        attempts = legacy.map((a) => ({
-          id: a.id,
-          user_id: a.user_id,
-          status: a.status === "completed" || a.submitted_at ? "SUBMITTED" : "IN_PROGRESS",
-          score: a.score,
-          max_score: a.total_marks || 100,
-          percentage: a.total_marks ? Math.round(((Number(a.score) || 0) / Number(a.total_marks)) * 100) : 0,
-          submitted_at: a.submitted_at,
+        return legacy.map((attempt) => ({
+          id: attempt.id,
+          user_id: attempt.user_id,
+          status: attempt.status === "completed" || attempt.submitted_at ? "SUBMITTED" : "IN_PROGRESS",
+          score: attempt.score,
+          max_score: attempt.total_marks || 100,
+          percentage: attempt.total_marks ? Math.round(((Number(attempt.score) || 0) / Number(attempt.total_marks)) * 100) : 0,
+          submitted_at: attempt.submitted_at,
         }));
       }
-    } else if (teacher) {
-      const tests = await rows(client.from("institute_tests").select("id,title").eq("institute_id", organizationId).eq("created_by", userId));
-      const testIds = tests.map((test) => String(test.id));
-      attempts = testIds.length ? await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).in("test_id", testIds).order("started_at", { ascending: false }).limit(100)) : [];
-    } else if (student) {
-      attempts = await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).eq("user_id", userId).order("started_at", { ascending: false }).limit(50));
-    }
+      if (teacher) {
+        const tests = await rows(client.from("institute_tests").select("id,title").eq("institute_id", organizationId).eq("created_by", userId));
+        const testIds = tests.map((test) => String(test.id));
+        return testIds.length ? rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).in("test_id", testIds).order("started_at", { ascending: false }).limit(100)) : [];
+      }
+      return student
+        ? rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).eq("user_id", userId).order("started_at", { ascending: false }).limit(50))
+        : [];
+    })();
 
-    let assignments: Row[] = [];
-    let submissions: Row[] = [];
-    if (leadership) {
-      assignments = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).order("due_at").limit(100));
-    } else if (teacher) {
-      assignments = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("created_by", userId).order("due_at").limit(100));
-    } else if (student) {
-      const direct = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("student_user_id", userId).eq("status", "PUBLISHED"));
-      const batchAssigned = visibleBatchIds.length ? await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).eq("status", "PUBLISHED")) : [];
-      assignments = unique([...direct, ...batchAssigned], "id");
-    }
-    if (assignments.length) {
+    const assignmentsPromise = (async () => {
+      let assignments: Row[] = [];
+      if (leadership) {
+        assignments = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).order("due_at").limit(100));
+      } else if (teacher) {
+        assignments = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("created_by", userId).order("due_at").limit(100));
+      } else if (student) {
+        const [direct, batchAssigned] = await Promise.all([
+          rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("student_user_id", userId).eq("status", "PUBLISHED")),
+          visibleBatchIds.length ? rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).eq("status", "PUBLISHED")) : Promise.resolve([] as Row[]),
+        ]);
+        assignments = unique([...direct, ...batchAssigned], "id");
+      }
+      if (!assignments.length) return { assignments, submissions: [] as Row[] };
       let query = client.from("organization_assignment_submissions").select("id,assignment_id,student_user_id,status,grade,submitted_at").eq("organization_id", organizationId).in("assignment_id", assignments.map((item) => String(item.id)));
       if (student) query = query.eq("student_user_id", userId);
-      submissions = await rows(query);
-    }
+      return { assignments, submissions: await rows(query) };
+    })();
 
-    let fees: Row[] = [];
-    let transactions: Row[] = [];
-    if (financeViewer) {
+    const financePromise = (async () => {
+      if (!financeViewer) return { fees: [] as Row[], transactions: [] as Row[] };
       let feeQuery = client.from("organization_student_fees").select("id,student_id,net_payable,status").eq("organization_id", organizationId);
       if (student) feeQuery = feeQuery.eq("student_id", userId);
-      fees = await rows(feeQuery);
+      const fees = await rows(feeQuery);
       const feeIds = fees.map((fee) => String(fee.id));
-      if (feeIds.length) transactions = await rows(client.from("organization_fee_transactions").select("id,student_fee_id,amount,transaction_type,created_at").eq("organization_id", organizationId).in("student_fee_id", feeIds));
-    }
+      const transactions = feeIds.length
+        ? await rows(client.from("organization_fee_transactions").select("id,student_fee_id,amount,transaction_type,created_at").eq("organization_id", organizationId).in("student_fee_id", feeIds))
+        : [];
+      return { fees, transactions };
+    })();
+
+    const [attendanceData, attempts, assignmentData, financeData] = await Promise.all([
+      attendancePromise,
+      attemptsPromise,
+      assignmentsPromise,
+      financePromise,
+    ]);
+    const { sessions, attendance } = attendanceData;
+    const { assignments, submissions } = assignmentData;
+    const { fees, transactions } = financeData;
 
     const present = attendance.filter((record) => record.status === "PRESENT").length;
     const submittedAttempts = attempts.filter((attempt) => attempt.status === "SUBMITTED");
