@@ -100,7 +100,6 @@ export function OrganizationSwitcher() {
       <button
         type="button"
         className="org-switcher-trigger"
-        aria-label={canSwitch ? `Switch institute. Current institute: ${active?.name}` : `Current institute: ${active?.name ?? "None"}`}
         aria-haspopup={canSwitch ? "listbox" : undefined}
         aria-expanded={canSwitch ? open : undefined}
         aria-controls={canSwitch ? "organization-switcher-menu" : undefined}

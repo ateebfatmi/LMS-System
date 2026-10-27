@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { hashInvitationToken } from "@/lib/invitation-token";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { guardRateLimit } from "@/lib/rate-limit";
 
 const acceptSchema = z.object({ token: z.string().min(40).max(128) });
 type Acceptance = {
@@ -15,6 +16,15 @@ type Acceptance = {
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+  const limited = await guardRateLimit({
+    request,
+    scope: "invitation-acceptance",
+    subject: userId,
+    limit: 20,
+    windowSeconds: 3600,
+  });
+  if (limited) return limited;
 
   const user = await currentUser();
   const email = user?.primaryEmailAddress?.emailAddress;

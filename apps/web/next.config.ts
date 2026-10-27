@@ -60,6 +60,7 @@ const nextConfig: NextConfig = {
     "@prepzii/assessment-core",
     "@prepzii/authorization",
     "@prepzii/membership",
+    "@prepzii/student-success",
     "@prepzii/ui",
   ],
   poweredByHeader: false,

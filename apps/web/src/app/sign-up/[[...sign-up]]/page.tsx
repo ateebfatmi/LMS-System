@@ -3,6 +3,8 @@ import Link from "next/link";
 import { PrepziiMark } from "@prepzii/ui";
 
 export default function SignUpPage() {
+  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+
   return (
     <div
       style={{
@@ -44,27 +46,46 @@ export default function SignUpPage() {
           overflow: "hidden",
         }}
       >
-        <SignUp
-          appearance={{
-            elements: {
-              card: {
-                borderRadius: "24px",
-                background: "#ffffff",
-                boxShadow: "none",
-              },
-              formButtonPrimary: {
-                backgroundColor: "#0B1528",
-                "&:hover": {
-                  backgroundColor: "#1e293b",
+        {clerkConfigured ? (
+          <SignUp
+            appearance={{
+              elements: {
+                card: {
+                  borderRadius: "24px",
+                  background: "#ffffff",
+                  boxShadow: "none",
+                },
+                formButtonPrimary: {
+                  backgroundColor: "#0B1528",
+                  "&:hover": {
+                    backgroundColor: "#1e293b",
+                  },
                 },
               },
-            },
-          }}
-          routing="path"
-          path="/sign-up"
-          signInUrl="/sign-in"
-          fallbackRedirectUrl="/auth/resolve"
-        />
+            }}
+            routing="path"
+            path="/sign-up"
+            signInUrl="/sign-in"
+            fallbackRedirectUrl="/auth/resolve"
+          />
+        ) : (
+          <section
+            role="status"
+            style={{
+              maxWidth: "440px",
+              padding: "28px",
+              background: "#ffffff",
+              color: "#0f172a",
+              borderRadius: "24px",
+              textAlign: "center",
+            }}
+          >
+            <h2 style={{ margin: "0 0 10px", fontSize: "18px" }}>Authentication is not configured</h2>
+            <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
+              Add the Clerk publishable and secret keys to this environment before creating an account.
+            </p>
+          </section>
+        )}
       </div>
 
       <div style={{ marginTop: "24px", textAlign: "center" }}>

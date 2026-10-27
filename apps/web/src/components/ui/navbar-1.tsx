@@ -28,7 +28,7 @@ const Navbar1 = ({ sticky = true }: { sticky?: boolean }) => {
   return (
     <header className={`${sticky ? "sticky top-0 z-40 sm:top-2" : "relative z-40"} flex w-full justify-center px-4 py-4`}>
       <div className="relative z-10 flex w-full max-w-6xl items-center justify-between rounded-full border border-slate-200/80 bg-white/90 px-4 py-2.5 shadow-[0_12px_35px_-16px_rgba(15,23,42,0.28)] backdrop-blur-xl sm:px-6">
-        <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label="PrepZii home">
+        <Link href="/" className="flex min-w-0 items-center gap-2.5">
           <motion.img
             src="/images/branding/prepzii-official-logo.png"
             alt=""

@@ -364,7 +364,7 @@ export default function Home() {
                 <span
                   style={{
                     background: isActive ? "#facc15" : "#f1f5f9",
-                    color: isActive ? "#0f172a" : "#64748b",
+                    color: isActive ? "#0f172a" : "#475569",
                     fontSize: "10px",
                     fontWeight: 800,
                     padding: "2px 8px",
@@ -618,11 +618,11 @@ export default function Home() {
                       }
 
                       if (status === "answered") {
-                        bg = "#22c55e";
+                        bg = "#15803d";
                         color = "#ffffff";
                         border = "none";
                       } else if (status === "marked") {
-                        bg = "#8b5cf6";
+                        bg = "#6d28d9";
                         color = "#ffffff";
                         border = "none";
                       }
@@ -1046,7 +1046,7 @@ export default function Home() {
                   border: "none",
                   cursor: "pointer",
                   background: billingCycle === "monthly" ? "#ffffff" : "transparent",
-                  color: billingCycle === "monthly" ? "#0f172a" : "#64748b",
+                  color: billingCycle === "monthly" ? "#0f172a" : "#475569",
                   boxShadow: billingCycle === "monthly" ? "0 2px 8px rgba(0,0,0,0.08)" : "none",
                   transition: "all 0.2s ease",
                 }}
@@ -1063,7 +1063,7 @@ export default function Home() {
                   border: "none",
                   cursor: "pointer",
                   background: billingCycle === "annual" ? "#0f172a" : "transparent",
-                  color: billingCycle === "annual" ? "#ffffff" : "#64748b",
+                  color: billingCycle === "annual" ? "#ffffff" : "#475569",
                   boxShadow: billingCycle === "annual" ? "0 2px 8px rgba(0,0,0,0.15)" : "none",
                   display: "inline-flex",
                   alignItems: "center",
@@ -1507,6 +1507,7 @@ export default function Home() {
                       Current Enrolled Students
                     </label>
                     <select
+                      aria-label="Current enrolled students"
                       value={studentCount}
                       onChange={(e) => setStudentCount(e.target.value)}
                       style={{

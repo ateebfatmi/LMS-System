@@ -29,7 +29,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("✓ Supabase URL:", url);
+  console.log("✓ Supabase URL: [CONFIGURED]");
   console.log("✓ Service Role Key: [CONFIGURED]");
   console.log("Connecting to Supabase...\n");
 
@@ -55,6 +55,7 @@ async function main() {
   console.log("Step 1: Inspecting Prerequisite Consumer Tables...");
 
   let consumerTablesFound = 0;
+  let compatibilityFailures = 0;
   for (const { name, desc } of prerequisiteTables) {
     try {
       const { data, error } = await supabase.from(name).select("*").limit(1);
@@ -78,6 +79,7 @@ async function main() {
       .limit(1);
 
     if (qErr) {
+      compatibilityFailures++;
       console.log(`  ⚠️  'public.questions' column check: ${qErr.message}`);
     } else {
       console.log("  ✓ 'public.questions': Verified real columns (exam, subject, option_a..d, correct_option).");
@@ -89,6 +91,7 @@ async function main() {
       .limit(1);
 
     if (batchErr) {
+      compatibilityFailures++;
       console.log(`  ⚠️  'public.institute_batches' column check: ${batchErr.message}`);
     } else {
       console.log("  ✓ 'public.institute_batches': Verified canonical columns (exam, target_year; no status/is_active).");
@@ -100,6 +103,7 @@ async function main() {
       .limit(1);
 
     if (testQErr) {
+      compatibilityFailures++;
       console.log(`  ⚠️  'public.institute_test_questions' column check: ${testQErr.message}`);
     } else {
       console.log("  ✓ 'public.institute_test_questions': Verified foreign key 'institute_test_id' (not test_id).");
@@ -111,15 +115,17 @@ async function main() {
       .limit(1);
 
     if (attemptErr) {
+      compatibilityFailures++;
       console.log(`  ⚠️  'public.institute_test_attempts' column check: ${attemptErr.message}`);
     } else {
       console.log("  ✓ 'public.institute_test_attempts': Verified columns (institute_test_id, user_id; no member_id).");
     }
   } catch (err: any) {
+    compatibilityFailures++;
     console.log(`  ⚠️  Column verification exception: ${err.message}`);
   }
 
-  // 3. Inspect Institutional LMS Additive Tables (Migrations 0001 - 0005)
+  // 3. Inspect production LMS relations from the active migration chain.
   const institutionalTables = [
     "organization_campuses",
     "organization_academic_years",
@@ -127,11 +133,19 @@ async function main() {
     "organization_courses",
     "organization_course_modules",
     "organization_course_lessons",
+    "organization_course_batches",
+    "organization_lesson_resources",
+    "organization_lesson_progress",
+    "organization_assignments",
+    "organization_assignment_submissions",
+    "organization_assessment_attempts",
     "organization_test_schedules",
     "organization_announcements",
+    "organization_notifications",
     "organization_attendance_sessions",
     "organization_attendance_records",
-    "organization_parent_students",
+    "organization_attendance_corrections",
+    "organization_guardian_links",
     "organization_cbt_sessions",
     "organization_cbt_answers",
     "organization_notification_dispatches",
@@ -139,9 +153,15 @@ async function main() {
     "organization_fee_plans",
     "organization_student_fees",
     "organization_fee_installments",
-    "organization_fee_payments",
-    "organization_admissions_enquiries",
-    "organization_admissions_followups",
+    "organization_fee_transactions",
+    "organization_fee_invoices",
+    "organization_leads",
+    "organization_invitations",
+    "organization_usage_counters",
+    "organization_branding",
+    "organization_student_interventions",
+    "organization_doubt_threads",
+    "organization_doubt_messages",
   ];
 
   console.log("\nStep 3: Checking Institutional Additive Tables Status...");
@@ -166,18 +186,29 @@ async function main() {
   try {
     const { data: vData, error: vErr } = await supabase.from("organization_batches").select("id, organization_id, target_exam").limit(1);
     if (vErr) {
+      compatibilityFailures++;
       console.log(`  ⏳ Compatibility view 'public.organization_batches': Not created yet (${vErr.message})`);
     } else {
       console.log(`  ✓ Compatibility view 'public.organization_batches': ACTIVE & QUERYABLE (${vData ? vData.length : 0} rows)`);
     }
   } catch {
+    compatibilityFailures++;
     console.log("  ⏳ Compatibility view 'public.organization_batches': Not created yet");
   }
 
   console.log(`\n=================================================================`);
   console.log(`Consumer Tables: ${consumerTablesFound} / ${prerequisiteTables.length} verified.`);
   console.log(`B2B Additive Tables: ${appliedCount} / ${institutionalTables.length} verified.`);
+  console.log(`Compatibility Checks: ${compatibilityFailures === 0 ? "PASS" : `${compatibilityFailures} FAILED`}.`);
   console.log(`=================================================================\n`);
+
+  if (
+    consumerTablesFound !== prerequisiteTables.length ||
+    appliedCount !== institutionalTables.length ||
+    compatibilityFailures > 0
+  ) {
+    throw new Error("Staging backend compatibility gate failed.");
+  }
 }
 
 main().catch((err) => {

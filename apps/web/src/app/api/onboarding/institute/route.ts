@@ -2,6 +2,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { guardRateLimit } from "@/lib/rate-limit";
 
 const onboardingSchema = z.object({
   name: z.string().trim().min(2).max(160),
@@ -128,6 +129,15 @@ export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+  const limited = await guardRateLimit({
+    request,
+    scope: "institute-onboarding",
+    subject: userId,
+    limit: 5,
+    windowSeconds: 3600,
+  });
+  if (limited) return limited;
+
   const user = await currentUser();
   const ownerEmail = user?.primaryEmailAddress?.emailAddress;
   if (!ownerEmail || user?.primaryEmailAddress?.verification?.status !== "verified") {
@@ -154,8 +164,9 @@ export async function POST(request: Request) {
   });
 
   let organization = (data as OnboardedOrganization[] | null)?.[0];
+  const runtimeEnvironment = process.env.DEPLOYMENT_ENV ?? process.env.NODE_ENV ?? "development";
 
-  if (isMissingOnboardingRpc(error)) {
+  if (isMissingOnboardingRpc(error) && !["production", "staging"].includes(runtimeEnvironment)) {
     console.warn("lms_create_institute is unavailable; using the canonical schema compatibility path.");
     const fallback = await createInstituteAgainstCanonicalSchema({
       ownerUserId: userId,

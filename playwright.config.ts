@@ -14,7 +14,7 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: "npx next dev -p 3005 apps/web",
+    command: "npm run build --workspace @prepzii-b2b/web && npm run start --workspace @prepzii-b2b/web -- -p 3005",
     url: "http://localhost:3005/api/health",
     reuseExistingServer: true,
     timeout: 60000,

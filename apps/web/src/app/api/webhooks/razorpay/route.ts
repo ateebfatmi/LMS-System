@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import { guardRateLimit } from "@/lib/rate-limit";
+
+const MAX_WEBHOOK_BYTES = 1_048_576;
+const WEBHOOK_TIMEOUT_MS = 8_000;
 
 /**
  * The FastAPI webhook endpoint is the single payment-event processor. This
@@ -6,6 +10,14 @@ import { NextResponse } from "next/server";
  * signed bytes. It never interprets or acknowledges a payment independently.
  */
 export async function POST(request: Request) {
+  const limited = await guardRateLimit({
+    request,
+    scope: "razorpay-webhook",
+    limit: 300,
+    windowSeconds: 60,
+  });
+  if (limited) return limited;
+
   const backendUrl = process.env.FASTAPI_INTERNAL_URL;
   const internalApiKey = process.env.INTERNAL_API_KEY;
   const signature = request.headers.get("x-razorpay-signature");
@@ -18,7 +30,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing webhook signature." }, { status: 400 });
   }
 
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_WEBHOOK_BYTES) {
+    return NextResponse.json({ error: "Webhook payload is too large." }, { status: 413 });
+  }
+
   const rawBody = await request.arrayBuffer();
+  if (rawBody.byteLength > MAX_WEBHOOK_BYTES) {
+    return NextResponse.json({ error: "Webhook payload is too large." }, { status: 413 });
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
   try {
     const response = await fetch(`${backendUrl.replace(/\/$/, "")}/api/v1/webhooks/razorpay`, {
       method: "POST",
@@ -29,6 +51,7 @@ export async function POST(request: Request) {
       },
       body: rawBody,
       cache: "no-store",
+      signal: controller.signal,
     });
     const responseBody = await response.text();
     return new NextResponse(responseBody, {
@@ -38,5 +61,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("Razorpay webhook processor could not be reached.", error);
     return NextResponse.json({ error: "Webhook processor unavailable." }, { status: 503 });
+  } finally {
+    clearTimeout(timeout);
   }
 }

@@ -23,11 +23,11 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run audit:migrations
+      - run: npm run test:sql
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
       - name: Run browser release smoke tests
         run: npm run test:e2e
-      - run: npm run build
       - run: npm audit --omit=dev
 
   backend-prototype:
@@ -67,4 +67,10 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
         run: ./scripts/run_database_tests.sh
+      - name: Verify backup and restore into a disposable database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          RECOVERY_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/prepzii_restore_test
+          RECOVERY_DATABASE_NAME: prepzii_restore_test
+        run: ./scripts/verify-backup-restore.sh
 

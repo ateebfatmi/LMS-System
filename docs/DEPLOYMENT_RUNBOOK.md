@@ -18,9 +18,9 @@ npm test
 npm run typecheck
 npm run lint
 npm run audit:migrations
+npm run test:sql
 npm run test:db
 npm run test:e2e
-npm run build
 npm audit --omit=dev
 python -m pip install -r backend/requirements.txt
 python -m pytest backend/tests -q
@@ -32,6 +32,7 @@ All commands must pass. Do not waive tenant-isolation, migration, browser, or de
 
 1. Create an encrypted database backup and record its identifier.
 2. Restore the backup into an isolated environment and verify it can be queried.
+   For the automated disposable drill, set `DATABASE_URL`, `RECOVERY_DATABASE_URL`, and a deliberately named `RECOVERY_DATABASE_NAME` containing `recovery`, `restore`, or `test`, then run `npm run test:restore`.
 3. Compare the staging migration ledger with `supabase/migrations` and the preserved incompatible branches in `supabase/legacy_migrations`; stop if an applied historical migration does not match the expected catalog.
 4. Apply migrations to staging, then run `./scripts/run_database_tests.sh` against staging.
 5. Exercise two real organizations and prove that users from organization A cannot read or mutate organization B data.

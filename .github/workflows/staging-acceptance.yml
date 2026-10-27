@@ -30,3 +30,11 @@ jobs:
           STAGING_ORGANIZATION_SLUG: ${{ vars.STAGING_ORGANIZATION_SLUG }}
           STAGING_FORBIDDEN_ORGANIZATION_SLUG: ${{ vars.STAGING_FORBIDDEN_ORGANIZATION_SLUG }}
         run: npm run test:e2e:staging
+      - name: Run representative staging load smoke
+        env:
+          LOAD_TEST_BASE_URL: ${{ vars.STAGING_BASE_URL }}
+          LOAD_TEST_REQUESTS: "500"
+          LOAD_TEST_CONCURRENCY: "25"
+          LOAD_TEST_MAX_P95_MS: "1500"
+          LOAD_TEST_MAX_ERROR_RATE: "0.01"
+        run: npm run test:load
