@@ -62,28 +62,20 @@ const Navbar1 = ({ sticky = true }: { sticky?: boolean }) => {
           ))}
         </nav>
 
-        <motion.div
-          className="hidden items-center gap-2 md:flex"
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.3, delay: 0.2 }}
-        >
+        <div className="hidden items-center gap-2 md:flex">
           <Link
             href="/sign-in"
-            className="rounded-full px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 lg:px-4"
+            className="rounded-full px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 lg:px-4"
           >
             Sign in
           </Link>
-          <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-slate-800 lg:px-5 lg:text-sm"
-              style={{ color: "#ffffff" }}
-            >
-              Open Workspace
-            </Link>
-          </motion.div>
-        </motion.div>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-xs font-semibold !text-white transition-colors hover:bg-slate-800 lg:px-5 lg:text-sm"
+          >
+            Open Workspace
+          </Link>
+        </div>
 
         <motion.button
           type="button"
