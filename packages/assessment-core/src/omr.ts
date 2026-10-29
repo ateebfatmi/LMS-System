@@ -22,6 +22,8 @@ export interface ScannedBubbleAnswer {
 }
 
 export interface OMRScanResult {
+  testId?: string;
+  testTitle?: string;
   rollNumber?: string;
   scannedAt: string;
   totalQuestions: number;
