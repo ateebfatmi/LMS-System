@@ -17,7 +17,7 @@ export default defineConfig({
     command: "npm run build --workspace @prepzii-b2b/web && npm run start --workspace @prepzii-b2b/web -- -p 3005",
     url: "http://localhost:3005/api/health",
     reuseExistingServer: true,
-    timeout: 60000,
+    timeout: 120000,
     env: {
       ...process.env,
       DEPLOYMENT_ENV: "development",

@@ -1,21 +1,16 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Badge, Button, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import {
   Camera,
-  Download,
   FileCheck2,
   Printer,
-  RefreshCw,
   ScanLine,
   UploadCloud,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
 } from "lucide-react";
+import type { OMRScanResult, ScannedBubbleAnswer } from "@prepzii/assessment-core";
 
 interface TestOption {
   id: string;
@@ -37,12 +32,11 @@ export function OMRWorkspace() {
   // Scanner state
   const [cameraActive, setCameraActive] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [scanResult, setScanResult] = useState<any | null>(null);
-  const [scanHistory, setScanHistory] = useState<any[]>([]);
+  const [scanResult, setScanResult] = useState<OMRScanResult | null>(null);
+  const [scanHistory, setScanHistory] = useState<OMRScanResult[]>([]);
   const [manualRollNumber, setManualRollNumber] = useState("");
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Load available tests and institute name
   useEffect(() => {
@@ -118,8 +112,8 @@ export function OMRWorkspace() {
     // Simulate scanning analysis latency for frame processing
     setTimeout(async () => {
       // Generate synthetic detected bubble responses based on totalQuestions
-      const generatedAnswers: any[] = [];
-      const options = ["A", "B", "C", "D"];
+      const generatedAnswers: ScannedBubbleAnswer[] = [];
+      const options: ("A" | "B" | "C" | "D")[] = ["A", "B", "C", "D"];
 
       for (let i = 1; i <= totalQuestions; i++) {
         // High realistic probability of filled bubble, small chance of blank or multiple
