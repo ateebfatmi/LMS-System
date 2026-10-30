@@ -1,7 +1,6 @@
 import { performance } from "node:perf_hooks";
 
-const baseUrl = process.env.LOAD_TEST_BASE_URL;
-if (!baseUrl) throw new Error("LOAD_TEST_BASE_URL is required.");
+const baseUrl = process.env.LOAD_TEST_BASE_URL || process.env.PLAYWRIGHT_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
 const totalRequests = Number(process.env.LOAD_TEST_REQUESTS ?? "200");
 const concurrency = Number(process.env.LOAD_TEST_CONCURRENCY ?? "20");

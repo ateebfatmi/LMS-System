@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SOURCE_URL="${DATABASE_URL:-}"
-RECOVERY_URL="${RECOVERY_DATABASE_URL:-}"
-RECOVERY_NAME="${RECOVERY_DATABASE_NAME:-}"
+export PATH="/Users/ateebfatmi/.docker/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+
+SOURCE_URL="${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5439/postgres}"
+RECOVERY_NAME="${RECOVERY_DATABASE_NAME:-prepzii_recovery_test}"
+RECOVERY_URL="${RECOVERY_DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5439/${RECOVERY_NAME}}"
 
 if [[ -z "$SOURCE_URL" || -z "$RECOVERY_URL" || -z "$RECOVERY_NAME" ]]; then
   echo "DATABASE_URL, RECOVERY_DATABASE_URL, and RECOVERY_DATABASE_NAME are required." >&2
@@ -17,12 +19,61 @@ if [[ ! "$RECOVERY_NAME" =~ ^[a-zA-Z0-9_]*(recovery|restore|test)[a-zA-Z0-9_]*$ 
   echo "RECOVERY_DATABASE_NAME must explicitly contain recovery, restore, or test." >&2
   exit 1
 fi
-for tool in pg_dump pg_restore psql dropdb createdb; do
-  if ! command -v "$tool" >/dev/null 2>&1; then
-    echo "PostgreSQL client tool '$tool' is required for the recovery drill." >&2
-    exit 127
+
+USE_DOCKER=0
+if ! command -v pg_dump >/dev/null 2>&1; then
+  if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q '^prepzii-staging-test$'; then
+    USE_DOCKER=1
+  else
+    for tool in pg_dump pg_restore psql dropdb createdb; do
+      if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "PostgreSQL client tool '$tool' is required for the recovery drill." >&2
+        exit 127
+      fi
+    done
   fi
-done
+fi
+
+if [[ "$USE_DOCKER" -eq 1 ]]; then
+  echo "==> Running recovery drill via prepzii-staging-test container..."
+  docker exec -i prepzii-staging-test sh -c "
+    set -euo pipefail
+    ARCHIVE=\$(mktemp /tmp/prepzii-backup-XXXXXX)
+    cleanup() {
+      rm -f \"\$ARCHIVE\"
+      dropdb -U postgres --if-exists '$RECOVERY_NAME' >/dev/null 2>&1 || true
+    }
+    trap cleanup EXIT
+
+    SOURCE_TABLES=\$(psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -c \"select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind in ('r','p');\")
+    SOURCE_RLS_TABLES=\$(psql -U postgres -d postgres -At -v ON_ERROR_STOP=1 -c \"select count(*) from pg_class where relnamespace = 'public'::regnamespace and relrowsecurity;\")
+    if [ \"\$SOURCE_TABLES\" -lt 1 ] || [ \"\$SOURCE_RLS_TABLES\" -lt 1 ]; then
+      echo 'Source schema is missing application tables or row-level security.' >&2
+      exit 1
+    fi
+
+    echo 'Creating logical backup from the isolated source...'
+    pg_dump -U postgres --format=custom --no-owner --no-acl -d postgres -f \"\$ARCHIVE\"
+
+    dropdb -U postgres --if-exists '$RECOVERY_NAME'
+    createdb -U postgres '$RECOVERY_NAME'
+
+    echo 'Restoring backup into disposable recovery database...'
+    pg_restore -U postgres --exit-on-error --no-owner --no-acl -d '$RECOVERY_NAME' \"\$ARCHIVE\"
+
+    psql -U postgres -d '$RECOVERY_NAME' -v ON_ERROR_STOP=1 -c 'select count(*) as institute_count from public.institutes;' >/dev/null
+    RESTORED_TABLES=\$(psql -U postgres -d '$RECOVERY_NAME' -At -v ON_ERROR_STOP=1 -c \"select count(*) from pg_class where relnamespace = 'public'::regnamespace and relkind in ('r','p');\")
+    RESTORED_RLS_TABLES=\$(psql -U postgres -d '$RECOVERY_NAME' -At -v ON_ERROR_STOP=1 -c \"select count(*) from pg_class where relnamespace = 'public'::regnamespace and relrowsecurity;\")
+
+    if [ \"\$RESTORED_TABLES\" != \"\$SOURCE_TABLES\" ] || [ \"\$RESTORED_RLS_TABLES\" != \"\$SOURCE_RLS_TABLES\" ]; then
+      echo \"Restored schema verification failed: source tables/RLS=\$SOURCE_TABLES/\$SOURCE_RLS_TABLES, restored=\$RESTORED_TABLES/\$RESTORED_RLS_TABLES.\" >&2
+      exit 1
+    fi
+
+    echo \"Backup restore verification passed (\$RESTORED_TABLES tables; \$RESTORED_RLS_TABLES protected by RLS).\"
+  "
+  exit 0
+fi
 
 ARCHIVE="$(mktemp "${TMPDIR:-/tmp}/prepzii-backup-XXXXXX")"
 cleanup() {
