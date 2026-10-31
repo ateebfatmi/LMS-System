@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button } from "@prepzii/ui";
+import { Badge, Button, Select } from "@prepzii/ui";
 
 export interface RecipientTarget {
   studentId: string;
@@ -224,24 +224,16 @@ export function WhatsAppDispatcherModal({
             <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "6px" }}>
               2. Select Message Template:
             </label>
-            <select
+            <Select
               value={template}
-              onChange={(e) => setTemplate(e.target.value as "ABSENT_ALERT" | "LOW_SCORE_WARNING" | "PTM_RANK_CARD" | "GENERAL_NOTICE")}
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: "10px",
-                border: "1px solid var(--line)",
-                fontSize: "13px",
-                fontWeight: 600,
-                marginBottom: "16px",
-              }}
+              onChange={(val) => setTemplate(val as "ABSENT_ALERT" | "LOW_SCORE_WARNING" | "PTM_RANK_CARD" | "GENERAL_NOTICE")}
+              style={{ marginBottom: "16px" }}
             >
               <option value="ABSENT_ALERT">🚨 Absent Alert Notice</option>
               <option value="LOW_SCORE_WARNING">📉 Low Test Score Alert (&lt;50%)</option>
               <option value="PTM_RANK_CARD">📊 Rank Card & Score Card Release</option>
               <option value="GENERAL_NOTICE">📢 Custom Institute Announcement</option>
-            </select>
+            </Select>
 
             {template === "GENERAL_NOTICE" && (
               <textarea

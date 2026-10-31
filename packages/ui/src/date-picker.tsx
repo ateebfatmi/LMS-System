@@ -315,6 +315,8 @@ export const DatePicker: FC<DatePickerProps> = ({
         position: "relative",
         display: "inline-block",
         width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
         fontFamily: "var(--font-prepzii-body, var(--font-body, system-ui, sans-serif))",
         ...style,
       }}
@@ -351,12 +353,14 @@ export const DatePicker: FC<DatePickerProps> = ({
         aria-expanded={isOpen}
         style={{
           width: "100%",
-          minHeight: "42px",
-          padding: "9px 12px",
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          minHeight: "40px",
+          padding: "8px 10px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "8px",
+          gap: "6px",
           borderRadius: "9px",
           border: isOpen
             ? "1px solid #9d831b"
@@ -371,16 +375,19 @@ export const DatePicker: FC<DatePickerProps> = ({
           boxShadow: isOpen ? "0 0 0 4px rgb(250 204 21 / 16%)" : "none",
           transition: "all 0.15s ease",
           opacity: disabled ? 0.6 : 1,
+          overflow: "hidden",
         }}
       >
         <span
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "8px",
+            gap: "6px",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            flex: 1,
+            minWidth: 0,
           }}
         >
           {displayText || effectivePlaceholder}
@@ -397,12 +404,13 @@ export const DatePicker: FC<DatePickerProps> = ({
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "18px",
-                height: "18px",
+                width: "16px",
+                height: "16px",
                 borderRadius: "50%",
                 color: "#94a3b8",
                 fontSize: "11px",
                 cursor: "pointer",
+                lineHeight: 1,
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
               onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
@@ -413,8 +421,8 @@ export const DatePicker: FC<DatePickerProps> = ({
 
           {/* Calendar & Clock Icon */}
           <svg
-            width="16"
-            height="16"
+            width="15"
+            height="15"
             viewBox="0 0 24 24"
             fill="none"
             stroke={isOpen ? "#d97706" : "#64748b"}

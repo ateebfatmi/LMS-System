@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Panel, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { InstituteTest, QuestionBankItem, TestPattern, TestResultSummary } from "@prepzii/contracts";
 import { getActiveOrganizationId, useActiveOrganizationId } from "@/lib/client-org";
@@ -428,17 +428,16 @@ export default function AssessmentsPage() {
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
                       Exam Pattern
                     </label>
-                    <select
+                    <Select
                       value={newPattern}
-                      onChange={(e) => setNewPattern(e.target.value as TestPattern)}
-                      className="select-input"
+                      onChange={(val) => setNewPattern(val as TestPattern)}
                       style={{ width: "100%" }}
                     >
                       <option value="JEE_ADVANCED">JEE Advanced (Partial Marking)</option>
                       <option value="JEE_MAIN">JEE Main (+4 / -1)</option>
                       <option value="NEET">NEET (+4 / -1)</option>
                       <option value="CUSTOM">Custom Pattern</option>
-                    </select>
+                    </Select>
                   </div>
 
                   <div>
@@ -505,39 +504,39 @@ export default function AssessmentsPage() {
               <form onSubmit={handleCreateTest}>
                 {/* Filter Bar */}
                 <div style={{ display: "flex", gap: "10px", marginBottom: "14px", flexWrap: "wrap", alignItems: "center" }}>
-                  <select
+                  <Select
                     value={subjectFilter}
-                    onChange={(e) => setSubjectFilter(e.target.value)}
-                    className="select-input"
+                    onChange={(val) => setSubjectFilter(val)}
+                    style={{ minWidth: "150px" }}
                   >
                     <option value="ALL">All Subjects</option>
                     <option value="Physics">Physics</option>
                     <option value="Chemistry">Chemistry</option>
                     <option value="Mathematics">Mathematics</option>
                     <option value="Biology">Biology</option>
-                  </select>
+                  </Select>
 
-                  <select
+                  <Select
                     value={diffFilter}
-                    onChange={(e) => setDiffFilter(e.target.value)}
-                    className="select-input"
+                    onChange={(val) => setDiffFilter(val)}
+                    style={{ minWidth: "150px" }}
                   >
                     <option value="ALL">All Difficulties</option>
                     <option value="EASY">Easy</option>
                     <option value="MEDIUM">Medium</option>
                     <option value="HARD">Hard</option>
                     <option value="ADVANCED">Advanced</option>
-                  </select>
+                  </Select>
 
-                  <select
+                  <Select
                     value={sourceFilter}
-                    onChange={(e) => setSourceFilter(e.target.value)}
-                    className="select-input"
+                    onChange={(val) => setSourceFilter(val)}
+                    style={{ minWidth: "180px" }}
                   >
                     <option value="ALL">All Sources (PYQ + Bank)</option>
                     <option value="PYQ">PYQ Only</option>
                     <option value="STANDARD">Question Bank Only</option>
-                  </select>
+                  </Select>
 
                   <input
                     type="text"

@@ -3,7 +3,7 @@
 import { useActiveOrganizationId } from "@/lib/client-org";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, DatePicker, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard, Panel, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { AttendanceStatus, NotificationDispatchLog, Batch } from "@prepzii/contracts";
 
@@ -198,15 +198,14 @@ export default function AttendancePage() {
                 <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--muted)", display: "block", marginBottom: "4px" }}>
                   Select Batch
                 </label>
-                <select
+                <Select
                   value={selectedBatch}
-                  onChange={(e) => setSelectedBatch(e.target.value)}
-                  className="select-input"
+                  onChange={(val) => setSelectedBatch(val)}
                   style={{ minWidth: "220px" }}
                 >
                   {batches.length === 0 && <option value="">No batches available</option>}
                   {batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -319,17 +318,16 @@ export default function AttendancePage() {
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
                   Notice Template Category
                 </label>
-                <select
+                <Select
                   value={selectedTemplate}
-                  onChange={(e) => setSelectedTemplate(e.target.value as typeof selectedTemplate)}
-                  className="select-input"
+                  onChange={(val) => setSelectedTemplate(val as typeof selectedTemplate)}
                   style={{ width: "100%" }}
                 >
                   <option value="ABSENT">🚨 Morning Absence Alert (Immediate)</option>
                   <option value="LATE">⏰ Late Arrival Notification</option>
                   <option value="PTM">📊 PTM Test Result & Rank Card</option>
                   <option value="NOTICE">📢 General Institute Announcement</option>
-                </select>
+                </Select>
               </div>
 
               <div>

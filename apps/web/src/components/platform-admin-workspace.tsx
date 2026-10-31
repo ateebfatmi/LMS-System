@@ -14,7 +14,7 @@ export function PlatformAdminWorkspace() {
   const load = useCallback(async () => { const response = await fetch("/api/platform", { cache: "no-store" }); const result = await response.json(); if (response.ok) { setData(result); setError(""); } else setError(result.error ?? "Unable to load platform administration."); }, []);
   useEffect(() => { const task = window.setTimeout(() => void load(), 0); return () => window.clearTimeout(task); }, [load]);
   async function mutate(action: string, payload: Row) { setBusy(true); setError(""); setMessage(""); const response = await fetch("/api/platform", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, payload }) }); const result = await response.json(); if (!response.ok) setError(result.error ?? "Unable to save platform operation."); else { setMessage("Platform operation saved and audited."); await load(); } setBusy(false); return response.ok; }
-  async function updatePlan(event: FormEvent<HTMLFormElement>, plan: Row) { event.preventDefault(); const form = new FormData(event.currentTarget); await mutate("UPDATE_PLAN", { planId: plan.id, name: form.get("name"), monthlyPricePaise: Math.round(Number(form.get("monthly")) * 100), annualPricePaise: Math.round(Number(form.get("annual")) * 100), studentLimit: Number(form.get("students")), branchLimit: Number(form.get("branches")), storageGb: Number(form.get("storage")), aiCreditsPerMonth: Number(form.get("ai")), entitlements: plan.entitlements ?? {}, isActive: form.get("active") === "on" }); }
+  async function updatePlan(event: FormEvent<HTMLFormElement>, plan: Row) { event.preventDefault(); const form = new FormData(event.currentTarget); await mutate("UPDATE_PLAN", { planId: plan.id, name: form.get("name"), monthlyPricePaise: Math.round(Number(form.get("monthly")) * 100), annualPricePaise: Math.round(Number(form.get("annual")) * 100), studentLimit: Number(form.get("students")), branchLimit: Number(form.get("branches")), storageGb: Number(form.get("storage")), aiCreditsPerMonth: 0, entitlements: plan.entitlements ?? {}, isActive: form.get("active") === "on" }); }
   async function saveFlag(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); if (await mutate("SET_FEATURE_FLAG", { key: form.get("key"), description: form.get("description"), enabled: form.get("enabled") === "on" })) event.currentTarget.reset(); }
   const institutes = data.institutes.filter((item) => (status === "ALL" || item.status === status) && `${item.name} ${item.slug} ${item.owner_user_id}`.toLowerCase().includes(search.toLowerCase()));
   const active = data.institutes.filter((item) => item.status === "ACTIVE").length; const students = data.counts.reduce((sum, item) => sum + Number(item.activeStudents ?? 0), 0); const mrr = data.subscriptions.filter((sub) => ["ACTIVE", "TRIAL"].includes(String(sub.status))).reduce((sum, sub) => sum + Number(data.plans.find((plan) => plan.id === sub.plan_id)?.monthly_price_paise ?? 0), 0);
@@ -61,10 +61,6 @@ export function PlatformAdminWorkspace() {
                   <label>
                     <span>Storage (GB)</span>
                     <input name="storage" type="number" min="1" defaultValue={Number(plan.storage_gb)} />
-                  </label>
-                  <label>
-                    <span>AI Credits/mo</span>
-                    <input name="ai" type="number" min="0" defaultValue={Number(plan.ai_credits_per_month)} />
                   </label>
                 </div>
               </form>

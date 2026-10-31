@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Badge, Button, MetricCard } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 
 export interface BankQuestion {
@@ -290,46 +290,49 @@ export default function QuestionBankPage() {
 
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)" }}>Subject:</label>
-          <select
+          <Select
             value={subjectFilter}
-            onChange={(e) => setSubjectFilter(e.target.value)}
-            style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--line)", fontSize: "12px", background: "white" }}
+            onChange={(val) => setSubjectFilter(val)}
+            size="sm"
+            style={{ width: "160px" }}
           >
             <option value="ALL">All Subjects</option>
             <option value="Physics">Physics</option>
             <option value="Chemistry">Chemistry</option>
             <option value="Mathematics">Mathematics</option>
             <option value="Biology">Biology</option>
-          </select>
+          </Select>
         </div>
 
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)" }}>Difficulty:</label>
-          <select
+          <Select
             value={difficultyFilter}
-            onChange={(e) => setDifficultyFilter(e.target.value)}
-            style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--line)", fontSize: "12px", background: "white" }}
+            onChange={(val) => setDifficultyFilter(val)}
+            size="sm"
+            style={{ width: "170px" }}
           >
             <option value="ALL">All Levels</option>
             <option value="EASY">Easy</option>
             <option value="MEDIUM">Medium</option>
             <option value="HARD">Hard</option>
             <option value="ADVANCED">Advanced (JEE Adv)</option>
-          </select>
+          </Select>
         </div>
 
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
           <label style={{ fontSize: "12px", fontWeight: 700, color: "var(--muted)" }}>Type:</label>
-          <select
+          <Select
             value={kindFilter}
-            onChange={(e) => setKindFilter(e.target.value)}
-            style={{ padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--line)", fontSize: "12px", background: "white" }}
+            onChange={(val) => setKindFilter(val)}
+            size="sm"
+            style={{ width: "190px" }}
           >
             <option value="ALL">All Question Types</option>
             <option value="single_choice">Single Choice (SCQ)</option>
             <option value="multiple_choice">Multiple Correct (MCQ)</option>
             <option value="numerical">Numerical Value (NVQ)</option>
-          </select>
+          </Select>
         </div>
       </div>
 
@@ -583,31 +586,31 @@ export default function QuestionBankPage() {
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
                     Subject *
                   </label>
-                  <select
+                  <Select
                     value={newSubject}
-                    onChange={(e) => setNewSubject(e.target.value as BankQuestion["subject"])}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--line)", fontSize: "13px", background: "white" }}
+                    onChange={(val) => setNewSubject(val as BankQuestion["subject"])}
+                    style={{ width: "100%" }}
                   >
                     <option value="Physics">Physics</option>
                     <option value="Chemistry">Chemistry</option>
                     <option value="Mathematics">Mathematics</option>
                     <option value="Biology">Biology</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
                     Question Type *
                   </label>
-                  <select
+                  <Select
                     value={newKind}
-                    onChange={(e) => setNewKind(e.target.value as BankQuestion["kind"])}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--line)", fontSize: "13px", background: "white" }}
+                    onChange={(val) => setNewKind(val as BankQuestion["kind"])}
+                    style={{ width: "100%" }}
                   >
                     <option value="single_choice">Single Choice (1 Correct)</option>
                     <option value="multiple_choice">Multiple Correct (Partial Marking)</option>
                     <option value="numerical">Numerical Value</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -616,32 +619,32 @@ export default function QuestionBankPage() {
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
                     Exam Target *
                   </label>
-                  <select
+                  <Select
                     value={newExamTag}
-                    onChange={(e) => setNewExamTag(e.target.value as BankQuestion["examTag"])}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--line)", fontSize: "13px", background: "white" }}
+                    onChange={(val) => setNewExamTag(val as BankQuestion["examTag"])}
+                    style={{ width: "100%" }}
                   >
                     <option value="JEE_ADVANCED">JEE Advanced</option>
                     <option value="JEE_MAIN">JEE Main</option>
                     <option value="NEET">NEET</option>
                     <option value="FOUNDATION">Foundation</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
                     Difficulty Level *
                   </label>
-                  <select
+                  <Select
                     value={newDifficulty}
-                    onChange={(e) => setNewDifficulty(e.target.value as BankQuestion["difficulty"])}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: "8px", border: "1px solid var(--line)", fontSize: "13px", background: "white" }}
+                    onChange={(val) => setNewDifficulty(val as BankQuestion["difficulty"])}
+                    style={{ width: "100%" }}
                   >
                     <option value="EASY">Easy</option>
                     <option value="MEDIUM">Medium</option>
                     <option value="HARD">Hard</option>
                     <option value="ADVANCED">Advanced</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

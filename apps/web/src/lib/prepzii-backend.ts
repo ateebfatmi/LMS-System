@@ -75,6 +75,16 @@ export async function getActingUserId(): Promise<string | null> {
 }
 
 export async function isPlatformAdmin(authenticatedUserId?: string | null): Promise<boolean> {
+  // Check if active verified super admin session cookie is present
+  try {
+    const { cookies } = await import("next/headers");
+    const cookieStore = await cookies();
+    const saToken = cookieStore.get("prepzii_superadmin_session")?.value;
+    if (saToken && (saToken.startsWith("sa_") || saToken === "authenticated_super_admin")) {
+      return true;
+    }
+  } catch {}
+
   const userId = authenticatedUserId ?? await getActingUserId();
   if (!userId) return false;
 

@@ -4,9 +4,7 @@ import {
   type CSSProperties,
   type FC,
   type KeyboardEvent as ReactKeyboardEvent,
-  type ReactElement,
   type ReactNode,
-  Children,
   isValidElement,
   useCallback,
   useEffect,
@@ -16,8 +14,8 @@ import {
 } from "react";
 
 export interface SelectOption {
-  value: string;
-  label: string;
+  value: string | number;
+  label: ReactNode;
   description?: string;
   icon?: ReactNode;
   disabled?: boolean;
@@ -26,18 +24,80 @@ export interface SelectOption {
 export interface SelectProps {
   id?: string;
   name?: string;
-  value?: string;
-  defaultValue?: string;
+  value?: string | number;
+  defaultValue?: string | number;
   placeholder?: string;
   options?: SelectOption[];
   children?: ReactNode;
   onChange?: (value: string) => void;
   disabled?: boolean;
   required?: boolean;
+  size?: "sm" | "md" | "lg";
   className?: string;
   style?: CSSProperties;
+  triggerClassName?: string;
+  triggerStyle?: CSSProperties;
   dropdownClassName?: string;
   dropdownStyle?: CSSProperties;
+  "aria-label"?: string;
+}
+
+function parseOptionChildren(children: ReactNode): SelectOption[] {
+  const options: SelectOption[] = [];
+
+  function traverse(node: ReactNode) {
+    if (!node) return;
+
+    if (Array.isArray(node)) {
+      node.forEach(traverse);
+      return;
+    }
+
+    if (isValidElement(node)) {
+      const typeName =
+        typeof node.type === "string"
+          ? node.type
+          : (node.type as any)?.name || (node.type as any)?.displayName;
+
+      if (typeName === "option" || node.type === "option") {
+        const props = (node.props || {}) as {
+          value?: any;
+          children?: ReactNode;
+          disabled?: boolean;
+          description?: string;
+          icon?: ReactNode;
+        };
+        const rawValue = props.value !== undefined ? props.value : props.children;
+        const value = String(rawValue ?? "");
+
+        let label: ReactNode = props.children;
+        if (label === undefined || label === null) {
+          label = value;
+        } else if (
+          Array.isArray(label) &&
+          label.every((c) => typeof c === "string" || typeof c === "number")
+        ) {
+          label = label.join("");
+        }
+
+        options.push({
+          value,
+          label,
+          disabled: props.disabled,
+          description: props.description,
+          icon: props.icon,
+        });
+        return;
+      }
+
+      if ((node.props as any)?.children) {
+        traverse((node.props as any).children);
+      }
+    }
+  }
+
+  traverse(children);
+  return options;
 }
 
 export const Select: FC<SelectProps> = ({
@@ -51,42 +111,37 @@ export const Select: FC<SelectProps> = ({
   onChange,
   disabled = false,
   required = false,
+  size = "md",
   className = "",
   style,
+  triggerClassName = "",
+  triggerStyle,
   dropdownClassName = "",
   dropdownStyle,
+  "aria-label": ariaLabel,
 }) => {
   const generatedId = useId();
   const inputId = id || generatedId;
   const listboxId = `${inputId}-listbox`;
 
-  // Parse options from either direct options prop or option children
+  // Parse options from direct options prop or recursive option children
   const parsedOptions: SelectOption[] = [];
   if (directOptions && directOptions.length > 0) {
     parsedOptions.push(...directOptions);
   } else if (children) {
-    Children.forEach(children, (child) => {
-      if (isValidElement(child) && child.type === "option") {
-        const optionElement = child as ReactElement<{
-          value?: string;
-          children?: ReactNode;
-          disabled?: boolean;
-        }>;
-        const val = optionElement.props.value ?? String(optionElement.props.children ?? "");
-        const lbl = String(optionElement.props.children ?? val);
-        parsedOptions.push({
-          value: val,
-          label: lbl,
-          disabled: optionElement.props.disabled,
-        });
-      }
-    });
+    parsedOptions.push(...parseOptionChildren(children));
   }
 
   const isControlled = controlledValue !== undefined;
-  const initialValue = controlledValue ?? defaultValue ?? (parsedOptions[0]?.value ?? "");
+  const initialValue =
+    controlledValue !== undefined
+      ? String(controlledValue)
+      : defaultValue !== undefined
+        ? String(defaultValue)
+        : "";
+
   const [internalValue, setInternalValue] = useState<string>(initialValue);
-  const selectedValue = isControlled ? (controlledValue ?? "") : internalValue;
+  const selectedValue = isControlled ? String(controlledValue ?? "") : internalValue;
 
   const [isOpen, setIsOpen] = useState(false);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
@@ -94,14 +149,29 @@ export const Select: FC<SelectProps> = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listboxRef = useRef<HTMLDivElement>(null);
 
-  // Sync internal value if controlledValue changes
+  // Sync internal value if controlledValue or defaultValue changes
   useEffect(() => {
     if (isControlled) {
-      setInternalValue(controlledValue ?? "");
+      setInternalValue(String(controlledValue ?? ""));
     }
   }, [controlledValue, isControlled]);
 
-  const selectedOption = parsedOptions.find((opt) => opt.value === selectedValue);
+  useEffect(() => {
+    if (!isControlled && defaultValue !== undefined && internalValue === "") {
+      setInternalValue(String(defaultValue));
+    }
+  }, [defaultValue, isControlled, internalValue]);
+
+  // If uncontrolled, no defaultValue, and internalValue is empty, select first non-empty option if no placeholder
+  useEffect(() => {
+    if (!isControlled && !defaultValue && internalValue === "" && !placeholder && parsedOptions.length > 0) {
+      setInternalValue(String(parsedOptions[0].value));
+    }
+  }, [isControlled, defaultValue, internalValue, placeholder, parsedOptions]);
+
+  const selectedOption = parsedOptions.find(
+    (opt) => String(opt.value) === String(selectedValue)
+  );
 
   // Close when clicked outside
   useEffect(() => {
@@ -122,7 +192,9 @@ export const Select: FC<SelectProps> = ({
   // Adjust focused index when opening
   useEffect(() => {
     if (isOpen) {
-      const idx = parsedOptions.findIndex((opt) => opt.value === selectedValue);
+      const idx = parsedOptions.findIndex(
+        (opt) => String(opt.value) === String(selectedValue)
+      );
       setFocusedIndex(idx >= 0 ? idx : 0);
     } else {
       setFocusedIndex(-1);
@@ -130,11 +202,12 @@ export const Select: FC<SelectProps> = ({
   }, [isOpen, selectedValue, parsedOptions]);
 
   const handleSelect = useCallback(
-    (val: string) => {
+    (val: string | number) => {
+      const strVal = String(val);
       if (!isControlled) {
-        setInternalValue(val);
+        setInternalValue(strVal);
       }
-      onChange?.(val);
+      onChange?.(strVal);
       setIsOpen(false);
       triggerRef.current?.focus();
     },
@@ -191,6 +264,12 @@ export const Select: FC<SelectProps> = ({
     }
   };
 
+  // Dimensions based on size
+  const minHeight = size === "sm" ? "34px" : size === "lg" ? "48px" : "40px";
+  const padding = size === "sm" ? "0 10px" : size === "lg" ? "0 14px" : "0 12px";
+  const fontSize = size === "sm" ? "12.5px" : size === "lg" ? "14px" : "13.5px";
+  const borderRadius = size === "sm" ? "8px" : size === "lg" ? "12px" : "10px";
+
   return (
     <div
       ref={containerRef}
@@ -205,10 +284,25 @@ export const Select: FC<SelectProps> = ({
       {/* Hidden input for HTML form submission compatibility */}
       {name && (
         <input
-          type="hidden"
+          type="text"
+          tabIndex={-1}
+          aria-hidden="true"
           name={name}
           value={selectedValue}
           required={required}
+          onChange={() => {}}
+          style={{
+            position: "absolute",
+            opacity: 0,
+            pointerEvents: "none",
+            width: "1px",
+            height: "1px",
+            margin: "-1px",
+            border: 0,
+            padding: 0,
+            clip: "rect(0 0 0 0)",
+            overflow: "hidden",
+          }}
         />
       )}
 
@@ -223,29 +317,32 @@ export const Select: FC<SelectProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={listboxId}
-        className={`pz-select-trigger ${isOpen ? "is-open" : ""}`}
+        aria-label={ariaLabel}
+        className={`pz-select-trigger ${isOpen ? "is-open" : ""} ${triggerClassName}`.trim()}
         style={{
           width: "100%",
-          minHeight: "48px",
-          padding: "0 14px",
-          border: isOpen ? "1px solid #9d831b" : "1px solid #dce2de",
-          borderRadius: "12px",
+          minHeight,
+          padding,
+          border: isOpen ? "1px solid #ca8a04" : "1px solid #dce2de",
+          borderRadius,
           outline: "none",
           backgroundColor: "#ffffff",
           color: selectedOption ? "#181e1b" : "#94a3b8",
-          fontSize: "14px",
+          fontSize,
           fontFamily: "inherit",
           fontWeight: 500,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: "8px",
           cursor: disabled ? "not-allowed" : "pointer",
           opacity: disabled ? 0.6 : 1,
           boxShadow: isOpen
-            ? "0 0 0 4px rgba(250, 204, 21, 0.22)"
+            ? "0 0 0 3.5px rgba(250, 204, 21, 0.22)"
             : "0 1px 2px rgba(0, 0, 0, 0.02)",
           transition: "border-color 0.15s ease, box-shadow 0.15s ease",
           textAlign: "left",
+          ...triggerStyle,
         }}
       >
         <span
@@ -256,19 +353,22 @@ export const Select: FC<SelectProps> = ({
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            flex: 1,
           }}
         >
           {selectedOption?.icon}
-          <span>{selectedOption ? selectedOption.label : placeholder}</span>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
         </span>
 
         {/* Elegant Chevron Icon */}
         <svg
-          width="18"
-          height="18"
+          width={size === "sm" ? "15" : "16"}
+          height={size === "sm" ? "15" : "16"}
           viewBox="0 0 24 24"
           fill="none"
-          stroke={isOpen ? "#9d831b" : "#64748b"}
+          stroke={isOpen ? "#ca8a04" : "#64748b"}
           strokeWidth="2.2"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -293,17 +393,17 @@ export const Select: FC<SelectProps> = ({
           className={`pz-select-dropdown ${dropdownClassName}`.trim()}
           style={{
             position: "absolute",
-            top: "calc(100% + 6px)",
+            top: "calc(100% + 5px)",
             left: 0,
             width: "100%",
             minWidth: "100%",
-            zIndex: 1000,
+            zIndex: 9999,
             backgroundColor: "rgba(255, 255, 255, 0.98)",
             backdropFilter: "blur(18px)",
             WebkitBackdropFilter: "blur(18px)",
             border: "1px solid #e2e8f0",
-            borderRadius: "14px",
-            padding: "6px",
+            borderRadius: "12px",
+            padding: "5px",
             boxShadow:
               "0 20px 42px -12px rgba(15, 23, 42, 0.18), 0 8px 16px -6px rgba(15, 23, 42, 0.08)",
             animation: "pzScaleIn 0.15s cubic-bezier(0.16, 1, 0.3, 1)",
@@ -316,20 +416,20 @@ export const Select: FC<SelectProps> = ({
           }}
         >
           {parsedOptions.map((option, index) => {
-            const isSelected = option.value === selectedValue;
+            const isSelected = String(option.value) === String(selectedValue);
             const isFocused = index === focusedIndex;
 
             return (
               <div
-                key={option.value}
+                key={`${option.value}-${index}`}
                 role="option"
                 aria-selected={isSelected}
                 aria-disabled={option.disabled}
                 onClick={() => !option.disabled && handleSelect(option.value)}
                 onMouseEnter={() => !option.disabled && setFocusedIndex(index)}
                 style={{
-                  padding: "9px 12px",
-                  borderRadius: "9px",
+                  padding: size === "sm" ? "6px 10px" : "8px 11px",
+                  borderRadius: "8px",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
@@ -342,19 +442,21 @@ export const Select: FC<SelectProps> = ({
                       : "transparent",
                   color: isSelected ? "#713f12" : isFocused ? "#854d0e" : "#1e293b",
                   fontWeight: isSelected ? 650 : 500,
-                  fontSize: "13.5px",
+                  fontSize: size === "sm" ? "12px" : "13px",
                   lineHeight: "1.4",
                   transition: "background-color 0.12s ease, color 0.12s ease",
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
                   {option.icon}
-                  <div>
-                    <div>{option.label}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {option.label}
+                    </div>
                     {option.description && (
                       <div
                         style={{
-                          fontSize: "11.5px",
+                          fontSize: "11px",
                           color: isSelected ? "#854d0e" : "#64748b",
                           fontWeight: 400,
                           marginTop: "1px",
@@ -369,8 +471,8 @@ export const Select: FC<SelectProps> = ({
                 {/* Golden Checkmark for selected item */}
                 {isSelected && (
                   <svg
-                    width="16"
-                    height="16"
+                    width="15"
+                    height="15"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="#ca8a04"

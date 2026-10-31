@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Badge, Button, MetricCard } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import {
   Camera,
@@ -235,17 +235,17 @@ export function OMRWorkspace() {
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "4px" }}>
                   Link with Test
                 </label>
-                <select
+                <Select
                   value={selectedTestId}
-                  onChange={(e) => handleTestChange(e.target.value)}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--line)", fontSize: "13px" }}
+                  onChange={(val) => handleTestChange(val)}
+                  placeholder="Choose assessment test"
                 >
                   {tests.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.title} ({t.total_questions || 75} Qs)
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -278,14 +278,13 @@ export function OMRWorkspace() {
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "4px" }}>
                     Columns
                   </label>
-                  <select
-                    value={columnsCount}
-                    onChange={(e) => setColumnsCount(parseInt(e.target.value) as 3 | 4)}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--line)", fontSize: "13px" }}
+                  <Select
+                    value={String(columnsCount)}
+                    onChange={(val) => setColumnsCount(parseInt(val) as 3 | 4)}
                   >
-                    <option value={3}>3 Columns (Recommended)</option>
-                    <option value={4}>4 Columns (Compact)</option>
-                  </select>
+                    <option value="3">3 Columns (Recommended)</option>
+                    <option value="4">4 Columns (Compact)</option>
+                  </Select>
                 </div>
               </div>
 
@@ -293,15 +292,14 @@ export function OMRWorkspace() {
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 700, color: "var(--muted)", marginBottom: "4px" }}>
                   Roll Number Digits
                 </label>
-                <select
-                  value={rollDigits}
-                  onChange={(e) => setRollDigits(parseInt(e.target.value))}
-                  style={{ width: "100%", padding: "8px 12px", borderRadius: "10px", border: "1px solid var(--line)", fontSize: "13px" }}
+                <Select
+                  value={String(rollDigits)}
+                  onChange={(val) => setRollDigits(parseInt(val))}
                 >
-                  <option value={5}>5 Digits</option>
-                  <option value={7}>7 Digits (Standard)</option>
-                  <option value={10}>10 Digits (All-India)</option>
-                </select>
+                  <option value="5">5 Digits</option>
+                  <option value="7">7 Digits (Standard)</option>
+                  <option value="10">10 Digits (All-India)</option>
+                </Select>
               </div>
 
               <div style={{ marginTop: "12px" }}>
