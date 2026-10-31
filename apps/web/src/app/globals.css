@@ -4223,3 +4223,25 @@ button {
     margin: 6mm;
   }
 }
+
+
+/* PrepZii DatePicker Popover Animation & Styles */
+@keyframes pzScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.pz-datepicker-trigger:hover {
+  border-color: #cbd5e1 !important;
+}
+
+.pz-datepicker-trigger:focus-visible {
+  border-color: #9d831b !important;
+  box-shadow: 0 0 0 4px rgb(250 204 21 / 16%) !important;
+}

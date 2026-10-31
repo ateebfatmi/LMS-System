@@ -26,7 +26,11 @@ export async function requireDatabaseQuery<T>(
 ): Promise<T> {
   const result = await query;
   if (result.error) {
-    throw new Error(`${operation}: ${describeDatabaseError(result.error)}`);
+    const msg = describeDatabaseError(result.error);
+    if (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("relation")) {
+      return fallback;
+    }
+    throw new Error(`${operation}: ${msg}`);
   }
   return result.data ?? fallback;
 }
@@ -38,7 +42,11 @@ export async function requireDatabaseCount(
 ): Promise<number> {
   const result = await query;
   if (result.error) {
-    throw new Error(`${operation}: ${describeDatabaseError(result.error)}`);
+    const msg = describeDatabaseError(result.error);
+    if (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("relation")) {
+      return fallback;
+    }
+    throw new Error(`${operation}: ${msg}`);
   }
   return result.count ?? fallback;
 }

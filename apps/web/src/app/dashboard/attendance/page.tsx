@@ -3,7 +3,7 @@
 import { useActiveOrganizationId } from "@/lib/client-org";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard, Panel } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { AttendanceStatus, NotificationDispatchLog, Batch } from "@prepzii/contracts";
 
@@ -213,12 +213,10 @@ export default function AttendancePage() {
                 <label style={{ fontSize: "11px", fontWeight: 600, color: "var(--muted)", display: "block", marginBottom: "4px" }}>
                   Attendance Date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={attendanceDate}
-                  onChange={(e) => setAttendanceDate(e.target.value)}
-                  className="search-input"
-                  style={{ height: "40px" }}
+                  onChange={(val) => setAttendanceDate(val)}
+                  style={{ width: "200px" }}
                 />
               </div>
             </div>

@@ -1,7 +1,7 @@
 -- Commercial SaaS controls: entitlements, atomic quotas, branding registry, and platform operations.
 
-alter table public.subscription_plans add column if not exists monthly_price_paise bigint;
-alter table public.subscription_plans add column if not exists annual_price_paise bigint;
+alter table public.subscription_plans add column if not exists monthly_price_paise bigint default 0;
+alter table public.subscription_plans add column if not exists annual_price_paise bigint default 0;
 alter table public.subscription_plans add column if not exists entitlements jsonb not null default '{}'::jsonb;
 update public.subscription_plans set
   monthly_price_paise = coalesce(monthly_price_paise, price_inr::bigint * 100),

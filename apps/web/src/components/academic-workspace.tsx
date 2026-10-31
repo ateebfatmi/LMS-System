@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Badge, Button, MetricCard } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 
 type View = "BATCHES" | "COURSES" | "CAMPUSES";
@@ -76,7 +76,7 @@ export function AcademicWorkspace({ view }: { view: View }) {
         <section className="panel academic-create-panel">
           <h2>Quick create</h2>
           {view === "BATCHES" && <>
-            <form onSubmit={(e) => void submit(e, "CREATE_ACADEMIC_YEAR", (f) => ({ name: value(f,"name"), startsOn: value(f,"startsOn"), endsOn: value(f,"endsOn"), isActive: true }))} className="compact-form"><h3>Academic session</h3><input name="name" required placeholder="2026–27"/><div><input name="startsOn" type="date" required/><input name="endsOn" type="date" required/></div><Button disabled={busy}>Create session</Button></form>
+            <form onSubmit={(e) => void submit(e, "CREATE_ACADEMIC_YEAR", (f) => ({ name: value(f,"name"), startsOn: value(f,"startsOn"), endsOn: value(f,"endsOn"), isActive: true }))} className="compact-form"><h3>Academic session</h3><input name="name" required placeholder="2026–27"/><div><DatePicker name="startsOn" required placeholder="Start date (dd/mm/yyyy)"/><DatePicker name="endsOn" required placeholder="End date (dd/mm/yyyy)"/></div><Button disabled={busy}>Create session</Button></form>
             <form onSubmit={(e) => void submit(e, "CREATE_BATCH", (f) => ({ name: value(f,"name"), targetExam: value(f,"targetExam"), gradeLevel: value(f,"gradeLevel") || null, roomNumber: null, campusId: value(f,"campusId") || null, academicYearId: value(f,"academicYearId") || null }))} className="compact-form"><h3>Batch</h3><input name="name" required placeholder="JEE 12A — Titans"/><select name="targetExam"><option>JEE_ADVANCED</option><option>JEE_MAIN</option><option>NEET</option><option>FOUNDATION</option><option>BOARDS</option></select><input name="gradeLevel" placeholder="Class 12"/><select name="campusId"><option value="">No campus</option>{data.campuses.map((x) => <option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</select><select name="academicYearId"><option value="">No session</option>{data.academicYears.map((x) => <option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</select><Button disabled={busy}>Create batch</Button></form>
             <form onSubmit={(e) => void submit(e, "ENROLL_MEMBER", (f) => ({ batchId: value(f,"batchId"), memberId: value(f,"memberId"), rollNumber: value(f,"rollNumber") || null }))} className="compact-form"><h3>Enrol active member</h3><select name="batchId" required><option value="">Choose batch</option>{data.batches.map((x) => <option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</select><select name="memberId" required><option value="">Choose student or teacher</option>{[...data.students,...data.faculty].map((x) => <option key={String(x.member_id)} value={String(x.member_id)}>{String(x.display_name)} · {String(x.member_role)}</option>)}</select><input name="rollNumber" placeholder="Optional roll number"/><Button disabled={busy}>Add to batch</Button></form>
           </>}

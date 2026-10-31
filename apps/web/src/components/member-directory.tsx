@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { OrganizationMemberDirectoryRecord } from "@prepzii/contracts";
-import { Badge, Button, MetricCard } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { MemberImportDialog } from "@/components/member-import-dialog";
 
@@ -261,7 +261,7 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
                   <label className="editor-wide">Qualification<input name="qualification" placeholder="e.g. B.Tech / M.Sc. Physics" /></label>
                 </>
               )}
-              <label>Enrollment Date<input name="joinedOn" type="date" defaultValue={new Date().toISOString().split("T")[0]} /></label>
+              <label>Enrollment Date<DatePicker name="joinedOn" defaultValue={new Date().toISOString().split("T")[0]} /></label>
             </div>
             <footer>
               <Button type="button" variant="outline" onClick={() => setShowAddModal(false)}>Cancel</Button>
@@ -296,7 +296,7 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
                   <label className="editor-wide">Qualification<input name="qualification" defaultValue={editing.qualification ?? ""} /></label>
                 </>
               )}
-              <label>Joined on<input name="joinedOn" type="date" defaultValue={editing.joinedOn ?? ""} /></label>
+              <label>Joined on<DatePicker name="joinedOn" defaultValue={editing.joinedOn ?? ""} /></label>
             </div>
             <footer><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" variant="primary" disabled={saving}>{saving ? "Saving…" : "Save profile"}</Button></footer>
           </form>

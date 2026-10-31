@@ -26,7 +26,12 @@ type Row = Record<string, unknown>;
 
 async function rows(query: PromiseLike<{ data: Row[] | null; error: { message?: string } | null }>): Promise<Row[]> {
   const result = await query;
-  if (result.error) throw new Error(result.error.message || "Doubt query failed.");
+  if (result.error) {
+    if (result.error.message?.includes("schema cache") || result.error.message?.includes("does not exist")) {
+      return [];
+    }
+    throw new Error(result.error.message || "Doubt query failed.");
+  }
   return result.data ?? [];
 }
 

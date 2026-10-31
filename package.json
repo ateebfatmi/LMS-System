@@ -24,6 +24,9 @@
     "audit:migrations": "node scripts/audit-migration-history.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test:sql": "python3 scripts/test-sql-schema-integration.py",
+    "validate:env": "node --env-file-if-exists=.env.local --experimental-strip-types scripts/validate-production-env.ts",
+    "db:bundle": "node scripts/build-migration-bundle.mjs",
+    "db:deploy": "bash scripts/apply-remote-migrations.sh",
     "preflight": "tsc scripts/check-backend-compatibility.ts --target ES2022 --module ESNext --moduleResolution Bundler --skipLibCheck --outDir scripts/dist && node --env-file-if-exists=apps/web/.env.local --env-file-if-exists=.env.local scripts/dist/check-backend-compatibility.js"
   },
   "devDependencies": {

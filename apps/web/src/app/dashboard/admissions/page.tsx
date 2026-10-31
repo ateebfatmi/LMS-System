@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard, Panel } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { AdmissionsEnquiryRecord, EnquiryStatus, LeadSource } from "@prepzii/contracts";
 
@@ -538,12 +538,9 @@ export default function AdmissionsPage() {
                 <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
                   Next follow-up date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={nextDate}
-                  onChange={(event) => setNextDate(event.target.value)}
-                  className="select-input"
-                  style={{ width: "100%" }}
+                  onChange={(val) => setNextDate(val)}
                 />
               </div>
 

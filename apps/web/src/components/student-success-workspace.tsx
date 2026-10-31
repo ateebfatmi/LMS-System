@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { resolveActiveOrganization } from "@/lib/client-org";
 
@@ -179,7 +179,7 @@ export function StudentSuccessWorkspace() {
             </Panel> : staff && <Panel title="Open an intervention" subtitle="A staff member must review the evidence before saving">
               <form className="compact-form" onSubmit={createIntervention}>
                 <textarea name="actionPlan" required minLength={3} placeholder="Agreed action plan, responsibilities, and check-in details" defaultValue={selected.risk.recommendedActions.join("\n")} />
-                <label>Next review<input name="nextReviewOn" type="date" /></label>
+                <label>Next review<DatePicker name="nextReviewOn" placeholder="Select next review date" /></label>
                 <Button disabled={busy}>Open intervention</Button>
               </form>
             </Panel>}
@@ -189,7 +189,7 @@ export function StudentSuccessWorkspace() {
                 <input name="title" required placeholder="Two-week mechanics recovery plan" />
                 <textarea name="goal" required placeholder="A clear outcome for the review date" />
                 <textarea name="items" required placeholder={"Revise Newton's laws\nComplete 30 mixed questions\nTake a timed topic test"} />
-                <label>Target date<input name="targetDate" type="date" required /></label>
+                <label>Target date<DatePicker name="targetDate" required placeholder="Select target date" /></label>
                 <Button disabled={busy}>Publish plan</Button>
               </form>
             </Panel>}
