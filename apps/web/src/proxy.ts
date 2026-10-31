@@ -32,6 +32,9 @@ const retiredProductionApiPaths = new Set([
 
 function isProtectedRoute(request: NextRequest): boolean {
   const pathname = request.nextUrl.pathname;
+  if (pathname === "/admin/login" || pathname.startsWith("/api/platform/auth")) {
+    return false;
+  }
   return protectedPathPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 

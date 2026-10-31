@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, Panel, ProgressBar } from "@prepzii/ui";
+import { Badge, Button, Panel, ProgressBar, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { BulkImportResult, InstituteSetupChecklist } from "@prepzii/contracts";
 
@@ -318,17 +318,16 @@ Kabir Verma,+919833445566,APX-2026-1217,JEE 11B - Nucleus,JEE_MAIN,M. Verma,+919
                 <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
                   Subject Specialization
                 </label>
-                <select
+                <Select
                   value={teacherSubject}
-                  onChange={(e) => setTeacherSubject(e.target.value)}
-                  className="select-input"
+                  onChange={(val) => setTeacherSubject(val)}
                   style={{ width: "100%" }}
                 >
                   <option value="Physics">Physics</option>
                   <option value="Chemistry">Chemistry</option>
                   <option value="Mathematics">Mathematics</option>
                   <option value="Biology">Biology</option>
-                </select>
+                </Select>
               </div>
             </div>
 

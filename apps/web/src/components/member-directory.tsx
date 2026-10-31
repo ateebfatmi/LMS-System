@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { OrganizationMemberDirectoryRecord } from "@prepzii/contracts";
-import { Badge, Button, DatePicker, MetricCard } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { MemberImportDialog } from "@/components/member-import-dialog";
 
@@ -188,17 +188,17 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
 
       <div className="filter-bar directory-filter">
         <input className="search-input" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder={isStudent ? "Search name, email, or roll number…" : "Search name, email, or employee code…"} />
-        <select
+        <Select
           aria-label="Filter by batch"
           value={selectedBatchFilter}
-          onChange={(e) => setSelectedBatchFilter(e.target.value)}
-          className="select-input"
+          onChange={(val) => setSelectedBatchFilter(val)}
+          style={{ minWidth: "180px" }}
         >
           <option value="ALL">All Batches</option>
           {batches.map((b) => (
             <option key={b.id} value={b.id}>{b.name}</option>
           ))}
-        </select>
+        </Select>
         <span>{loading ? "Loading…" : `${displayedMembers.length} displayed`}</span>
       </div>
 
@@ -249,14 +249,14 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
               {isStudent ? (
                 <>
                   <label>Roll Number<input name="rollNumber" placeholder="e.g. JEE-26-001" /></label>
-                  <label>Assign to Batch<select name="batchId" defaultValue=""><option value="">Select Batch (Optional)</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+                  <label>Assign to Batch<Select name="batchId" defaultValue=""><option value="">Select Batch (Optional)</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></label>
                   <label>Guardian Name<input name="guardianName" placeholder="Parent / Guardian" /></label>
                   <label>Guardian Phone<input name="guardianPhone" placeholder="Parent Phone" /></label>
                 </>
               ) : (
                 <>
                   <label>Employee Code<input name="employeeCode" placeholder="e.g. FAC-001" /></label>
-                  <label>Assign Primary Batch<select name="batchId" defaultValue=""><option value="">Select Batch (Optional)</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+                  <label>Assign Primary Batch<Select name="batchId" defaultValue=""><option value="">Select Batch (Optional)</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></label>
                   <label>Subject Specialization<input name="subjectSpecialization" placeholder="e.g. Organic Chemistry" /></label>
                   <label className="editor-wide">Qualification<input name="qualification" placeholder="e.g. B.Tech / M.Sc. Physics" /></label>
                 </>
@@ -278,20 +278,20 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
             <header><div><h2>Edit {isStudent ? "student" : "faculty"} profile</h2><p>{editing.email}</p></div><button type="button" onClick={() => setEditing(null)} aria-label="Close">✕</button></header>
             <div className="member-editor-grid">
               <label>Display name<input name="displayName" required defaultValue={editing.displayName} /></label>
-              <label>Status<select name="status" defaultValue={editing.status === "PENDING" ? "ACTIVE" : editing.status}><option>ACTIVE</option><option>INACTIVE</option><option>SUSPENDED</option></select></label>
+              <label>Status<Select name="status" defaultValue={editing.status === "PENDING" ? "ACTIVE" : editing.status}><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option><option value="SUSPENDED">SUSPENDED</option></Select></label>
               <label>Phone<input name="phone" defaultValue={editing.phone ?? ""} /></label>
               <label>Alternate phone<input name="alternatePhone" defaultValue={editing.alternatePhone ?? ""} /></label>
               {isStudent ? (
                 <>
                   <label>Roll number<input name="rollNumber" defaultValue={editing.rollNumber ?? ""} /></label>
-                  <label>Batch<select name="batchId" defaultValue={editing.batches[0]?.id ?? ""}><option value="">No batch assigned</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+                  <label>Batch<Select name="batchId" defaultValue={editing.batches[0]?.id ?? ""}><option value="">No batch assigned</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></label>
                   <label>Guardian name<input name="guardianName" defaultValue={editing.guardianName ?? ""} /></label>
                   <label>Guardian phone<input name="guardianPhone" defaultValue={editing.guardianPhone ?? ""} /></label>
                 </>
               ) : (
                 <>
                   <label>Employee code<input name="employeeCode" defaultValue={editing.employeeCode ?? ""} /></label>
-                  <label>Primary Batch<select name="batchId" defaultValue={editing.batches[0]?.id ?? ""}><option value="">No batch assigned</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+                  <label>Primary Batch<Select name="batchId" defaultValue={editing.batches[0]?.id ?? ""}><option value="">No batch assigned</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></label>
                   <label>Subject specialization<input name="subjectSpecialization" defaultValue={editing.subjectSpecialization ?? ""} /></label>
                   <label className="editor-wide">Qualification<input name="qualification" defaultValue={editing.qualification ?? ""} /></label>
                 </>

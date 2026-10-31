@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Badge, Button, MetricCard, ProgressBar } from "@prepzii/ui";
+import { Badge, Button, MetricCard, ProgressBar, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { getActiveOrganizationId, useActiveOrganizationId } from "@/lib/client-org";
 import type { Batch } from "@prepzii/contracts";
@@ -273,10 +273,9 @@ export default function BatchesPage() {
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
                     Target Exam
                   </label>
-                  <select
+                  <Select
                     value={newTargetExam}
-                    onChange={(e) => setNewTargetExam(e.target.value)}
-                    className="select-input"
+                    onChange={(val) => setNewTargetExam(val)}
                     style={{ width: "100%" }}
                   >
                     <option value="JEE_ADVANCED">JEE Advanced</option>
@@ -284,24 +283,23 @@ export default function BatchesPage() {
                     <option value="NEET">NEET Medical</option>
                     <option value="FOUNDATION">Foundation / Olympiad</option>
                     <option value="BOARDS">Class 12 Boards</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
                     Grade Level
                   </label>
-                  <select
+                  <Select
                     value={newGradeLevel}
-                    onChange={(e) => setNewGradeLevel(e.target.value)}
-                    className="select-input"
+                    onChange={(val) => setNewGradeLevel(val)}
                     style={{ width: "100%" }}
                   >
                     <option value="Class 12">Class 12</option>
                     <option value="Class 11">Class 11</option>
                     <option value="Dropper / Repeater">Dropper / Repeater</option>
                     <option value="Class 10">Class 10</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -323,17 +321,16 @@ export default function BatchesPage() {
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
                     Lead Mentor / Faculty
                   </label>
-                  <select
+                  <Select
                     value={newFaculty}
-                    onChange={(e) => setNewFaculty(e.target.value)}
-                    className="select-input"
+                    onChange={(val) => setNewFaculty(val)}
                     style={{ width: "100%" }}
                   >
                     <option value="Er. Vivek Gupta">Er. Vivek Gupta (Physics)</option>
                     <option value="Dr. Ananya Mehta">Dr. Ananya Mehta (Biology)</option>
                     <option value="Dr. Arvind Joshi">Dr. Arvind Joshi (Chemistry)</option>
                     <option value="Prof. Rajesh Sen">Prof. Rajesh Sen (Maths)</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

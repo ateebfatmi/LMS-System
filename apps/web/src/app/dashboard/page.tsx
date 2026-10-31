@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState, useEffect } from "react";
-import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Panel, ProgressBar, Select } from "@prepzii/ui";
 import { DashboardLayout, mapMembershipRole, type AppRole } from "@/components/dashboard-layout";
 import type { ChildAcademicProfile } from "@/lib/dal/parent-repository";
 import type { InstituteAnalyticsSummary } from "@/lib/dal/analytics-repository";
@@ -241,25 +241,18 @@ function OverviewContent() {
         >
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
             <span style={{ fontSize: "12px", fontWeight: 700, color: "var(--foreground)" }}>Active Coaching Institute:</span>
-            <select
+            <Select
               value={activeOrg?.id || ""}
-              onChange={(e) => handleOrgChange(e.target.value)}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "8px",
-                border: "1px solid var(--line)",
-                fontSize: "13px",
-                fontWeight: 600,
-                background: "#f8fafc",
-                cursor: "pointer",
-              }}
+              onChange={(val) => handleOrgChange(val)}
+              size="sm"
+              style={{ minWidth: "220px" }}
             >
               {organizations.map((org) => (
                 <option key={org.id} value={org.id}>
                   {org.name} ({org.userRole || "MEMBER"})
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
           <Badge variant="brand" size="sm">
             Role: {activeOrg?.userRole || "MEMBER"}

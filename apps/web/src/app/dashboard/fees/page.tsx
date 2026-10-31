@@ -3,7 +3,7 @@
 import { useActiveOrganizationId } from "@/lib/client-org";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Panel, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { FeePaymentMethod, FeePlan, FeeReceiptSummary, StudentFeeLedger } from "@prepzii/contracts";
 
@@ -315,10 +315,9 @@ export default function FeesPage() {
                 <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
                   Payment Method
                 </label>
-                <select
+                <Select
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value as FeePaymentMethod)}
-                  className="select-input"
+                  onChange={(val) => setPaymentMethod(val as FeePaymentMethod)}
                   style={{ width: "100%" }}
                 >
                   <option value="UPI">UPI (Google Pay / PhonePe / Paytm)</option>
@@ -326,7 +325,7 @@ export default function FeesPage() {
                   <option value="NEFT_RTGS">Bank Transfer (NEFT / RTGS / IMPS)</option>
                   <option value="CHEQUE">Cheque / Demand Draft</option>
                   <option value="CARD">Debit / Credit Card</option>
-                </select>
+                </Select>
               </div>
 
               <div>

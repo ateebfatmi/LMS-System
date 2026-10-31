@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Panel, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { resolveActiveOrganization } from "@/lib/client-org";
 
@@ -65,11 +65,11 @@ export function DoubtWorkspace() {
     {notice && <div className="success-banner" role="status">{notice}</div>}
     {student && <Panel title="Ask your faculty" subtitle="Use no unnecessary personal or sensitive information">
       <form className="compact-form doubt-create-form" onSubmit={async (event) => { event.preventDefault(); const form = new FormData(event.currentTarget); const ok = await mutate("CREATE_THREAD", { batchId: String(form.get("batchId")), subject: String(form.get("subject")), title: String(form.get("title")), description: String(form.get("description")), priority: String(form.get("priority")) }); if (ok) event.currentTarget.reset(); }}>
-        <select name="batchId" required><option value="">Choose batch</option>{data.batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</select>
+        <Select name="batchId" required placeholder="Choose batch"><option value="">Choose batch</option>{data.batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</Select>
         <input name="subject" required minLength={2} placeholder="Subject or chapter" />
         <input name="title" required minLength={3} placeholder="What do you need help with?" />
         <textarea name="description" required minLength={3} placeholder="Show what you tried and where you got stuck" />
-        <select name="priority"><option value="NORMAL">Normal</option><option value="HIGH">High — blocking current work</option></select>
+        <Select name="priority" defaultValue="NORMAL"><option value="NORMAL">Normal</option><option value="HIGH">High — blocking current work</option></Select>
         <Button disabled={busy}>Submit doubt</Button>
       </form>
     </Panel>}

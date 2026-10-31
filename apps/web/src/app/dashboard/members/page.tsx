@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 
 type Organization = { id: string; name: string; slug: string };
@@ -96,7 +97,7 @@ export default function MembersPage() {
           <p>Invitations expire after seven days and only work for the verified email below.</p>
           <form className="onboarding-form" onSubmit={createInvitation}>
             <label>Email address<input name="email" type="email" required placeholder="teacher@example.com" /></label>
-            <label>Organization role<select name="role" defaultValue="TEACHER">{roles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+            <label>Organization role<Select name="role" defaultValue="TEACHER">{roles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>
             {error && <div className="form-error" role="alert">{error}</div>}
             <button className="pz-button pz-button-primary" disabled={busy || !organization}>{busy ? "Creating…" : "Create secure invite"}</button>
           </form>

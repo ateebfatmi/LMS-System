@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { PrepziiMark, Badge } from "@prepzii/ui";
+import { PrepziiMark, Badge, Select } from "@prepzii/ui";
 import { Navbar1 } from "@/components/ui/navbar-1";
 
 // Mock CBT Question Data
@@ -66,7 +66,7 @@ const CBT_QUESTIONS = [
 // Interactive Preview Tabs
 const PREVIEW_TABS = [
   { id: "cbt", label: "CBT Mock Test Simulator", badge: "Live NTA Grid" },
-  { id: "analytics", label: "Weak Chapter AI Radar", badge: "Accuracy 89%" },
+  { id: "analytics", label: "Weak Chapter Diagnostic Radar", badge: "Accuracy 89%" },
   { id: "admissions", label: "Admissions CRM Pipeline", badge: "₹4.8L Pipeline" },
   { id: "fees", label: "Fee Instalments & Invoicing", badge: "Instant GST" },
 ];
@@ -694,7 +694,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Tab 2: Weak Chapter AI Radar */}
+        {/* Tab 2: Weak Chapter Diagnostic Radar */}
         {activeTab === "analytics" && (
           <div
             style={{
@@ -711,7 +711,7 @@ export default function Home() {
                   Diagnostic Accuracy Radar: Batch JEE 2026 Titans
                 </h3>
                 <p style={{ margin: 0, color: "#64748b", fontSize: "13px" }}>
-                  AI analysis across 42 students from Test #08 (Electrostatics, Optics & Thermodynamics)
+                  Diagnostic analysis across 42 students from Test #08 (Electrostatics, Optics & Thermodynamics)
                 </p>
               </div>
               <span
@@ -965,7 +965,7 @@ export default function Home() {
             </span>
             <h3 style={{ fontSize: "20px", margin: "10px 0 12px", color: "#0f172a" }}>Weak Chapter Diagnostics</h3>
             <p style={{ fontSize: "14px", color: "#475569", lineHeight: "1.6", margin: 0 }}>
-              AI pinpointing the exact concepts where students bleed marks due to negative scoring or time drag. Export
+              Pinpointing the exact concepts where students bleed marks due to negative scoring or time drag. Export
               comprehensive student rank cards for parent-teacher conferences.
             </p>
           </div>
@@ -1191,7 +1191,7 @@ export default function Home() {
                 <li>✓ Up to 3 Campus Branches</li>
                 <li>✓ <strong>All Features in Starter</strong></li>
                 <li>✓ Admissions CRM & Walk-in Pipeline</li>
-                <li>✓ AI Weak Chapter Accuracy Diagnostics</li>
+                <li>✓ Weak Chapter Accuracy Diagnostics</li>
                 <li>✓ WhatsApp & SMS Dispatcher</li>
                 <li>✓ CSV Bulk Roster Import & Migration</li>
                 <li>✓ Priority Dedicated Support</li>
@@ -1506,25 +1506,17 @@ export default function Home() {
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "6px", color: "#334155" }}>
                       Current Enrolled Students
                     </label>
-                    <select
+                    <Select
                       aria-label="Current enrolled students"
                       value={studentCount}
-                      onChange={(e) => setStudentCount(e.target.value)}
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        borderRadius: "10px",
-                        border: "1px solid #cbd5e1",
-                        fontSize: "14px",
-                        background: "#ffffff",
-                        outline: "none",
-                      }}
+                      onChange={(val) => setStudentCount(val)}
+                      style={{ width: "100%" }}
                     >
                       <option value="under-100">Under 100 Students</option>
                       <option value="100-500">100 - 500 Students</option>
                       <option value="500-1500">500 - 1,500 Students</option>
                       <option value="1500+">1,500+ Students (Enterprise)</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
 

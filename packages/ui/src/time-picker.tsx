@@ -18,6 +18,7 @@ export interface TimePickerProps {
   placeholder?: string;
   required?: boolean;
   disabled?: boolean;
+  size?: "sm" | "md" | "lg";
   className?: string;
   style?: CSSProperties;
   stepMinutes?: number;
@@ -86,6 +87,7 @@ export const TimePicker: FC<TimePickerProps> = ({
   placeholder = "--:-- --",
   required = false,
   disabled = false,
+  size = "md",
   className = "",
   style,
   stepMinutes = 5,
@@ -188,6 +190,11 @@ export const TimePicker: FC<TimePickerProps> = ({
     minutesList.push(i);
   }
 
+  const minHeight = size === "sm" ? "34px" : size === "lg" ? "48px" : "40px";
+  const padding = size === "sm" ? "0 8px" : size === "lg" ? "0 14px" : "0 10px";
+  const fontSize = size === "sm" ? "12px" : size === "lg" ? "14px" : "13px";
+  const borderRadius = size === "sm" ? "8px" : size === "lg" ? "12px" : "9px";
+
   return (
     <div
       ref={containerRef}
@@ -195,6 +202,8 @@ export const TimePicker: FC<TimePickerProps> = ({
       style={{
         position: "relative",
         width: "100%",
+        maxWidth: "100%",
+        boxSizing: "border-box",
         userSelect: "none",
         ...style,
       }}
@@ -219,16 +228,18 @@ export const TimePicker: FC<TimePickerProps> = ({
         className={`pz-timepicker-trigger ${isOpen ? "is-open" : ""}`}
         style={{
           width: "100%",
-          minHeight: "48px",
-          padding: "0 14px",
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          minHeight,
+          padding,
           border: isOpen ? "1px solid #9d831b" : "1px solid #dce2de",
-          borderRadius: "12px",
+          borderRadius,
           outline: "none",
           backgroundColor: "#ffffff",
           color: effectiveValue ? "#181e1b" : "#94a3b8",
-          fontSize: "14px",
+          fontSize,
           fontFamily: "inherit",
-          fontWeight: 600,
+          fontWeight: 500,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -238,15 +249,27 @@ export const TimePicker: FC<TimePickerProps> = ({
             ? "0 0 0 4px rgba(250, 204, 21, 0.22)"
             : "0 1px 2px rgba(0, 0, 0, 0.02)",
           transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-          letterSpacing: "0.02em",
+          letterSpacing: "0.01em",
+          overflow: "hidden",
         }}
       >
-        <span>{displayString}</span>
+        <span
+          style={{
+            minWidth: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            flex: 1,
+            textAlign: "left",
+          }}
+        >
+          {displayString}
+        </span>
 
         {/* Crisp Clock Icon */}
         <svg
-          width="17"
-          height="17"
+          width="15"
+          height="15"
           viewBox="0 0 24 24"
           fill="none"
           stroke={isOpen ? "#9d831b" : "#64748b"}

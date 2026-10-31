@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, DatePicker, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard, Panel, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { AdmissionsEnquiryRecord, EnquiryStatus, LeadSource } from "@prepzii/contracts";
 
@@ -381,26 +381,24 @@ export default function AdmissionsPage() {
                   <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
                     Target Examination
                   </label>
-                  <select
+                  <Select
                     value={targetExam}
-                    onChange={(e) => setTargetExam(e.target.value as typeof targetExam)}
-                    className="select-input"
+                    onChange={(val) => setTargetExam(val as typeof targetExam)}
                     style={{ width: "100%" }}
                   >
                     <option value="JEE_ADVANCED">JEE Advanced</option>
                     <option value="JEE_MAIN">JEE Main</option>
                     <option value="NEET">NEET</option>
                     <option value="FOUNDATION">Foundation</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
                     Lead Source
                   </label>
-                  <select
+                  <Select
                     value={leadSource}
-                    onChange={(e) => setLeadSource(e.target.value as LeadSource)}
-                    className="select-input"
+                    onChange={(val) => setLeadSource(val as LeadSource)}
                     style={{ width: "100%" }}
                   >
                     <option value="WALK_IN">Walk-in Visit</option>
@@ -409,7 +407,7 @@ export default function AdmissionsPage() {
                     <option value="WEBSITE">Website Form</option>
                     <option value="SEMINAR">Seminar / Talent Exam</option>
                     <option value="NEWSPAPER_AD">Newspaper / Hoarding</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -491,25 +489,23 @@ export default function AdmissionsPage() {
                   <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
                     Interaction Type
                   </label>
-                  <select
+                  <Select
                     value={interactionType}
-                    onChange={(e) => setInteractionType(e.target.value as typeof interactionType)}
-                    className="select-input"
+                    onChange={(val) => setInteractionType(val as typeof interactionType)}
                     style={{ width: "100%" }}
                   >
                     <option value="PHONE_CALL">Phone Call</option>
                     <option value="IN_PERSON_MEETING">Campus Meeting</option>
                     <option value="WHATSAPP">WhatsApp Chat</option>
-                  </select>
+                  </Select>
                 </div>
                 <div>
                   <label style={{ fontSize: "12px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
                     Update Lead Status
                   </label>
-                  <select
+                  <Select
                     value={newStatus}
-                    onChange={(e) => setNewStatus(e.target.value as EnquiryStatus)}
-                    className="select-input"
+                    onChange={(val) => setNewStatus(val as EnquiryStatus)}
                     style={{ width: "100%" }}
                   >
                     <option value="CONTACTED">Contacted</option>
@@ -517,7 +513,7 @@ export default function AdmissionsPage() {
                     <option value="DEMO_ATTENDED">Demo Attended</option>
                     <option value="OFFER_EXTENDED">Offer Extended</option>
                     <option value="LOST">Lost / Dropped</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

@@ -191,7 +191,7 @@ export default function ReportsPage() {
       <div style={{ marginTop: "16px" }}>
         <Panel
           title="Students Recommended for Academic Intervention"
-          subtitle="Identified deterministically by test score and attendance rules without unsupported AI claims"
+          subtitle="Identified deterministically by test score and attendance rules"
         >
           <div className="data-table-wrap">
             <table className="data-table">
@@ -281,7 +281,7 @@ export default function ReportsPage() {
               Analytics Formula Transparency
             </h3>
             <p style={{ margin: "0 0 16px", fontSize: "12px", color: "var(--muted)" }}>
-              PrepZii B2B calculates all academic metrics deterministically without black-box or unsupported AI models.
+              PrepZii B2B calculates all academic metrics deterministically based on test scores and attendance records.
             </p>
 
             <div style={{ display: "grid", gap: "16px" }}>

@@ -173,7 +173,7 @@ export function OrganizationSwitcher() {
               }}
             >
               <Plus size={15} style={{ opacity: 0.7 }} />
-              <span>＋ Create new institute</span>
+              <span>Create new institute</span>
             </Link>
 
             {isPlatformAdmin && (
@@ -187,14 +187,16 @@ export function OrganizationSwitcher() {
                   padding: "8px 10px",
                   borderRadius: "8px",
                   fontSize: "13px",
-                  fontWeight: 600,
+                  fontWeight: 700,
                   color: "#92400e",
                   backgroundColor: "#fef3c7",
+                  border: "1px solid #fde68a",
                   textDecoration: "none",
+                  transition: "background-color 0.12s ease",
                 }}
               >
                 <ShieldCheck size={16} />
-                <span>Super Admin Console</span>
+                <span>Super Admin Control Center</span>
               </Link>
             )}
           </div>

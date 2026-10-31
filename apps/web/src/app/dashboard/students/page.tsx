@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge, Button, MetricCard } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import type { StudentRecord } from "@/lib/mock-data";
 import { getActiveOrganizationId, useActiveOrganizationId } from "@/lib/client-org";
@@ -121,10 +121,10 @@ export default function StudentsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="search-input"
           />
-          <select
+          <Select
             value={selectedBatch}
-            onChange={(e) => setSelectedBatch(e.target.value)}
-            className="select-input"
+            onChange={(val) => setSelectedBatch(val)}
+            style={{ minWidth: "180px" }}
           >
             <option value="ALL">All Batches</option>
             {batches.map((b) => (
@@ -132,7 +132,7 @@ export default function StudentsPage() {
                 {b.name} ({(b.targetExam || "JEE").replace("_", " ")})
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div style={{ display: "flex", gap: "8px" }}>
@@ -340,10 +340,9 @@ export default function StudentsPage() {
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "6px" }}>
                   Target Batch Allocation
                 </label>
-                <select
+                <Select
                   value={newBatchId}
-                  onChange={(e) => setNewBatchId(e.target.value)}
-                  className="select-input"
+                  onChange={(val) => setNewBatchId(val)}
                   style={{ width: "100%" }}
                 >
                   {batches.map((b) => (
@@ -351,7 +350,7 @@ export default function StudentsPage() {
                       {b.name} ({(b.targetExam || "JEE").replace("_", " ")})
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>

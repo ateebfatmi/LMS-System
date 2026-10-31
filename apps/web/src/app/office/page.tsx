@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Badge, Button, MetricCard, Panel } from "@prepzii/ui";
+import { Badge, Button, MetricCard, Panel, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { mockStudents, mockLeads, mockCampusRooms } from "@/lib/mock-data";
 
@@ -162,22 +162,13 @@ export default function OfficePage() {
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
                   Select Student
                 </label>
-                <select
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: "10px",
-                    border: "1px solid var(--line)",
-                    fontSize: "13px",
-                    background: "white",
-                  }}
-                >
+                <Select style={{ width: "100%" }}>
                   {mockStudents.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} ({s.rollNumber}) — {s.batchName}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
@@ -197,17 +188,17 @@ export default function OfficePage() {
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
                     Payment Mode
                   </label>
-                  <select
+                  <Select
                     value={cashierMode}
-                    onChange={(e) => setCashierMode(e.target.value)}
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--line)", fontSize: "13px", background: "white" }}
+                    onChange={(val) => setCashierMode(val)}
+                    style={{ width: "100%" }}
                   >
                     <option value="UPI">UPI / QR Code</option>
                     <option value="CASH">Cash at Counter</option>
                     <option value="CARD">Debit / Credit Card</option>
                     <option value="CHEQUE">Bank Cheque</option>
                     <option value="NET_BANKING">Net Banking NEFT</option>
-                  </select>
+                  </Select>
                 </div>
               </div>
 

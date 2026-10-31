@@ -983,7 +983,7 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
       "Custom Institute White-Label Domain",
       "Automated Razorpay Fee Collection",
       "Dedicated Technical Account Manager",
-      "Automated AI Question & Worksheet Generator",
+      "Automated Question & Worksheet Generator",
     ],
     isActive: true,
   },
