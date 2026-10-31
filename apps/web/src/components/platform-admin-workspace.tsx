@@ -3,7 +3,29 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Badge, Button, MetricCard, PrepziiLogoIcon, Select } from "@prepzii/ui";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  ArrowUpRight,
+  ContactRound,
+  Download,
+  Gem,
+  LayoutDashboard,
+  Lock,
+  Megaphone,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  RefreshCw,
+  School,
+  ScrollText,
+  ShieldCheck,
+  SlidersHorizontal,
+  UsersRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
+import { Badge, Button, MetricCard, PrepziiMark, Select } from "@prepzii/ui";
 import { rememberActiveOrganization } from "@/lib/client-org";
 
 type Row = Record<string, unknown>;
@@ -34,6 +56,17 @@ type Data = {
   aiDrafts: Row[];
   systemHealth?: SystemHealth;
 };
+
+type AdminSection =
+  | "overview"
+  | "institutes"
+  | "users"
+  | "plans"
+  | "demos"
+  | "flags"
+  | "broadcasts"
+  | "support"
+  | "audits";
 
 const empty: Data = {
   institutes: [],
@@ -80,6 +113,54 @@ const ENTITLEMENT_KEYS = [
   { key: "whiteLabel", label: "White-Label & Custom Domain" },
 ] as const;
 
+const SECTION_META: Record<AdminSection, { title: string; subtitle: string; icon: LucideIcon }> = {
+  overview: {
+    title: "Command Center",
+    subtitle: "Executive fleet metrics, infrastructure telemetry & priority governance queue",
+    icon: LayoutDashboard,
+  },
+  institutes: {
+    title: "Institutes Fleet",
+    subtitle: "Tenant lifecycle, student quotas, custom domains & deep workspace governance",
+    icon: School,
+  },
+  users: {
+    title: "Global Users & Access",
+    subtitle: "Cross-tenant member directory, role assignments & direct user provisioning",
+    icon: UsersRound,
+  },
+  plans: {
+    title: "Commercial Plans & Upgrades",
+    subtitle: "SaaS subscription tiers, pricing, limits & module entitlements",
+    icon: Gem,
+  },
+  demos: {
+    title: "Demo Leads & B2B Sales",
+    subtitle: "Inbound institute inquiries & 1-click live workspace provisioning",
+    icon: ContactRound,
+  },
+  flags: {
+    title: "Feature Switches",
+    subtitle: "Platform-wide rollout switches, beta capabilities & emergency killswitches",
+    icon: SlidersHorizontal,
+  },
+  broadcasts: {
+    title: "System Broadcasts",
+    subtitle: "Dispatch official platform announcements across active institute portals",
+    icon: Megaphone,
+  },
+  support: {
+    title: "Support Access",
+    subtitle: "Time-bounded, audited support windows for tenant troubleshooting",
+    icon: ShieldCheck,
+  },
+  audits: {
+    title: "Security Audit Trail",
+    subtitle: "Immutable compliance ledger of all administrative mutations & logins",
+    icon: ScrollText,
+  },
+};
+
 const money = (paise: unknown) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -90,9 +171,9 @@ const money = (paise: unknown) =>
 export function PlatformAdminWorkspace() {
   const router = useRouter();
   const [data, setData] = useState<Data>(empty);
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "institutes" | "users" | "plans" | "demos" | "flags" | "audits"
-  >("overview");
+  const [activeTab, setActiveTab] = useState<AdminSection>("overview");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Fleet filters
   const [search, setSearch] = useState("");
@@ -534,299 +615,323 @@ export function PlatformAdminWorkspace() {
     ? data.institutes.find((i) => String(i.id) === inspectedInstituteId) ?? null
     : null;
 
+  const navItems: { id: AdminSection; label: string; icon: LucideIcon; count?: number }[] = [
+    { id: "overview", label: "Command Center", icon: LayoutDashboard },
+    { id: "institutes", label: "Institutes Fleet", icon: School, count: data.institutes.length },
+    { id: "users", label: "Global Users & Roles", icon: UsersRound, count: data.members.length },
+    {
+      id: "plans",
+      label: "Commercial Plans",
+      icon: Gem,
+      count: pendingUpgrades.length || undefined,
+    },
+    {
+      id: "demos",
+      label: "Demo Leads & Sales",
+      icon: ContactRound,
+      count: pendingDemos.length || data.demoRequests.length || undefined,
+    },
+    { id: "flags", label: "Feature Switches", icon: SlidersHorizontal, count: data.flags.length },
+    { id: "broadcasts", label: "System Broadcasts", icon: Megaphone },
+    {
+      id: "support",
+      label: "Support Access",
+      icon: ShieldCheck,
+      count: data.supportRequests.filter((r) => r.status === "APPROVED").length || undefined,
+    },
+    { id: "audits", label: "Security Audit Trail", icon: ScrollText, count: data.audits.length },
+  ];
+
+  const activeMeta = SECTION_META[activeTab];
+
   return (
-    <div className="platform-admin" style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-      {/* Super Admin High-Security Header */}
-      <header
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "16px",
-          padding: "14px 28px",
-          backgroundColor: "#0B1528",
-          borderBottom: "1px solid rgba(250, 204, 21, 0.2)",
-          color: "#ffffff",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-          <PrepziiLogoIcon className="w-8 h-8" />
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <strong style={{ fontSize: "16px", fontWeight: 800, letterSpacing: "0.02em" }}>
-                PREP<span style={{ color: "#FACC15" }}>ZII</span>
-              </strong>
-              <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 800,
-                  padding: "2px 8px",
-                  borderRadius: "6px",
-                  backgroundColor: "rgba(250, 204, 21, 0.15)",
-                  color: "#FACC15",
-                  border: "1px solid rgba(250, 204, 21, 0.3)",
-                  letterSpacing: "0.08em",
-                }}
-              >
-                SUPER ADMIN ROOT
-              </span>
-            </div>
-            <small style={{ color: "#94a3b8", fontSize: "11px" }}>
-              Fleet Governance, Tenant Provisioning & Central Control Terminal
-            </small>
-          </div>
-        </div>
-
-        {/* Live Vitals Indicator */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            fontSize: "12px",
-            color: "#cbd5e1",
-            backgroundColor: "rgba(255, 255, 255, 0.05)",
-            padding: "6px 14px",
-            borderRadius: "999px",
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-          }}
-        >
-          <span style={{ color: "#4ade80" }}>●</span>
-          <span>Database: {data.systemHealth?.databaseLatencyMs ?? 14}ms</span>
-          <span style={{ color: "rgba(255, 255, 255, 0.2)" }}>|</span>
-          <span>
-            Q-Bank: {(data.systemHealth?.questionBankCount ?? 14200).toLocaleString("en-IN")} Qs
-          </span>
-          <span style={{ color: "rgba(255, 255, 255, 0.2)" }}>|</span>
-          <span>AI: {data.systemHealth?.aiModelName ?? "gemini-2.5-flash"}</span>
-        </div>
-
-        {/* Actions & Session Locking */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button
+    <main className={`app-shell ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+      {/* Mobile Backdrop */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.button
             type="button"
-            onClick={() => void load()}
-            style={{
-              color: "#cbd5e1",
-              fontSize: "12px",
-              fontWeight: 600,
-              background: "rgba(255, 255, 255, 0.06)",
-              border: "1px solid rgba(255, 255, 255, 0.14)",
-              padding: "6px 12px",
-              borderRadius: "8px",
-              cursor: "pointer",
-            }}
-          >
-            ↻ Sync
-          </button>
+            className="sidebar-backdrop"
+            aria-label="Close navigation"
+            onClick={() => setMobileMenuOpen(false)}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          />
+        )}
+      </AnimatePresence>
 
+      {/* =========================================================
+          LEFT FLOATING SIDEBAR NAVIGATION DOCK (MATCHING LMS UI)
+         ========================================================= */}
+      <aside
+        className={`sidebar dashboard-navbar ${sidebarCollapsed ? "collapsed" : ""} ${mobileMenuOpen ? "mobile-open" : ""}`}
+      >
+        <div className="brand-row">
+          <motion.div whileHover={{ rotate: 1.5, scale: 1.02 }} transition={{ duration: 0.2 }}>
+            <Link href="/admin" aria-label="PrepZii Super Admin">
+              <PrepziiMark compact={sidebarCollapsed} theme="light" />
+            </Link>
+          </motion.div>
+          <span className="inst-pill">SUPER ADMIN</span>
+          <motion.button
+            type="button"
+            className="sidebar-collapse"
+            onClick={() => setSidebarCollapsed((c) => !c)}
+            whileTap={{ scale: 0.9 }}
+            aria-label={sidebarCollapsed ? "Expand navigation" : "Minimize navigation"}
+            title={sidebarCollapsed ? "Expand navigation" : "Minimize navigation"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen aria-hidden="true" /> : <PanelLeftClose aria-hidden="true" />}
+          </motion.button>
+          <motion.button
+            type="button"
+            className="sidebar-close"
+            onClick={() => setMobileMenuOpen(false)}
+            whileTap={{ scale: 0.9 }}
+            aria-label="Close navigation"
+          >
+            <X aria-hidden="true" />
+          </motion.button>
+        </div>
+
+        {/* Super Admin Identity Card (matching OrganizationSwitcher style) */}
+        <div className="org-switcher" style={{ cursor: "default" }}>
+          <span className="org-avatar">SA</span>
+          <span className="org-switcher-copy">
+            <strong>Platform Root</strong>
+            <small>Super Admin Terminal</small>
+          </span>
+          {!sidebarCollapsed && (
+            <span
+              title="Authenticated Root Session"
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "999px",
+                backgroundColor: "#22c55e",
+                boxShadow: "0 0 8px rgba(34, 197, 94, 0.7)",
+                flexShrink: 0,
+              }}
+            />
+          )}
+        </div>
+
+        <div className="side-nav-heading">
+          <span>Governance</span>
+          <span>ROOT</span>
+        </div>
+
+        {/* Sidebar Navigation Links */}
+        <nav className="side-nav" aria-label="Super Admin navigation">
+          {navItems.map((item) => {
+            const isActive = activeTab === item.id;
+            const Icon = item.icon;
+            return (
+              <motion.div key={item.id} whileHover={{ x: 3 }} whileTap={{ scale: 0.98 }}>
+                <a
+                  href={`#${item.id}`}
+                  className={isActive ? "active" : ""}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setActiveTab(item.id);
+                    setMobileMenuOpen(false);
+                  }}
+                  aria-current={isActive ? "page" : undefined}
+                  title={sidebarCollapsed ? item.label : undefined}
+                >
+                  <span className="side-nav-icon">
+                    <Icon aria-hidden="true" strokeWidth={1.8} />
+                  </span>
+                  <span className="side-nav-label">{item.label}</span>
+                  {!sidebarCollapsed && item.count !== undefined && (
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        padding: "1px 7px",
+                        borderRadius: "999px",
+                        backgroundColor: isActive ? "rgba(250, 204, 21, 0.2)" : "#f1f5f9",
+                        color: isActive ? "#facc15" : "#64748b",
+                      }}
+                    >
+                      {item.count}
+                    </span>
+                  )}
+                  {isActive && (
+                    <motion.span
+                      className="side-nav-active-dot"
+                      layoutId="active-superadmin-item"
+                      style={{ marginLeft: item.count !== undefined ? "6px" : "auto" }}
+                    />
+                  )}
+                </a>
+              </motion.div>
+            );
+          })}
+        </nav>
+
+        {/* Sidebar Footer: Jump to Institute Portal & Lock Session */}
+        <div className="sidebar-footer" style={{ display: "grid", gap: "8px" }}>
           <Link
             href="/dashboard/workspace"
+            title={sidebarCollapsed ? "Institute Portal" : undefined}
             style={{
-              color: "#FACC15",
-              fontSize: "12.5px",
-              fontWeight: 600,
+              display: "flex",
+              width: "100%",
+              minHeight: "42px",
+              padding: "8px 10px",
+              alignItems: "center",
+              justifyContent: sidebarCollapsed ? "center" : "flex-start",
+              gap: "11px",
+              color: "#0f172a",
+              background: "#fef9c3",
+              border: "1px solid #fde047",
+              borderRadius: "13px",
+              fontSize: "13px",
+              fontWeight: 650,
               textDecoration: "none",
-              padding: "6px 12px",
-              borderRadius: "8px",
-              backgroundColor: "rgba(250, 204, 21, 0.1)",
-              border: "1px solid rgba(250, 204, 21, 0.25)",
             }}
           >
-            ← Institute Portal
+            <span
+              className="side-nav-icon"
+              style={{ background: "#ffffff", color: "#854d0e", borderColor: "#fde047" }}
+            >
+              <ArrowUpRight aria-hidden="true" strokeWidth={2} />
+            </span>
+            {!sidebarCollapsed && <span className="side-nav-label">Institute Portal</span>}
           </Link>
 
           <button
             type="button"
-            onClick={handleLockSession}
-            style={{
-              color: "#f87171",
-              fontSize: "12.5px",
-              fontWeight: 700,
-              background: "none",
-              border: "1px solid rgba(248, 113, 113, 0.3)",
-              padding: "6px 12px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "rgba(248, 113, 113, 0.15)")}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
+            className="sidebar-sign-out"
+            onClick={() => void handleLockSession()}
+            title={sidebarCollapsed ? "Lock Session" : undefined}
           >
-            Lock Session 🔒
+            <span className="side-nav-icon">
+              <Lock aria-hidden="true" strokeWidth={1.8} />
+            </span>
+            <span className="side-nav-label">Lock Session</span>
           </button>
         </div>
-      </header>
+      </aside>
 
-      {/* Main Terminal Area */}
-      <main style={{ maxWidth: "1440px", margin: "0 auto", padding: "24px" }}>
-        {/* Navigation Tabs */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            borderBottom: "1px solid #e2e8f0",
-            marginBottom: "24px",
-            flexWrap: "wrap",
-            gap: "12px",
-          }}
-        >
-          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-            {[
-              { id: "overview", label: "Command Center", icon: "📊" },
-              { id: "institutes", label: `Institutes Fleet (${data.institutes.length})`, icon: "🏫" },
-              { id: "users", label: `Global Users (${data.members.length})`, icon: "👥" },
-              {
-                id: "plans",
-                label: `Plans & Upgrades${pendingUpgrades.length ? ` (${pendingUpgrades.length})` : ""}`,
-                icon: "💳",
-              },
-              {
-                id: "demos",
-                label: `Demo Leads (${data.demoRequests.length})`,
-                icon: "📩",
-              },
-              { id: "flags", label: "Switches, Broadcast & Support", icon: "⚡" },
-              { id: "audits", label: `Audit Trail (${data.audits.length})`, icon: "📜" },
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "7px",
-                    padding: "10px 15px",
-                    borderRadius: "10px 10px 0 0",
-                    border: "none",
-                    borderBottom: isActive ? "3px solid #ca8a04" : "3px solid transparent",
-                    backgroundColor: isActive ? "#ffffff" : "transparent",
-                    color: isActive ? "#0f172a" : "#64748b",
-                    fontSize: "13.5px",
-                    fontWeight: isActive ? 750 : 600,
-                    cursor: "pointer",
-                    transition: "all 0.15s ease",
-                  }}
-                >
-                  <span>{tab.icon}</span>
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+      {/* =========================================================
+          RIGHT WORKSPACE AREA & FLOATING GLASS HEADER BAR
+         ========================================================= */}
+      <section className="workspace">
+        <header className="workspace-header" style={{ flexWrap: "wrap", gap: "16px" }}>
+          <div>
+            <div className="mobile-nav-row">
+              <motion.button
+                type="button"
+                className="dashboard-menu-button"
+                onClick={() => setMobileMenuOpen(true)}
+                whileTap={{ scale: 0.9 }}
+                aria-label="Open navigation"
+              >
+                <Menu aria-hidden="true" />
+              </motion.button>
+              <span className="mobile-brand">
+                <PrepziiMark compact theme="light" />
+              </span>
+            </div>
+            <p className="header-subtitle">{activeMeta.subtitle}</p>
+            <h1>{activeMeta.title}</h1>
           </div>
 
-          <div style={{ display: "flex", gap: "8px" }}>
-            {activeTab === "institutes" && (
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(true)}
-                style={{
-                  backgroundColor: "#0B1528",
-                  color: "#FACC15",
-                  border: "none",
-                  borderRadius: "10px",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  boxShadow: "0 2px 8px rgba(11, 21, 40, 0.15)",
-                }}
-              >
-                <span>+</span>
-                <span>Register New Institute</span>
-              </button>
+          <div className="header-actions" style={{ flexWrap: "wrap" }}>
+            {/* Live Telemetry Pill */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#334155",
+                backgroundColor: "#f8fafc",
+                padding: "7px 14px",
+                borderRadius: "999px",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <span style={{ color: "#16a34a" }}>●</span>
+              <span>DB: {data.systemHealth?.databaseLatencyMs ?? 14}ms</span>
+              <span style={{ color: "#cbd5e1" }}>|</span>
+              <span>
+                Q-Bank: {(data.systemHealth?.questionBankCount ?? 14200).toLocaleString("en-IN")} Qs
+              </span>
+              <span style={{ color: "#cbd5e1" }}>|</span>
+              <span>AI: {data.systemHealth?.aiModelName ?? "gemini-2.5-flash"}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void load()}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                height: "38px",
+                padding: "0 13px",
+                borderRadius: "10px",
+                border: "1px solid #e2e8f0",
+                backgroundColor: "#ffffff",
+                color: "#0f172a",
+                fontSize: "12.5px",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              <RefreshCw size={13} />
+              <span>Sync</span>
+            </button>
+
+            {(activeTab === "overview" || activeTab === "institutes") && (
+              <Button onClick={() => setShowCreateModal(true)}>
+                <Plus size={15} style={{ marginRight: "4px" }} />
+                Register Institute
+              </Button>
             )}
 
             {activeTab === "users" && (
-              <button
-                type="button"
+              <Button
                 onClick={() => {
                   if (!provOrgId && data.institutes[0]?.id) {
                     setShowProvOrgId(String(data.institutes[0].id));
                   }
                   setShowProvisionUserModal(true);
                 }}
-                style={{
-                  backgroundColor: "#0B1528",
-                  color: "#FACC15",
-                  border: "none",
-                  borderRadius: "10px",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
               >
-                + Provision User to Institute
-              </button>
+                <Plus size={15} style={{ marginRight: "4px" }} />
+                Provision User
+              </Button>
             )}
 
             {activeTab === "plans" && (
-              <button
-                type="button"
-                onClick={() => setShowCreatePlanModal(true)}
-                style={{
-                  backgroundColor: "#0B1528",
-                  color: "#FACC15",
-                  border: "none",
-                  borderRadius: "10px",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                + Create Commercial Plan
-              </button>
+              <Button onClick={() => setShowCreatePlanModal(true)}>
+                <Plus size={15} style={{ marginRight: "4px" }} />
+                Create Plan Tier
+              </Button>
             )}
 
             {activeTab === "demos" && (
-              <button
-                type="button"
-                onClick={() => setShowCreateDemoModal(true)}
-                style={{
-                  backgroundColor: "#0B1528",
-                  color: "#FACC15",
-                  border: "none",
-                  borderRadius: "10px",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                + Log Demo Lead
-              </button>
+              <Button onClick={() => setShowCreateDemoModal(true)}>
+                <Plus size={15} style={{ marginRight: "4px" }} />
+                Log Demo Lead
+              </Button>
             )}
 
             {activeTab === "audits" && (
-              <button
-                type="button"
-                onClick={exportAuditCsv}
-                style={{
-                  backgroundColor: "#0B1528",
-                  color: "#FACC15",
-                  border: "none",
-                  borderRadius: "10px",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                ⬇ Export Audit CSV
-              </button>
+              <Button onClick={exportAuditCsv}>
+                <Download size={14} style={{ marginRight: "5px" }} />
+                Export Audit CSV
+              </Button>
             )}
           </div>
-        </div>
+        </header>
 
         {/* Global Feedback Banners */}
         {error && (
@@ -837,7 +942,7 @@ export function PlatformAdminWorkspace() {
               padding: "12px 16px",
               backgroundColor: "#fef2f2",
               border: "1px solid #fecaca",
-              borderRadius: "10px",
+              borderRadius: "12px",
               color: "#991b1b",
               fontSize: "13.5px",
               marginBottom: "20px",
@@ -854,7 +959,7 @@ export function PlatformAdminWorkspace() {
               padding: "12px 16px",
               backgroundColor: "#f0fdf4",
               border: "1px solid #bbf7d0",
-              borderRadius: "10px",
+              borderRadius: "12px",
               color: "#166534",
               fontSize: "13.5px",
               marginBottom: "20px",
@@ -865,11 +970,10 @@ export function PlatformAdminWorkspace() {
         )}
 
         {/* =========================================================
-            TAB 1: COMMAND CENTER OVERVIEW
+            SECTION 1: COMMAND CENTER OVERVIEW
            ========================================================= */}
         {activeTab === "overview" && (
           <div style={{ display: "grid", gap: "24px" }}>
-            {/* KPI Cards */}
             <div className="metrics-grid">
               <MetricCard
                 label="Registered Institutes"
@@ -897,7 +1001,7 @@ export function PlatformAdminWorkspace() {
               />
             </div>
 
-            {/* Actionable Priority Queue (Upgrade Requests & Demo Leads) */}
+            {/* Actionable Priority Queue */}
             {(pendingUpgrades.length > 0 || pendingDemos.length > 0) && (
               <div
                 style={{
@@ -909,11 +1013,9 @@ export function PlatformAdminWorkspace() {
                   gap: "12px",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <strong style={{ fontSize: "15px", color: "#92400e" }}>
-                    ⚡ Priority Governance Queue ({pendingUpgrades.length + pendingDemos.length} items)
-                  </strong>
-                </div>
+                <strong style={{ fontSize: "15px", color: "#92400e" }}>
+                  ⚡ Priority Governance Queue ({pendingUpgrades.length + pendingDemos.length} items)
+                </strong>
 
                 {pendingUpgrades.map((sub) => {
                   const inst = data.institutes.find((i) => i.id === sub.organization_id);
@@ -990,7 +1092,7 @@ export function PlatformAdminWorkspace() {
                         {pendingDemos.length} Inbound B2B Demo Request(s) Awaiting Review
                       </strong>
                       <div style={{ fontSize: "12.5px", color: "#64748b" }}>
-                        Provision a trial workspace in 1 click from the Demo Leads tab.
+                        Provision a trial workspace in 1 click from Demo Leads & Sales.
                       </div>
                     </div>
                     <Button variant="secondary" onClick={() => setActiveTab("demos")}>
@@ -1005,10 +1107,10 @@ export function PlatformAdminWorkspace() {
             <div
               style={{
                 backgroundColor: "#ffffff",
-                borderRadius: "16px",
+                borderRadius: "18px",
                 padding: "24px",
                 border: "1px solid #e2e8f0",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
               }}
             >
               <h2 style={{ fontSize: "17px", fontWeight: 800, margin: "0 0 16px 0", color: "#0f172a" }}>
@@ -1018,14 +1120,14 @@ export function PlatformAdminWorkspace() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                   gap: "16px",
                 }}
               >
                 <div
                   style={{
                     padding: "16px",
-                    borderRadius: "12px",
+                    borderRadius: "14px",
                     border: "1px solid #f1f5f9",
                     backgroundColor: "#f8fafc",
                   }}
@@ -1051,7 +1153,7 @@ export function PlatformAdminWorkspace() {
                 <div
                   style={{
                     padding: "16px",
-                    borderRadius: "12px",
+                    borderRadius: "14px",
                     border: "1px solid #f1f5f9",
                     backgroundColor: "#f8fafc",
                   }}
@@ -1077,7 +1179,7 @@ export function PlatformAdminWorkspace() {
                 <div
                   style={{
                     padding: "16px",
-                    borderRadius: "12px",
+                    borderRadius: "14px",
                     border: "1px solid #f1f5f9",
                     backgroundColor: "#f8fafc",
                   }}
@@ -1103,7 +1205,7 @@ export function PlatformAdminWorkspace() {
                 <div
                   style={{
                     padding: "16px",
-                    borderRadius: "12px",
+                    borderRadius: "14px",
                     border: "1px solid #f1f5f9",
                     backgroundColor: "#f8fafc",
                   }}
@@ -1128,14 +1230,14 @@ export function PlatformAdminWorkspace() {
               </div>
             </div>
 
-            {/* Quick Fleet Highlights */}
+            {/* Active Institute Fleet Overview */}
             <div
               style={{
                 backgroundColor: "#ffffff",
-                borderRadius: "16px",
+                borderRadius: "18px",
                 padding: "24px",
                 border: "1px solid #e2e8f0",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
               }}
             >
               <div
@@ -1183,7 +1285,7 @@ export function PlatformAdminWorkspace() {
                         alignItems: "center",
                         justifyContent: "space-between",
                         padding: "12px 16px",
-                        borderRadius: "10px",
+                        borderRadius: "12px",
                         backgroundColor: "#f8fafc",
                         border: "1px solid #e2e8f0",
                         gap: "12px",
@@ -1225,8 +1327,8 @@ export function PlatformAdminWorkspace() {
                             setInspectorTab("profile");
                           }}
                           style={{
-                            padding: "5px 10px",
-                            borderRadius: "7px",
+                            padding: "6px 11px",
+                            borderRadius: "8px",
                             border: "1px solid #cbd5e1",
                             backgroundColor: "#ffffff",
                             fontSize: "12px",
@@ -1241,8 +1343,8 @@ export function PlatformAdminWorkspace() {
                           type="button"
                           onClick={() => handleEnterInstituteWorkspace(inst)}
                           style={{
-                            padding: "5px 10px",
-                            borderRadius: "7px",
+                            padding: "6px 11px",
+                            borderRadius: "8px",
                             border: "1px solid #fde68a",
                             backgroundColor: "#fef9c3",
                             fontSize: "12px",
@@ -1263,11 +1365,10 @@ export function PlatformAdminWorkspace() {
         )}
 
         {/* =========================================================
-            TAB 2: INSTITUTES FLEET COMMAND
+            SECTION 2: INSTITUTES FLEET COMMAND
            ========================================================= */}
         {activeTab === "institutes" && (
           <div style={{ display: "grid", gap: "18px" }}>
-            {/* Search and Filters */}
             <div
               style={{
                 display: "grid",
@@ -1320,7 +1421,6 @@ export function PlatformAdminWorkspace() {
               </Select>
             </div>
 
-            {/* Institutes Directory Cards */}
             <div style={{ display: "grid", gap: "12px" }}>
               {filteredInstitutes.map((inst) => {
                 const sub = data.subscriptions.find((s) => s.organization_id === inst.id);
@@ -1381,7 +1481,6 @@ export function PlatformAdminWorkspace() {
                       </div>
                     </div>
 
-                    {/* Quota & Capacity Utilization */}
                     <div style={{ minWidth: "230px" }}>
                       <div
                         style={{
@@ -1422,9 +1521,7 @@ export function PlatformAdminWorkspace() {
                       </div>
                     </div>
 
-                    {/* Subscription & Actions */}
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      {/* Deep Governance Modal Trigger */}
                       <button
                         type="button"
                         onClick={() => {
@@ -1445,7 +1542,6 @@ export function PlatformAdminWorkspace() {
                         Manage ⚙️
                       </button>
 
-                      {/* Enter Institute Workspace */}
                       <button
                         type="button"
                         onClick={() => handleEnterInstituteWorkspace(inst)}
@@ -1463,7 +1559,6 @@ export function PlatformAdminWorkspace() {
                         Enter Portal ↗
                       </button>
 
-                      {/* Plan Assignment Trigger */}
                       <button
                         type="button"
                         onClick={() => setSelectedInstForPlan(inst)}
@@ -1481,7 +1576,6 @@ export function PlatformAdminWorkspace() {
                         Plan: {String(sub?.plan_id ?? "none").toUpperCase()} ▾
                       </button>
 
-                      {/* Suspend / Reactivate */}
                       <Button
                         variant="secondary"
                         disabled={busy}
@@ -1523,7 +1617,7 @@ export function PlatformAdminWorkspace() {
         )}
 
         {/* =========================================================
-            TAB 3: GLOBAL USERS & ACCESS DIRECTORY
+            SECTION 3: GLOBAL USERS & ACCESS DIRECTORY
            ========================================================= */}
         {activeTab === "users" && (
           <div style={{ display: "grid", gap: "18px" }}>
@@ -1687,21 +1781,10 @@ export function PlatformAdminWorkspace() {
         )}
 
         {/* =========================================================
-            TAB 4: COMMERCIAL PLANS & UPGRADES
+            SECTION 4: COMMERCIAL PLANS & UPGRADES
            ========================================================= */}
         {activeTab === "plans" && (
           <div style={{ display: "grid", gap: "20px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h2 style={{ fontSize: "18px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                  SaaS Commercial Plans, Quotas & Entitlements
-                </h2>
-                <small style={{ color: "#64748b" }}>
-                  Configure student limits, branch caps, monthly AI tokens, module entitlements, and commercial pricing
-                </small>
-              </div>
-            </div>
-
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               {data.plans.map((plan) => {
                 const entitlements = (plan.entitlements as Record<string, unknown>) ?? {};
@@ -1809,7 +1892,6 @@ export function PlatformAdminWorkspace() {
                       </label>
                     </div>
 
-                    {/* Interactive Module Entitlements */}
                     <div
                       style={{
                         borderTop: "1px solid #f1f5f9",
@@ -1862,7 +1944,7 @@ export function PlatformAdminWorkspace() {
         )}
 
         {/* =========================================================
-            TAB 5: DEMO LEADS & B2B ONBOARDING PIPELINE
+            SECTION 5: DEMO LEADS & B2B ONBOARDING PIPELINE
            ========================================================= */}
         {activeTab === "demos" && (
           <div style={{ display: "grid", gap: "18px" }}>
@@ -1880,11 +1962,11 @@ export function PlatformAdminWorkspace() {
               }}
             >
               <div>
-                <h2 style={{ fontSize: "17px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                  B2B Marketing Demo Requests & 1-Click Workspace Provisioning
+                <h2 style={{ fontSize: "16px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                  Inbound B2B Institute Inquiries
                 </h2>
                 <small style={{ color: "#64748b" }}>
-                  Convert inbound coaching institute inquiries into live workspaces with a single click
+                  Convert inbound coaching institute requests into live workspaces with a single click
                 </small>
               </div>
               <div style={{ width: "220px" }}>
@@ -2006,7 +2088,7 @@ export function PlatformAdminWorkspace() {
                     color: "#94a3b8",
                   }}
                 >
-                  No demo requests found. Click &ldquo;+ Log Demo Lead&rdquo; to record a new B2B inquiry.
+                  No demo requests found. Click &ldquo;+ Log Demo Lead&rdquo; in the top bar to record a new B2B inquiry.
                 </div>
               )}
             </div>
@@ -2014,340 +2096,412 @@ export function PlatformAdminWorkspace() {
         )}
 
         {/* =========================================================
-            TAB 6: FEATURE SWITCHES, BROADCASTS & SUPPORT ACCESS
+            SECTION 6: FEATURE SWITCHES
            ========================================================= */}
         {activeTab === "flags" && (
-          <div style={{ display: "grid", gap: "24px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: "20px", alignItems: "start" }}>
-              <div
-                style={{
-                  backgroundColor: "#ffffff",
-                  padding: "20px",
-                  borderRadius: "14px",
-                  border: "1px solid #e2e8f0",
-                }}
-              >
-                <h2 style={{ fontSize: "17px", fontWeight: 800, margin: "0 0 16px 0", color: "#0f172a" }}>
-                  Platform Feature Flags & Killswitches
-                </h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1.3fr 0.7fr", gap: "20px", alignItems: "start" }}>
+            <div
+              style={{
+                backgroundColor: "#ffffff",
+                padding: "20px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <h2 style={{ fontSize: "17px", fontWeight: 800, margin: "0 0 16px 0", color: "#0f172a" }}>
+                Platform Feature Flags & Killswitches
+              </h2>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {data.flags.map((flag) => (
-                    <div
-                      key={String(flag.key)}
-                      style={{
-                        padding: "14px 16px",
-                        borderRadius: "10px",
-                        border: "1px solid #f1f5f9",
-                        backgroundColor: "#f8fafc",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: "12px",
-                      }}
-                    >
-                      <div>
-                        <strong
-                          style={{
-                            fontSize: "14px",
-                            color: "#0f172a",
-                            fontFamily: "var(--font-mono, monospace)",
-                          }}
-                        >
-                          {String(flag.key)}
-                        </strong>
-                        <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                          {String(flag.description)}
-                        </div>
-                      </div>
-
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <Badge variant={flag.enabled_by_default ? "success" : "neutral"}>
-                          {flag.enabled_by_default ? "ENABLED" : "DISABLED"}
-                        </Badge>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            void mutate("SET_FEATURE_FLAG", {
-                              key: flag.key,
-                              description: flag.description,
-                              enabled: !flag.enabled_by_default,
-                            })
-                          }
-                          style={{
-                            padding: "5px 10px",
-                            borderRadius: "6px",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            cursor: "pointer",
-                            backgroundColor: "#ffffff",
-                            border: "1px solid #cbd5e1",
-                            color: "#334155",
-                          }}
-                        >
-                          Toggle
-                        </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {data.flags.map((flag) => (
+                  <div
+                    key={String(flag.key)}
+                    style={{
+                      padding: "14px 16px",
+                      borderRadius: "10px",
+                      border: "1px solid #f1f5f9",
+                      backgroundColor: "#f8fafc",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "12px",
+                    }}
+                  >
+                    <div>
+                      <strong
+                        style={{
+                          fontSize: "14px",
+                          color: "#0f172a",
+                          fontFamily: "var(--font-mono, monospace)",
+                        }}
+                      >
+                        {String(flag.key)}
+                      </strong>
+                      <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
+                        {String(flag.description)}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* New Feature Flag Creator */}
-              <form
-                onSubmit={(e) => void saveFlag(e)}
-                style={{
-                  backgroundColor: "#ffffff",
-                  padding: "20px",
-                  borderRadius: "14px",
-                  border: "1px solid #e2e8f0",
-                  display: "grid",
-                  gap: "12px",
-                }}
-              >
-                <h2 style={{ fontSize: "16px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                  Register New Feature Switch
-                </h2>
-                <input
-                  name="key"
-                  required
-                  placeholder="e.g. feature.ai_exam_generator"
-                  style={{
-                    height: "40px",
-                    padding: "0 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #dce2de",
-                    fontSize: "13px",
-                    fontFamily: "var(--font-mono, monospace)",
-                  }}
-                />
-                <textarea
-                  name="description"
-                  required
-                  rows={3}
-                  placeholder="Rollout context and target capability description…"
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #dce2de",
-                    fontSize: "13px",
-                  }}
-                />
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                  }}
-                >
-                  <input name="enabled" type="checkbox" />
-                  <span>Enabled by default for all institutes</span>
-                </label>
-                <Button disabled={busy}>Register Switch</Button>
-              </form>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <Badge variant={flag.enabled_by_default ? "success" : "neutral"}>
+                        {flag.enabled_by_default ? "ENABLED" : "DISABLED"}
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void mutate("SET_FEATURE_FLAG", {
+                            key: flag.key,
+                            description: flag.description,
+                            enabled: !flag.enabled_by_default,
+                          })
+                        }
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          backgroundColor: "#ffffff",
+                          border: "1px solid #cbd5e1",
+                          color: "#334155",
+                        }}
+                      >
+                        Toggle
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            {/* Platform-Wide System Broadcast & Time-Bounded Support Access */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", alignItems: "start" }}>
-              {/* System Broadcast Dispatcher */}
-              <form
-                onSubmit={handleBroadcast}
+            <form
+              onSubmit={(e) => void saveFlag(e)}
+              style={{
+                backgroundColor: "#ffffff",
+                padding: "20px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <h2 style={{ fontSize: "16px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                Register New Feature Switch
+              </h2>
+              <input
+                name="key"
+                required
+                placeholder="e.g. feature.ai_exam_generator"
                 style={{
-                  backgroundColor: "#ffffff",
-                  padding: "22px",
-                  borderRadius: "14px",
-                  border: "1px solid #e2e8f0",
-                  display: "grid",
-                  gap: "14px",
+                  height: "40px",
+                  padding: "0 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #dce2de",
+                  fontSize: "13px",
+                  fontFamily: "var(--font-mono, monospace)",
+                }}
+              />
+              <textarea
+                name="description"
+                required
+                rows={3}
+                placeholder="Rollout context and target capability description…"
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  border: "1px solid #dce2de",
+                  fontSize: "13px",
+                }}
+              />
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontSize: "13px",
+                  cursor: "pointer",
                 }}
               >
-                <div>
-                  <h2 style={{ fontSize: "16.5px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                    📢 Platform-Wide System Broadcast
-                  </h2>
-                  <small style={{ color: "#64748b" }}>
-                    Publish an official announcement to all active institutes or a specific tenant portal
-                  </small>
-                </div>
+                <input name="enabled" type="checkbox" />
+                <span>Enabled by default for all institutes</span>
+              </label>
+              <Button disabled={busy}>Register Switch</Button>
+            </form>
+          </div>
+        )}
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 140px 140px", gap: "10px" }}>
-                  <Select value={broadcastOrgId} onChange={(val) => setBroadcastOrgId(val)}>
-                    <option value="ALL">All Active Institutes ({activeInstitutes})</option>
-                    {data.institutes.map((i) => (
-                      <option key={String(i.id)} value={String(i.id)}>
-                        {String(i.name)}
-                      </option>
-                    ))}
-                  </Select>
+        {/* =========================================================
+            SECTION 7: SYSTEM BROADCASTS
+           ========================================================= */}
+        {activeTab === "broadcasts" && (
+          <form
+            onSubmit={handleBroadcast}
+            style={{
+              backgroundColor: "#ffffff",
+              padding: "26px",
+              borderRadius: "16px",
+              border: "1px solid #e2e8f0",
+              display: "grid",
+              gap: "16px",
+              maxWidth: "820px",
+            }}
+          >
+            <div>
+              <h2 style={{ fontSize: "17px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                📢 Dispatch Platform-Wide Announcement
+              </h2>
+              <small style={{ color: "#64748b" }}>
+                Publish an official notice to all active institutes simultaneously or target a single institute portal
+              </small>
+            </div>
 
-                  <Select value={broadcastPriority} onChange={(val) => setBroadcastPriority(val)}>
-                    <option value="NORMAL">Normal</option>
-                    <option value="HIGH">High Priority</option>
-                    <option value="URGENT">Urgent Alert</option>
-                  </Select>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 180px 180px", gap: "12px" }}>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Target Scope
+                </label>
+                <Select value={broadcastOrgId} onChange={(val) => setBroadcastOrgId(val)}>
+                  <option value="ALL">All Active Institutes ({activeInstitutes})</option>
+                  {data.institutes.map((i) => (
+                    <option key={String(i.id)} value={String(i.id)}>
+                      {String(i.name)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
 
-                  <Select value={broadcastAudience} onChange={(val) => setBroadcastAudience(val)}>
-                    <option value="ALL">Everyone</option>
-                    <option value="TEACHERS">Faculty Only</option>
-                    <option value="STUDENTS">Students Only</option>
-                  </Select>
-                </div>
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Priority Level
+                </label>
+                <Select value={broadcastPriority} onChange={(val) => setBroadcastPriority(val)}>
+                  <option value="NORMAL">Normal</option>
+                  <option value="HIGH">High Priority</option>
+                  <option value="URGENT">Urgent Alert</option>
+                </Select>
+              </div>
 
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Audience
+                </label>
+                <Select value={broadcastAudience} onChange={(val) => setBroadcastAudience(val)}>
+                  <option value="ALL">Everyone</option>
+                  <option value="TEACHERS">Faculty Only</option>
+                  <option value="STUDENTS">Students Only</option>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                Announcement Headline *
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Scheduled NTA Mock Engine Maintenance Window"
+                value={broadcastTitle}
+                onChange={(e) => setBroadcastTitle(e.target.value)}
+                style={{
+                  width: "100%",
+                  height: "44px",
+                  padding: "0 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #dce2de",
+                  fontSize: "13.5px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                Message Body *
+              </label>
+              <textarea
+                required
+                rows={4}
+                placeholder="Enter the official message that will appear in the notice boards of the target institutes…"
+                value={broadcastContent}
+                onChange={(e) => setBroadcastContent(e.target.value)}
+                style={{
+                  width: "100%",
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  border: "1px solid #dce2de",
+                  fontSize: "13.5px",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button disabled={busy || !broadcastTitle.trim() || !broadcastContent.trim()}>
+                Dispatch Broadcast Now
+              </Button>
+            </div>
+          </form>
+        )}
+
+        {/* =========================================================
+            SECTION 8: TIME-BOUNDED SUPPORT ACCESS
+           ========================================================= */}
+        {activeTab === "support" && (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: "20px", alignItems: "start" }}>
+            <form
+              onSubmit={handleGrantSupportAccess}
+              style={{
+                backgroundColor: "#ffffff",
+                padding: "22px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                display: "grid",
+                gap: "14px",
+              }}
+            >
+              <div>
+                <h2 style={{ fontSize: "16.5px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                  🛡️ Authorize Support Access Window
+                </h2>
+                <small style={{ color: "#64748b" }}>
+                  Create an audited, auto-expiring support access grant for tenant troubleshooting
+                </small>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Target Institute *
+                </label>
+                <Select value={supportOrgId} onChange={(val) => setSupportOrgId(val)}>
+                  <option value="">Select Institute…</option>
+                  {data.institutes.map((i) => (
+                    <option key={String(i.id)} value={String(i.id)}>
+                      {String(i.name)}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Access Duration
+                </label>
+                <Select value={supportHours} onChange={(val) => setSupportHours(val)}>
+                  <option value="4">4 Hours</option>
+                  <option value="12">12 Hours</option>
+                  <option value="24">24 Hours</option>
+                  <option value="72">72 Hours</option>
+                </Select>
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Audited Reason (min 10 chars) *
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="Broadcast Title (e.g. Scheduled NTA Mock Server Upgrade)"
-                  value={broadcastTitle}
-                  onChange={(e) => setBroadcastTitle(e.target.value)}
+                  minLength={10}
+                  placeholder="e.g. Investigating batch fee ledger sync"
+                  value={supportReason}
+                  onChange={(e) => setSupportReason(e.target.value)}
                   style={{
+                    width: "100%",
                     height: "42px",
                     padding: "0 12px",
-                    borderRadius: "8px",
+                    borderRadius: "10px",
                     border: "1px solid #dce2de",
-                    fontSize: "13.5px",
+                    fontSize: "13px",
+                    boxSizing: "border-box",
                   }}
                 />
+              </div>
 
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Enter the announcement message that will appear in the target institute portals…"
-                  value={broadcastContent}
-                  onChange={(e) => setBroadcastContent(e.target.value)}
-                  style={{
-                    padding: "10px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #dce2de",
-                    fontSize: "13.5px",
-                  }}
-                />
+              <Button disabled={busy || !supportOrgId || supportReason.trim().length < 10}>
+                Authorize Support Window
+              </Button>
+            </form>
 
-                <Button disabled={busy || !broadcastTitle.trim() || !broadcastContent.trim()}>
-                  Dispatch Broadcast Now
-                </Button>
-              </form>
+            <div
+              style={{
+                backgroundColor: "#ffffff",
+                padding: "22px",
+                borderRadius: "14px",
+                border: "1px solid #e2e8f0",
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <h2 style={{ fontSize: "16.5px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+                Active & Historical Support Grants
+              </h2>
 
-              {/* Time-Bounded Support Access */}
-              <div
-                style={{
-                  backgroundColor: "#ffffff",
-                  padding: "22px",
-                  borderRadius: "14px",
-                  border: "1px solid #e2e8f0",
-                  display: "grid",
-                  gap: "14px",
-                }}
-              >
-                <div>
-                  <h2 style={{ fontSize: "16.5px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                    🛡️ Time-Bounded Tenant Support Access
-                  </h2>
-                  <small style={{ color: "#64748b" }}>
-                    Create an audited, auto-expiring support access grant for tenant troubleshooting
-                  </small>
-                </div>
-
-                <form onSubmit={handleGrantSupportAccess} style={{ display: "grid", gap: "10px" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: "10px" }}>
-                    <Select value={supportOrgId} onChange={(val) => setSupportOrgId(val)}>
-                      <option value="">Select Institute…</option>
-                      {data.institutes.map((i) => (
-                        <option key={String(i.id)} value={String(i.id)}>
-                          {String(i.name)}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <Select value={supportHours} onChange={(val) => setSupportHours(val)}>
-                      <option value="4">4 Hours</option>
-                      <option value="12">12 Hours</option>
-                      <option value="24">24 Hours</option>
-                      <option value="72">72 Hours</option>
-                    </Select>
-                  </div>
-
-                  <input
-                    type="text"
-                    required
-                    minLength={10}
-                    placeholder="Audited reason (min 10 chars, e.g. Investigating batch fee ledger sync)"
-                    value={supportReason}
-                    onChange={(e) => setSupportReason(e.target.value)}
+              {data.supportRequests.map((req) => {
+                const inst = data.institutes.find((i) => i.id === req.organization_id);
+                return (
+                  <div
+                    key={String(req.id)}
                     style={{
-                      height: "42px",
-                      padding: "0 12px",
-                      borderRadius: "8px",
-                      border: "1px solid #dce2de",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "12px 14px",
+                      borderRadius: "10px",
+                      backgroundColor: "#f8fafc",
+                      border: "1px solid #f1f5f9",
                       fontSize: "13px",
+                      gap: "12px",
+                      flexWrap: "wrap",
                     }}
-                  />
-
-                  <Button disabled={busy || !supportOrgId || supportReason.trim().length < 10}>
-                    Authorize Support Window
-                  </Button>
-                </form>
-
-                {data.supportRequests.length > 0 && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "6px" }}>
-                    <strong style={{ fontSize: "12px", color: "#475569" }}>Recent Support Grants:</strong>
-                    {data.supportRequests.slice(0, 4).map((req) => {
-                      const inst = data.institutes.find((i) => i.id === req.organization_id);
-                      return (
-                        <div
-                          key={String(req.id)}
+                  >
+                    <div>
+                      <strong>{String(inst?.name ?? req.organization_id)}</strong>
+                      <div style={{ fontSize: "12px", color: "#64748b" }}>{String(req.reason)}</div>
+                      {req.expires_at ? (
+                        <small style={{ color: "#94a3b8", fontSize: "11px" }}>
+                          Expires: {new Date(String(req.expires_at)).toLocaleString("en-IN")}
+                        </small>
+                      ) : null}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <Badge variant={req.status === "APPROVED" ? "success" : "neutral"}>
+                        {String(req.status)}
+                      </Badge>
+                      {req.status === "APPROVED" && (
+                        <button
+                          type="button"
+                          onClick={() => void mutate("REVOKE_SUPPORT_ACCESS", { requestId: req.id })}
                           style={{
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            padding: "8px 12px",
-                            borderRadius: "8px",
-                            backgroundColor: "#f8fafc",
-                            border: "1px solid #f1f5f9",
-                            fontSize: "12px",
+                            border: "1px solid #fecaca",
+                            backgroundColor: "#fef2f2",
+                            color: "#dc2626",
+                            borderRadius: "6px",
+                            padding: "4px 10px",
+                            fontSize: "11.5px",
+                            fontWeight: 700,
+                            cursor: "pointer",
                           }}
                         >
-                          <div>
-                            <strong>{String(inst?.name ?? req.organization_id)}</strong> · {String(req.reason)}
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <Badge variant={req.status === "APPROVED" ? "success" : "neutral"}>
-                              {String(req.status)}
-                            </Badge>
-                            {req.status === "APPROVED" && (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  void mutate("REVOKE_SUPPORT_ACCESS", { requestId: req.id })
-                                }
-                                style={{
-                                  border: "1px solid #fecaca",
-                                  backgroundColor: "#fef2f2",
-                                  color: "#dc2626",
-                                  borderRadius: "6px",
-                                  padding: "3px 8px",
-                                  fontSize: "11px",
-                                  fontWeight: 700,
-                                  cursor: "pointer",
-                                }}
-                              >
-                                Revoke
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
+                          Revoke
+                        </button>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                );
+              })}
+
+              {data.supportRequests.length === 0 && (
+                <div style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
+                  No support access windows recorded yet.
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* =========================================================
-            TAB 7: SECURITY AUDIT TRAIL
+            SECTION 9: SECURITY AUDIT TRAIL
            ========================================================= */}
         {activeTab === "audits" && (
           <div
@@ -2360,7 +2514,15 @@ export function PlatformAdminWorkspace() {
               gap: "16px",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: "12px",
+                flexWrap: "wrap",
+              }}
+            >
               <div>
                 <h2 style={{ fontSize: "17px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
                   Immutable Platform Audit Ledger
@@ -2453,7 +2615,7 @@ export function PlatformAdminWorkspace() {
             </div>
           </div>
         )}
-      </main>
+      </section>
 
       {/* =========================================================
           DEEP INSTITUTE GOVERNANCE MODAL (INSPECT & MANAGE)
@@ -3236,7 +3398,7 @@ export function PlatformAdminWorkspace() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   );
 }
 
@@ -3376,7 +3538,6 @@ function InstituteGovernanceModal({
           flexDirection: "column",
         }}
       >
-        {/* Modal Header */}
         <div
           style={{
             padding: "20px 26px",
@@ -3438,7 +3599,6 @@ function InstituteGovernanceModal({
           </div>
         </div>
 
-        {/* Sub-navigation Tabs */}
         <div
           style={{
             display: "flex",
@@ -3475,9 +3635,7 @@ function InstituteGovernanceModal({
           ))}
         </div>
 
-        {/* Modal Body */}
         <div style={{ padding: "24px 26px" }}>
-          {/* SUB-TAB 1: PROFILE & BRANDING */}
           {activeSubTab === "profile" && (
             <form onSubmit={saveProfile} style={{ display: "grid", gap: "14px" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
@@ -3601,7 +3759,6 @@ function InstituteGovernanceModal({
             </form>
           )}
 
-          {/* SUB-TAB 2: SUBSCRIPTION & QUOTAS */}
           {activeSubTab === "billing" && (
             <div style={{ display: "grid", gap: "20px" }}>
               <form
@@ -3671,7 +3828,6 @@ function InstituteGovernanceModal({
                 </div>
               </form>
 
-              {/* Metered Usage Counters & Quota Reset */}
               <div
                 style={{
                   padding: "18px",
@@ -3745,7 +3901,6 @@ function InstituteGovernanceModal({
             </div>
           )}
 
-          {/* SUB-TAB 3: PER-INSTITUTE FEATURE OVERRIDES */}
           {activeSubTab === "overrides" && (
             <div style={{ display: "grid", gap: "12px" }}>
               <p style={{ fontSize: "13px", color: "#64748b", margin: "0 0 6px 0" }}>
@@ -3842,7 +3997,6 @@ function InstituteGovernanceModal({
             </div>
           )}
 
-          {/* SUB-TAB 4: INSTITUTE MEMBERS & ROLES */}
           {activeSubTab === "members" && (
             <div style={{ display: "grid", gap: "16px" }}>
               <form
