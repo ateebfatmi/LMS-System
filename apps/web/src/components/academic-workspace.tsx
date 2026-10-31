@@ -93,9 +93,17 @@ export function AcademicWorkspace({ view }: { view: View }) {
 
         <section className="panel academic-records">
           <h2>{view === "BATCHES" ? "Current batches" : view === "COURSES" ? "Course catalogue" : "Rooms & weekly timetable"}</h2>
-          {view === "BATCHES" && data.batches.map((x) => <article key={String(x.id)}><div><strong>{String(x.name)}</strong><small>{String(x.grade_level ?? "No grade")} · {String(x.target_exam)}</small></div><Badge variant={x.is_active ? "success" : "neutral"}>{x.is_active ? "ACTIVE" : "INACTIVE"}</Badge></article>)}
+          {view === "BATCHES" && data.batches.map((x) => (
+            <article key={String(x.id)}>
+              <div>
+                <strong>{String(x.name)}</strong>
+                <small>{Number(x.student_count ?? 0)} enrolled student{Number(x.student_count) === 1 ? "" : "s"} · {String(x.grade_level ?? "All grades")} · {String(x.target_exam).replaceAll("_", " ")}</small>
+              </div>
+              <Badge variant={x.is_active ? "success" : "neutral"}>{x.is_active ? "ACTIVE" : "INACTIVE"}</Badge>
+            </article>
+          ))}
           {view === "COURSES" && data.courses.map((x) => <article key={String(x.id)}><div><strong>{String(x.title)}</strong><small>{String(x.description ?? "No description")}</small></div><Badge variant="neutral">{String(x.status)}</Badge></article>)}
-          {view === "CAMPUSES" && <>{data.rooms.map((x) => <article key={String(x.id)}><div><strong>{String(x.name)}</strong><small>Capacity {String(x.capacity)} · {String(x.status)}</small></div></article>)}<h3>Schedule</h3>{data.schedules.map((x) => <article key={String(x.id)}><div><strong>{String(x.day_of_week)} · {String(x.time_slot)}</strong><small>{String(x.subject)}</small></div></article>)}</>}
+          {view === "CAMPUSES" && <>{data.rooms.map((x) => <article key={String(x.id)}><div><strong>{String(x.name)}</strong><small>Capacity {String(x.capacity)} · {String(x.status)}</small></div></article>)}<h3>Schedule</h3>{data.schedules.map((x) => <article key={String(x.id)}><div><strong>{String(x.day_of_week)} · {String(x.time_slot)}</strong><small>{String(x.subject)} · {String(data.batches.find((b) => b.id === x.batch_id)?.name ?? "Batch")}</small></div></article>)}</>}
           {((view === "BATCHES" && !data.batches.length) || (view === "COURSES" && !data.courses.length) || (view === "CAMPUSES" && !data.rooms.length)) && <p className="empty-state">No records yet. Use the forms to create the first one.</p>}
         </section>
       </div>

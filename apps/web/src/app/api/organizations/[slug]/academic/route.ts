@@ -52,6 +52,24 @@ export async function GET(_request: Request, context: Context) {
     }));
   }
 
+  // Count enrolled students per batch
+  const { data: batchMemberRows } = await client
+    .from("organization_batch_members")
+    .select("batch_id")
+    .eq("organization_id", organizationId)
+    .eq("role", "STUDENT");
+
+  const countsByBatch = new Map<string, number>();
+  for (const row of (batchMemberRows ?? []) as { batch_id: string }[]) {
+    const current = countsByBatch.get(row.batch_id) ?? 0;
+    countsByBatch.set(row.batch_id, current + 1);
+  }
+
+  batches = batches.map((b: Record<string, unknown>) => ({
+    ...b,
+    student_count: countsByBatch.get(String(b.id)) ?? 0,
+  }));
+
   // Get students and faculty
   let students = await requireDatabaseQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 100, p_offset: 0 }), null, "Load student directory");
   if (!students) {

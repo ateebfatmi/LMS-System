@@ -22,6 +22,7 @@ export default function CRMPage() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Stage | "ALL">("ALL");
   const [showForm, setShowForm] = useState(false);
+  const [convertingLead, setConvertingLead] = useState<Lead | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -71,12 +72,76 @@ export default function CRMPage() {
     if (ok) setShowForm(false);
   }
 
+  async function convertLead(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!organization || !convertingLead) return;
+    setBusy(true); setError(""); setMessage("");
+    const form = new FormData(event.currentTarget);
+    const text = (name: string) => String(form.get(name) ?? "").trim() || null;
+    const batchId = text("batchId");
+    const response = await fetch(`/api/organizations/${encodeURIComponent(organization.slug)}/members`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        role: "STUDENT",
+        displayName: form.get("displayName"),
+        email: form.get("email"),
+        phone: text("phone"),
+        rollNumber: text("rollNumber"),
+        batchId: batchId || null,
+        guardianName: text("guardianName"),
+        guardianPhone: text("guardianPhone"),
+        joinedOn: text("joinedOn") || new Date().toISOString().split("T")[0],
+        leadId: convertingLead.id,
+      }),
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      setError(result.error ?? "Unable to enroll student from lead.");
+    } else {
+      setConvertingLead(null);
+      setMessage(`Successfully enrolled ${convertingLead.name} into batch.`);
+      await load(organization);
+    }
+    setBusy(false);
+  }
+
   return <DashboardLayout title="Admissions CRM" subtitle={`${organization?.name ?? "Institute"} · Audited inquiry and follow-up pipeline`} action={<Button onClick={() => setShowForm((value) => !value)}>{showForm ? "Close form" : "＋ New lead"}</Button>}>
     <div className="metrics-grid"><MetricCard label="Total inquiries" value={String(data.leads.length)} detail="All recorded leads" accent="yellow"/><MetricCard label="Active pipeline" value={String(active)} detail="Requires follow-up" accent="navy"/><MetricCard label="Enrolled" value={String(converted)} detail="Completed onboarding" accent="green"/><MetricCard label="Conversion rate" value={`${data.leads.length ? Math.round(converted / data.leads.length * 1000) / 10 : 0}%`} detail="Lead to enrolled student" accent="orange"/></div>
     {error && <div className="form-error directory-error" role="alert">{error}</div>}{message && <div className="success-banner" role="status">{message}</div>}
     {showForm && <Panel title="Record an admission inquiry"><form className="crm-form" onSubmit={(event) => void create(event)}><label>Student name<input name="name" required minLength={2}/></label><label>Phone<input name="phone" required minLength={7}/></label><label>Email<input name="email" type="email"/></label><label>Guardian name<input name="guardianName"/></label><label>Guardian phone<input name="guardianPhone"/></label><label>Target exam<select name="targetExam" defaultValue="JEE_MAIN"><option>JEE_MAIN</option><option>JEE_ADVANCED</option><option>NEET</option><option>FOUNDATION</option><option>BOARDS</option><option>OTHER</option></select></label><label>Target batch<select name="targetBatchId"><option value="">Not selected</option>{data.batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</select></label><label>Source<select name="source" defaultValue="WALK_IN"><option>WALK_IN</option><option>WEBSITE</option><option>REFERRAL</option><option>SOCIAL_MEDIA</option><option>NEWSPAPER</option><option>CAMPAIGN</option><option>OTHER</option></select></label><label>Follow-up<input name="followUpDate" type="date"/></label><label>Estimated fee (INR)<input name="estimatedFee" type="number" min="0" step="0.01"/></label><label>Counsellor<input name="counsellor"/></label><label className="crm-notes">Notes<textarea name="notes" rows={3}/></label><Button disabled={busy}>{busy ? "Saving…" : "Save lead"}</Button></form></Panel>}
     <div className="directory-toolbar"><input aria-label="Search admissions leads" placeholder="Search name, phone or guardian" value={search} onChange={(event) => setSearch(event.target.value)}/><select aria-label="Filter lead stage" value={filter} onChange={(event) => setFilter(event.target.value as Stage | "ALL")}><option value="ALL">All stages</option>{stages.map((stage) => <option key={stage} value={stage}>{labels[stage]}</option>)}</select></div>
-    <div className="crm-board">{stages.map((stage) => <section className="panel crm-column" key={stage}><header><Badge variant={variants[stage]}>{labels[stage]}</Badge><strong>{visible.filter((lead) => lead.stage === stage).length}</strong></header>{visible.filter((lead) => lead.stage === stage).map((lead) => <article key={lead.id}><div><strong>{lead.name}</strong><small>{lead.phone} · {lead.target_exam.replaceAll("_", " ")}</small></div><span>₹{Number(lead.estimated_fee).toLocaleString("en-IN")}</span>{lead.follow_up_date && <small>Follow-up {new Date(`${lead.follow_up_date}T00:00:00`).toLocaleDateString("en-IN")}</small>}{lead.stage !== "CONVERTED" && <select aria-label={`Update stage for ${lead.name}`} value={lead.stage} disabled={busy} onChange={(event) => void mutate("UPDATE_STAGE", { leadId: lead.id, stage: event.target.value as MutableStage })}>{stages.filter((item) => item !== "CONVERTED").map((item) => <option key={item}>{item}</option>)}</select>}</article>)}{!visible.some((lead) => lead.stage === stage) && <p className="empty-state">No leads</p>}</section>)}</div>
+    <div className="crm-board">{stages.map((stage) => <section className="panel crm-column" key={stage}><header><Badge variant={variants[stage]}>{labels[stage]}</Badge><strong>{visible.filter((lead) => lead.stage === stage).length}</strong></header>{visible.filter((lead) => lead.stage === stage).map((lead) => <article key={lead.id}><div><strong>{lead.name}</strong><small>{lead.phone} · {lead.target_exam.replaceAll("_", " ")}</small></div><span>₹{Number(lead.estimated_fee).toLocaleString("en-IN")}</span>{lead.follow_up_date && <small>Follow-up {new Date(`${lead.follow_up_date}T00:00:00`).toLocaleDateString("en-IN")}</small>}{lead.stage !== "CONVERTED" && <div className="crm-card-actions"><select aria-label={`Update stage for ${lead.name}`} value={lead.stage} disabled={busy} onChange={(event) => void mutate("UPDATE_STAGE", { leadId: lead.id, stage: event.target.value as MutableStage })}>{stages.filter((item) => item !== "CONVERTED").map((item) => <option key={item}>{item}</option>)}</select><Button variant="secondary" className="btn-xs" disabled={busy} onClick={() => setConvertingLead(lead)}>Enroll student</Button></div>}</article>)}{!visible.some((lead) => lead.stage === stage) && <p className="empty-state">No leads</p>}</section>)}</div>
+
+    {/* Lead-to-Student Enrollment Modal */}
+    {convertingLead && (
+      <div className="modal-backdrop" role="presentation">
+        <form className="member-editor" onSubmit={convertLead}>
+          <header>
+            <div>
+              <h2>Enroll lead as student</h2>
+              <p>Convert {convertingLead.name} into an enrolled student with active membership and batch assignment.</p>
+            </div>
+            <button type="button" onClick={() => setConvertingLead(null)} aria-label="Close">✕</button>
+          </header>
+          <div className="member-editor-grid">
+            <label>Student Name *<input name="displayName" required minLength={2} defaultValue={convertingLead.name} /></label>
+            <label>Email Address *<input name="email" type="email" required defaultValue={convertingLead.email || `${convertingLead.phone}@student.local`} /></label>
+            <label>Phone Number<input name="phone" defaultValue={convertingLead.phone} /></label>
+            <label>Roll Number<input name="rollNumber" placeholder="e.g. JEE-26-001" /></label>
+            <label>Enrolled Batch<select name="batchId" defaultValue={convertingLead.target_batch_id || ""}><option value="">Select Batch (Optional)</option>{data.batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+            <label>Guardian Name<input name="guardianName" defaultValue={convertingLead.guardian_name || ""} /></label>
+            <label>Guardian Phone<input name="guardianPhone" defaultValue={convertingLead.guardian_phone || ""} /></label>
+            <label>Enrollment Date<input name="joinedOn" type="date" defaultValue={new Date().toISOString().split("T")[0]} /></label>
+          </div>
+          <footer>
+            <Button type="button" variant="outline" onClick={() => setConvertingLead(null)}>Cancel</Button>
+            <Button type="submit" variant="primary" disabled={busy}>{busy ? "Enrolling…" : "Complete Enrollment"}</Button>
+          </footer>
+        </form>
+      </div>
+    )}
+
     <p className="readiness-note">A lead is marked enrolled only after the reviewed student onboarding flow links a real membership. CRM stage changes cannot create student accounts.</p>
   </DashboardLayout>;
 }
