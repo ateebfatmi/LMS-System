@@ -169,15 +169,15 @@ async function main() {
 
   for (const table of institutionalTables) {
     try {
-      const { error } = await supabase.from(table).select("id").limit(1);
+      const { error } = await supabase.from(table).select("*").limit(1);
       if (error) {
-        console.log(`  ⏳ 'public.${table}': Not applied yet`);
+        console.log(`  ⏳ 'public.${table}': Query error (${error.message})`);
       } else {
         appliedCount++;
         console.log(`  ✓ 'public.${table}': APPLIED & ACCESSIBLE`);
       }
-    } catch {
-      console.log(`  ⏳ 'public.${table}': Not applied yet`);
+    } catch (err: any) {
+      console.log(`  ⏳ 'public.${table}': Exception (${err.message})`);
     }
   }
 
