@@ -2,8 +2,17 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PrepziiMark } from "@prepzii/ui";
+import { PrepziiMark, Select } from "@prepzii/ui";
 import { rememberActiveOrganization } from "@/lib/client-org";
+
+const INSTITUTE_TYPE_OPTIONS = [
+  { value: "COACHING", label: "Coaching institute", description: "JEE, NEET, Foundation & competitive test-prep academy" },
+  { value: "TUITION", label: "Tuition centre", description: "Subject-wise school curriculum & board exam batches" },
+  { value: "SCHOOL", label: "School", description: "K-12 educational institute or junior college" },
+  { value: "ONLINE_ACADEMY", label: "Online academy", description: "Digital-first live streaming & hybrid learning" },
+  { value: "INDIVIDUAL_TUTOR", label: "Individual tutor", description: "Independent educator or private coaching mentor" },
+  { value: "OTHER", label: "Other", description: "Vocational or specialized training institute" },
+];
 
 function slugify(value: string) {
   return value
@@ -69,14 +78,11 @@ export default function InstituteOnboardingPage() {
           <div className="onboarding-grid">
             <label>
               Institute type
-              <select name="instituteType" defaultValue="COACHING">
-                <option value="COACHING">Coaching institute</option>
-                <option value="TUITION">Tuition centre</option>
-                <option value="SCHOOL">School</option>
-                <option value="ONLINE_ACADEMY">Online academy</option>
-                <option value="INDIVIDUAL_TUTOR">Individual tutor</option>
-                <option value="OTHER">Other</option>
-              </select>
+              <Select
+                name="instituteType"
+                defaultValue="COACHING"
+                options={INSTITUTE_TYPE_OPTIONS}
+              />
             </label>
             <label>Contact phone<input name="phone" required placeholder="9876543210" inputMode="tel" /></label>
             <label>City<input name="city" required placeholder="Kota" /></label>

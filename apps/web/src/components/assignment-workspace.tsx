@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { assignmentSubmissionState } from "@prepzii/learning";
-import { Badge, Button, MetricCard } from "@prepzii/ui";
+import { Badge, Button, DateTimePicker, MetricCard } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 
 type Organization = { name: string; slug: string };
@@ -119,7 +119,7 @@ export function AssignmentWorkspace() {
             <label>Instructions<textarea name="instructions" required placeholder="Show all steps and upload…" /></label>
             <label>Assign to<select value={targetType} onChange={(event) => setTargetType(event.target.value as typeof targetType)}><option>COURSE</option><option>BATCH</option><option>STUDENT</option></select></label>
             <label>Target<select name="targetId" required><option value="">Choose target</option>{targetOptions.map((item) => <option key={item.id} value={item.id}>{item.title ?? item.name}</option>)}</select></label>
-            <div><label>Available from<input name="availableFrom" type="datetime-local" /></label><label>Due at<input name="dueAt" type="datetime-local" required /></label></div>
+            <div><label>Available from<DateTimePicker name="availableFrom" placeholder="Available from (optional)" /></label><label>Due at<DateTimePicker name="dueAt" required placeholder="Due at" /></label></div>
             <div><label>Maximum marks<input name="maxMarks" type="number" min="0.01" step="0.01" required /></label><label>Maximum attempts<input name="maxAttempts" type="number" min="1" max="10" defaultValue="1" required /></label></div>
             <label>Rubric <small>One per line: Criterion | marks</small><textarea name="rubric" placeholder={"Reasoning | 5\nFinal answer | 5"} /></label>
             <label className="check-row"><input name="allowLate" type="checkbox" value="true" /> Allow late submissions</label>

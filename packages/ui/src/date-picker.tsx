@@ -23,6 +23,7 @@ export interface DatePickerProps {
   className?: string;
   style?: CSSProperties;
   displayFormat?: "dd/mm/yyyy" | "yyyy-mm-dd" | "friendly";
+  enableTime?: boolean;
 }
 
 const MONTH_NAMES = [
@@ -46,40 +47,70 @@ function padZero(num: number): string {
   return num < 10 ? `0${num}` : `${num}`;
 }
 
-function parseISODate(isoString?: string): { year: number; month: number; day: number } | null {
-  if (!isoString || typeof isoString !== "string") return null;
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoString.trim());
-  if (!match) return null;
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10) - 1; // 0-indexed
-  const day = parseInt(match[3], 10);
+interface ParsedDateTime {
+  year: number;
+  month: number;
+  day: number;
+  hours: number;
+  minutes: number;
+}
+
+function parseDateTimeString(raw?: string): ParsedDateTime | null {
+  if (!raw || typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  // Match YYYY-MM-DD or YYYY-MM-DDTHH:mm or ISO format
+  const dateMatch = /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/.exec(trimmed);
+  if (!dateMatch) return null;
+
+  const year = parseInt(dateMatch[1], 10);
+  const month = parseInt(dateMatch[2], 10) - 1; // 0-indexed
+  const day = parseInt(dateMatch[3], 10);
+  const hours = dateMatch[4] !== undefined ? parseInt(dateMatch[4], 10) : 9; // Default 09:00
+  const minutes = dateMatch[5] !== undefined ? parseInt(dateMatch[5], 10) : 0;
+
   if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
-  return { year, month, day };
+  return { year, month, day, hours, minutes };
 }
 
-function formatToISO(year: number, month: number, day: number): string {
-  return `${year}-${padZero(month + 1)}-${padZero(day)}`;
-}
-
-function formatDisplayDate(
-  isoString: string,
-  format: "dd/mm/yyyy" | "yyyy-mm-dd" | "friendly"
+function formatToOutput(
+  year: number,
+  month: number,
+  day: number,
+  hours: number,
+  minutes: number,
+  enableTime: boolean
 ): string {
-  const parsed = parseISODate(isoString);
+  const datePart = `${year}-${padZero(month + 1)}-${padZero(day)}`;
+  if (!enableTime) return datePart;
+  return `${datePart}T${padZero(hours)}:${padZero(minutes)}`;
+}
+
+function formatDisplayString(
+  raw: string,
+  format: "dd/mm/yyyy" | "yyyy-mm-dd" | "friendly",
+  enableTime: boolean
+): string {
+  const parsed = parseDateTimeString(raw);
   if (!parsed) return "";
-  const { year, month, day } = parsed;
+  const { year, month, day, hours, minutes } = parsed;
 
+  let dateStr = "";
   if (format === "yyyy-mm-dd") {
-    return `${year}-${padZero(month + 1)}-${padZero(day)}`;
-  }
-
-  if (format === "friendly") {
+    dateStr = `${year}-${padZero(month + 1)}-${padZero(day)}`;
+  } else if (format === "friendly") {
     const monthShort = MONTH_NAMES[month].slice(0, 3);
-    return `${day} ${monthShort} ${year}`;
+    dateStr = `${day} ${monthShort} ${year}`;
+  } else {
+    // dd/mm/yyyy
+    dateStr = `${padZero(day)}/${padZero(month + 1)}/${year}`;
   }
 
-  // Default: dd/mm/yyyy
-  return `${padZero(day)}/${padZero(month + 1)}/${year}`;
+  if (!enableTime) return dateStr;
+
+  // 12-hour display with AM/PM
+  const ampm = hours >= 12 ? "PM" : "AM";
+  const displayHours = hours % 12 === 0 ? 12 : hours % 12;
+  return `${dateStr}, ${padZero(displayHours)}:${padZero(minutes)} ${ampm}`;
 }
 
 export const DatePicker: FC<DatePickerProps> = ({
@@ -88,7 +119,7 @@ export const DatePicker: FC<DatePickerProps> = ({
   value: controlledValue,
   defaultValue,
   onChange,
-  placeholder = "dd/mm/yyyy",
+  placeholder,
   required = false,
   disabled = false,
   min,
@@ -96,21 +127,26 @@ export const DatePicker: FC<DatePickerProps> = ({
   className = "",
   style,
   displayFormat = "dd/mm/yyyy",
+  enableTime = false,
 }) => {
+  const defaultPlaceholder = enableTime ? "dd/mm/yyyy, --:-- --" : "dd/mm/yyyy";
+  const effectivePlaceholder = placeholder ?? defaultPlaceholder;
+
   const isControlled = controlledValue !== undefined;
   const [internalValue, setInternalValue] = useState<string>(
     controlledValue ?? defaultValue ?? ""
   );
 
-  const selectedISO = isControlled ? controlledValue ?? "" : internalValue;
-  const parsedSelected = parseISODate(selectedISO);
+  const selectedRaw = isControlled ? controlledValue ?? "" : internalValue;
+  const parsedSelected = parseDateTimeString(selectedRaw);
 
   // Today reference
-  const today = new Date();
-  const todayYear = today.getFullYear();
-  const todayMonth = today.getMonth();
-  const todayDay = today.getDate();
-  const todayISO = formatToISO(todayYear, todayMonth, todayDay);
+  const now = new Date();
+  const todayYear = now.getFullYear();
+  const todayMonth = now.getMonth();
+  const todayDay = now.getDate();
+  const todayHours = now.getHours();
+  const todayMinutes = Math.floor(now.getMinutes() / 5) * 5; // rounded to 5 mins
 
   // View state (which month/year is currently visible in calendar)
   const [viewYear, setViewYear] = useState<number>(
@@ -118,6 +154,14 @@ export const DatePicker: FC<DatePickerProps> = ({
   );
   const [viewMonth, setViewMonth] = useState<number>(
     parsedSelected ? parsedSelected.month : todayMonth
+  );
+
+  // Time state
+  const [selectedHours, setSelectedHours] = useState<number>(
+    parsedSelected ? parsedSelected.hours : 9
+  );
+  const [selectedMinutes, setSelectedMinutes] = useState<number>(
+    parsedSelected ? parsedSelected.minutes : 0
   );
 
   const [isOpen, setIsOpen] = useState(false);
@@ -129,10 +173,12 @@ export const DatePicker: FC<DatePickerProps> = ({
   useEffect(() => {
     if (isControlled && controlledValue !== undefined) {
       setInternalValue(controlledValue);
-      const parsed = parseISODate(controlledValue);
+      const parsed = parseDateTimeString(controlledValue);
       if (parsed) {
         setViewYear(parsed.year);
         setViewMonth(parsed.month);
+        setSelectedHours(parsed.hours);
+        setSelectedMinutes(parsed.minutes);
       }
     }
   }, [controlledValue, isControlled]);
@@ -163,14 +209,43 @@ export const DatePicker: FC<DatePickerProps> = ({
     };
   }, [isOpen]);
 
-  const handleSelectDate = (year: number, month: number, day: number) => {
-    const iso = formatToISO(year, month, day);
+  const updateValue = (
+    year: number,
+    month: number,
+    day: number,
+    hours: number,
+    minutes: number
+  ) => {
+    const formatted = formatToOutput(year, month, day, hours, minutes, enableTime);
     if (!isControlled) {
-      setInternalValue(iso);
+      setInternalValue(formatted);
     }
-    onChange?.(iso);
-    setIsOpen(false);
-    setIsYearDropdownOpen(false);
+    onChange?.(formatted);
+  };
+
+  const handleSelectDate = (year: number, month: number, day: number) => {
+    updateValue(year, month, day, selectedHours, selectedMinutes);
+    if (!enableTime) {
+      setIsOpen(false);
+      setIsYearDropdownOpen(false);
+    }
+  };
+
+  const handleTimeChange = (newHours: number, newMinutes: number) => {
+    setSelectedHours(newHours);
+    setSelectedMinutes(newMinutes);
+    if (parsedSelected) {
+      updateValue(
+        parsedSelected.year,
+        parsedSelected.month,
+        parsedSelected.day,
+        newHours,
+        newMinutes
+      );
+    } else {
+      // If no date selected yet, pick today's date with the time
+      updateValue(todayYear, todayMonth, todayDay, newHours, newMinutes);
+    }
   };
 
   const handleClear = (e?: ReactMouseEvent) => {
@@ -182,8 +257,13 @@ export const DatePicker: FC<DatePickerProps> = ({
     setIsOpen(false);
   };
 
-  const handleToday = () => {
-    handleSelectDate(todayYear, todayMonth, todayDay);
+  const handleNow = () => {
+    setSelectedHours(todayHours);
+    setSelectedMinutes(todayMinutes);
+    updateValue(todayYear, todayMonth, todayDay, todayHours, todayMinutes);
+    if (!enableTime) {
+      setIsOpen(false);
+    }
   };
 
   const handlePrevMonth = (e: ReactMouseEvent) => {
@@ -207,14 +287,11 @@ export const DatePicker: FC<DatePickerProps> = ({
   };
 
   // Calendar calculations
-  // Days in current view month
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  // First day of week for current month (0 = Sunday, 1 = Monday, ...)
   const firstDayOfWeek = new Date(viewYear, viewMonth, 1).getDay();
-  // Days in previous month for padding
   const daysInPrevMonth = new Date(viewYear, viewMonth, 0).getDate();
 
-  // Generate Year choices: -5 years to +5 years around today
+  // Year choices
   const yearOptions: number[] = [];
   const startYear = Math.min(todayYear - 4, viewYear - 2);
   const endYear = Math.max(todayYear + 6, viewYear + 3);
@@ -222,7 +299,13 @@ export const DatePicker: FC<DatePickerProps> = ({
     yearOptions.push(y);
   }
 
-  const displayText = selectedISO ? formatDisplayDate(selectedISO, displayFormat) : "";
+  const displayText = selectedRaw
+    ? formatDisplayString(selectedRaw, displayFormat, enableTime)
+    : "";
+
+  // Time conversion for UI (12-hour format)
+  const isPM = selectedHours >= 12;
+  const current12Hour = selectedHours % 12 === 0 ? 12 : selectedHours % 12;
 
   return (
     <div
@@ -241,13 +324,13 @@ export const DatePicker: FC<DatePickerProps> = ({
         <input
           type="hidden"
           name={name}
-          value={selectedISO}
-          required={required && !selectedISO}
+          value={selectedRaw}
+          required={required && !selectedRaw}
           id={id ? `${id}-hidden` : undefined}
         />
       )}
 
-      {/* Trigger Button / Input Display */}
+      {/* Trigger Button */}
       <button
         type="button"
         id={id}
@@ -258,6 +341,8 @@ export const DatePicker: FC<DatePickerProps> = ({
             if (!isOpen && parsedSelected) {
               setViewYear(parsedSelected.year);
               setViewMonth(parsedSelected.month);
+              setSelectedHours(parsedSelected.hours);
+              setSelectedMinutes(parsedSelected.minutes);
             }
           }
         }}
@@ -288,17 +373,26 @@ export const DatePicker: FC<DatePickerProps> = ({
           opacity: disabled ? 0.6 : 1,
         }}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: "8px", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {displayText || placeholder}
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {displayText || effectivePlaceholder}
         </span>
 
-        <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          {selectedISO && !disabled && (
+        <span style={{ display: "flex", alignItems: "center", gap: "4px", flexShrink: 0 }}>
+          {selectedRaw && !disabled && (
             <span
               role="button"
               tabIndex={0}
               onClick={handleClear}
-              title="Clear date"
+              title="Clear"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -317,7 +411,7 @@ export const DatePicker: FC<DatePickerProps> = ({
             </span>
           )}
 
-          {/* PrepZii Themed Calendar Icon */}
+          {/* Calendar & Clock Icon */}
           <svg
             width="16"
             height="16"
@@ -333,11 +427,12 @@ export const DatePicker: FC<DatePickerProps> = ({
             <line x1="16" y1="2" x2="16" y2="6" />
             <line x1="8" y1="2" x2="8" y2="6" />
             <line x1="3" y1="10" x2="21" y2="10" />
+            {enableTime && <circle cx="12" cy="15" r="2" fill={isOpen ? "#d97706" : "#64748b"} />}
           </svg>
         </span>
       </button>
 
-      {/* Custom PrepZii Popover Calendar */}
+      {/* Popover Calendar */}
       {isOpen && (
         <div
           role="dialog"
@@ -348,7 +443,7 @@ export const DatePicker: FC<DatePickerProps> = ({
             top: "calc(100% + 6px)",
             left: 0,
             zIndex: 1000,
-            width: "288px",
+            width: enableTime ? "310px" : "288px",
             background: "#ffffff",
             borderRadius: "16px",
             border: "1px solid rgba(226, 232, 240, 0.9)",
@@ -368,7 +463,6 @@ export const DatePicker: FC<DatePickerProps> = ({
               marginBottom: "14px",
             }}
           >
-            {/* Month & Year Title / Selector */}
             <div style={{ position: "relative" }}>
               <button
                 type="button"
@@ -411,7 +505,7 @@ export const DatePicker: FC<DatePickerProps> = ({
                 </svg>
               </button>
 
-              {/* Quick Month & Year Picker Dropdown */}
+              {/* Year Dropdown */}
               {isYearDropdownOpen && (
                 <div
                   style={{
@@ -432,7 +526,6 @@ export const DatePicker: FC<DatePickerProps> = ({
                     overflowY: "auto",
                   }}
                 >
-                  {/* Month Buttons */}
                   <div
                     style={{
                       gridColumn: "1 / -1",
@@ -504,7 +597,7 @@ export const DatePicker: FC<DatePickerProps> = ({
               )}
             </div>
 
-            {/* Previous and Next Month Chevrons */}
+            {/* Navigation Chevrons */}
             <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
               <button
                 type="button"
@@ -602,7 +695,7 @@ export const DatePicker: FC<DatePickerProps> = ({
               gap: "3px",
             }}
           >
-            {/* Previous Month Padding */}
+            {/* Prev month padding */}
             {Array.from({ length: firstDayOfWeek }).map((_, idx) => {
               const dayNum = daysInPrevMonth - firstDayOfWeek + idx + 1;
               return (
@@ -623,15 +716,20 @@ export const DatePicker: FC<DatePickerProps> = ({
               );
             })}
 
-            {/* Current Month Days */}
+            {/* Current month days */}
             {Array.from({ length: daysInMonth }).map((_, idx) => {
               const dayNum = idx + 1;
-              const dateISO = formatToISO(viewYear, viewMonth, dayNum);
-              const isSelected = selectedISO === dateISO;
-              const isToday = todayISO === dateISO;
+              const dateOnlyISO = `${viewYear}-${padZero(viewMonth + 1)}-${padZero(dayNum)}`;
+              const selectedDateOnly = parsedSelected
+                ? `${parsedSelected.year}-${padZero(parsedSelected.month + 1)}-${padZero(parsedSelected.day)}`
+                : "";
 
-              const isBeforeMin = min ? dateISO < min : false;
-              const isAfterMax = max ? dateISO > max : false;
+              const isSelected = selectedDateOnly === dateOnlyISO;
+              const isToday =
+                todayYear === viewYear && todayMonth === viewMonth && todayDay === dayNum;
+
+              const isBeforeMin = min ? dateOnlyISO < min.split("T")[0] : false;
+              const isAfterMax = max ? dateOnlyISO > max.split("T")[0] : false;
               const isDisabled = isBeforeMin || isAfterMax;
 
               return (
@@ -650,9 +748,7 @@ export const DatePicker: FC<DatePickerProps> = ({
                     fontWeight: isSelected ? 800 : isToday ? 700 : 500,
                     borderRadius: "8px",
                     border: isToday && !isSelected ? "1px solid #FACC15" : "none",
-                    background: isSelected
-                      ? "#0B1528"
-                      : "transparent",
+                    background: isSelected ? "#0B1528" : "transparent",
                     color: isSelected
                       ? "#FACC15"
                       : isDisabled
@@ -663,9 +759,7 @@ export const DatePicker: FC<DatePickerProps> = ({
                     cursor: isDisabled ? "not-allowed" : "pointer",
                     position: "relative",
                     transition: "all 0.12s ease",
-                    boxShadow: isSelected
-                      ? "0 2px 8px rgba(11, 21, 40, 0.25)"
-                      : "none",
+                    boxShadow: isSelected ? "0 2px 8px rgba(11, 21, 40, 0.25)" : "none",
                   }}
                   onMouseEnter={(e) => {
                     if (!isSelected && !isDisabled) {
@@ -681,7 +775,6 @@ export const DatePicker: FC<DatePickerProps> = ({
                   }}
                 >
                   {dayNum}
-                  {/* Gold active pip for today when selected */}
                   {isToday && isSelected && (
                     <span
                       style={{
@@ -699,13 +792,145 @@ export const DatePicker: FC<DatePickerProps> = ({
             })}
           </div>
 
-          {/* Calendar Footer: Clear & Today Actions */}
+          {/* Time Picker Controls (if enableTime is true) */}
+          {enableTime && (
+            <div
+              style={{
+                marginTop: "14px",
+                paddingTop: "12px",
+                borderTop: "1px solid #f1f5f9",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 700, color: "#64748b" }}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span>Select Time</span>
+                </div>
+
+                {/* AM/PM Toggle */}
+                <div
+                  style={{
+                    display: "inline-flex",
+                    borderRadius: "6px",
+                    border: "1px solid #e2e8f0",
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isPM) handleTimeChange(selectedHours - 12, selectedMinutes);
+                    }}
+                    style={{
+                      padding: "2px 8px",
+                      fontSize: "11px",
+                      fontWeight: !isPM ? 800 : 500,
+                      border: "none",
+                      background: !isPM ? "#0B1528" : "#ffffff",
+                      color: !isPM ? "#FACC15" : "#64748b",
+                      cursor: "pointer",
+                    }}
+                  >
+                    AM
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isPM) handleTimeChange(selectedHours + 12, selectedMinutes);
+                    }}
+                    style={{
+                      padding: "2px 8px",
+                      fontSize: "11px",
+                      fontWeight: isPM ? 800 : 500,
+                      border: "none",
+                      background: isPM ? "#0B1528" : "#ffffff",
+                      color: isPM ? "#FACC15" : "#64748b",
+                      cursor: "pointer",
+                    }}
+                  >
+                    PM
+                  </button>
+                </div>
+              </div>
+
+              {/* Hour & Minute Pickers */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: "8px" }}>
+                <select
+                  value={current12Hour}
+                  onChange={(e) => {
+                    const h12 = parseInt(e.target.value, 10);
+                    const new24 = isPM ? (h12 === 12 ? 12 : h12 + 12) : (h12 === 12 ? 0 : h12);
+                    handleTimeChange(new24, selectedMinutes);
+                  }}
+                  style={{
+                    padding: "6px 8px",
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    color: "#0f172a",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    outline: "none",
+                    textAlign: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                    <option key={h} value={h}>
+                      {padZero(h)} hr
+                    </option>
+                  ))}
+                </select>
+
+                <span style={{ fontSize: "14px", fontWeight: 800, color: "#94a3b8" }}>:</span>
+
+                <select
+                  value={selectedMinutes}
+                  onChange={(e) => {
+                    handleTimeChange(selectedHours, parseInt(e.target.value, 10));
+                  }}
+                  style={{
+                    padding: "6px 8px",
+                    borderRadius: "8px",
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    color: "#0f172a",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    outline: "none",
+                    textAlign: "center",
+                    cursor: "pointer",
+                  }}
+                >
+                  {Array.from({ length: 12 }, (_, i) => i * 5).map((m) => (
+                    <option key={m} value={m}>
+                      {padZero(m)} min
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* Calendar Footer */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginTop: "14px",
+              marginTop: "12px",
               paddingTop: "10px",
               borderTop: "1px solid #f1f5f9",
             }}
@@ -736,34 +961,59 @@ export const DatePicker: FC<DatePickerProps> = ({
               Clear
             </button>
 
-            <button
-              type="button"
-              onClick={handleToday}
-              style={{
-                background: "#fef9c3",
-                border: "1px solid #fef08a",
-                fontSize: "12px",
-                fontWeight: 700,
-                color: "#854d0e",
-                cursor: "pointer",
-                padding: "4px 12px",
-                borderRadius: "6px",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#fde047";
-                e.currentTarget.style.color = "#713f12";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#fef9c3";
-                e.currentTarget.style.color = "#854d0e";
-              }}
-            >
-              Today
-            </button>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button
+                type="button"
+                onClick={handleNow}
+                style={{
+                  background: "#fef9c3",
+                  border: "1px solid #fef08a",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "#854d0e",
+                  cursor: "pointer",
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  transition: "all 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = "#fde047";
+                  e.currentTarget.style.color = "#713f12";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = "#fef9c3";
+                  e.currentTarget.style.color = "#854d0e";
+                }}
+              >
+                {enableTime ? "Now" : "Today"}
+              </button>
+
+              {enableTime && (
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  style={{
+                    background: "#0B1528",
+                    border: "none",
+                    fontSize: "12px",
+                    fontWeight: 700,
+                    color: "#FACC15",
+                    cursor: "pointer",
+                    padding: "4px 12px",
+                    borderRadius: "6px",
+                  }}
+                >
+                  Done
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
+};
+
+export const DateTimePicker: FC<Omit<DatePickerProps, "enableTime">> = (props) => {
+  return <DatePicker {...props} enableTime={true} />;
 };

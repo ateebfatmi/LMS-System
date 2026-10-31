@@ -4245,3 +4245,30 @@ button {
   border-color: #9d831b !important;
   box-shadow: 0 0 0 4px rgb(250 204 21 / 16%) !important;
 }
+
+/* PrepZii Custom Select Component */
+.pz-select-trigger:hover:not(:disabled) {
+  border-color: #cbd5e1 !important;
+}
+
+.pz-select-trigger:focus-visible {
+  border-color: #9d831b !important;
+  box-shadow: 0 0 0 4px rgb(250 204 21 / 18%) !important;
+}
+
+.pz-select-dropdown::-webkit-scrollbar {
+  width: 5px;
+}
+
+.pz-select-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pz-select-dropdown::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.pz-select-dropdown::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

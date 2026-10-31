@@ -1,6 +1,7 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Plus, ShieldCheck } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { rememberActiveOrganization, resolveActiveOrganization } from "@/lib/client-org";
 
@@ -8,6 +9,7 @@ type Organization = { id: string; name: string; slug: string; logoUrl: string | 
 
 export function OrganizationSwitcher() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [activeSlug, setActiveSlug] = useState("");
   const [role, setRole] = useState("");
   const [busy, setBusy] = useState(true);
@@ -44,8 +46,10 @@ export function OrganizationSwitcher() {
         resolveActiveOrganization(),
       ]);
       if (cancelled || !listResponse.ok) return setBusy(false);
-      const list = (await listResponse.json()).organizations as Organization[];
+      const data = await listResponse.json();
+      const list = (data.organizations ?? []) as Organization[];
       setOrganizations(list);
+      setIsPlatformAdmin(Boolean(data.isPlatformAdmin));
       if (active?.organization?.slug) {
         setActiveSlug(active.organization.slug);
         setRole(active.role ?? "");
@@ -90,7 +94,7 @@ export function OrganizationSwitcher() {
       .slice(0, 2)
       .toUpperCase();
   const initials = initialsFor(active?.name ?? "PrepZii");
-  const canSwitch = organizations.length > 1 && !busy;
+  const canSwitch = !busy;
   const accessLabel = role
     ? `${role.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase())} access`
     : "Create an institute";
@@ -142,6 +146,58 @@ export function OrganizationSwitcher() {
               </button>
             );
           })}
+
+          <div
+            style={{
+              borderTop: "1px solid rgba(0, 0, 0, 0.08)",
+              marginTop: "8px",
+              paddingTop: "6px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "3px",
+            }}
+          >
+            <Link
+              href="/onboarding"
+              onClick={() => setOpen(false)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "8px 10px",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: "#1e293b",
+                textDecoration: "none",
+              }}
+            >
+              <Plus size={15} style={{ opacity: 0.7 }} />
+              <span>＋ Create new institute</span>
+            </Link>
+
+            {isPlatformAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setOpen(false)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 10px",
+                  borderRadius: "8px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "#92400e",
+                  backgroundColor: "#fef3c7",
+                  textDecoration: "none",
+                }}
+              >
+                <ShieldCheck size={16} />
+                <span>Super Admin Console</span>
+              </Link>
+            )}
+          </div>
         </div>
       )}
     </div>

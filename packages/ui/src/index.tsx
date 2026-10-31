@@ -158,4 +158,5 @@ export function StatusDot({ status }: { status: "live" | "online" | "idle" | "of
 }
 
 export * from "./date-picker";
+export * from "./select";
 

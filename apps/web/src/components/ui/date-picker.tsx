@@ -1,1 +1,2 @@
-export { DatePicker, type DatePickerProps } from "@prepzii/ui";
+export { DatePicker, DateTimePicker, type DatePickerProps } from "@prepzii/ui";
+
