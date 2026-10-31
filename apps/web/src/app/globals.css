@@ -4063,10 +4063,75 @@ button {
 .platform-institutes strong, .platform-institutes small, .platform-side strong, .platform-side small { display: block; }
 .platform-institutes small, .platform-side small { margin-top: 3px; color: var(--muted); font-size: 11px; }
 .platform-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(320px, .7fr); gap: 18px; margin-top: 18px; align-items: start; }
-.admin-plan-form { display: grid; grid-template-columns: .5fr 1.2fr repeat(6, minmax(85px, .7fr)) auto auto; align-items: end; gap: 7px; padding: 12px 0; border-bottom: 1px solid var(--line); }
-.admin-plan-form label { display: grid; gap: 4px; color: var(--muted); font-size: 10px; }
-.admin-plan-form .check-row { display: flex; align-items: center; }
-.admin-plan-form .check-row input { min-height: 16px; }
+.admin-plan-card {
+  background: white;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.plan-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.plan-id-tag {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.plan-name-input {
+  font-weight: 600;
+  font-size: 15px;
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  background: white;
+}
+.plan-card-fields {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 900px) {
+  .plan-card-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .plan-card-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.plan-card-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plan-card-fields label span {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+}
+.plan-card-fields input {
+  padding: 6px 10px;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #f8fafc;
+  min-height: 36px;
+}
 .platform-side { display: grid; gap: 10px; }
 .platform-side .compact-form { display: grid; gap: 8px; }
 .platform-side .compact-form input { min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; }
@@ -4271,4 +4336,31 @@ button {
 
 .pz-select-dropdown::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* PrepZii Custom TimePicker Component */
+.pz-timepicker-trigger:hover:not(:disabled) {
+  border-color: #cbd5e1 !important;
+}
+
+.pz-timepicker-trigger:focus-visible {
+  border-color: #9d831b !important;
+  box-shadow: 0 0 0 4px rgb(250 204 21 / 18%) !important;
+}
+
+.pz-time-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.pz-time-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pz-time-scroll::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.pz-time-scroll::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
