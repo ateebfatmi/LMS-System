@@ -17,7 +17,7 @@ export default function SignInPage() {
         padding: "24px",
       }}
     >
-      <div style={{ marginBottom: "28px", textAlign: "center" }}>
+      <div style={{ marginBottom: "20px", textAlign: "center" }}>
         <Link href="/" style={{ textDecoration: "none", display: "inline-block" }}>
           <PrepziiMark />
         </Link>
@@ -35,8 +35,64 @@ export default function SignInPage() {
           Sign In to Your Institute Workspace
         </h1>
         <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
-          Sign in once. PrepZii will open your platform admin or institute workspace automatically.
+          Sign in to your coaching institute portal or switch to platform super admin.
         </p>
+      </div>
+
+      {/* Portal Selection Tabs at the Start of Login */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "24px",
+          padding: "5px",
+          borderRadius: "14px",
+          backgroundColor: "rgba(15, 23, 42, 0.7)",
+          border: "1px solid rgba(255, 255, 255, 0.12)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <Link
+          href="/sign-in"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 18px",
+            borderRadius: "10px",
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#0f172a",
+            backgroundColor: "#ffffff",
+            textDecoration: "none",
+            boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+          }}
+        >
+          <span>🏫</span>
+          <span>Institute Login</span>
+        </Link>
+
+        <Link
+          href="/admin/login"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 18px",
+            borderRadius: "10px",
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#FACC15",
+            backgroundColor: "rgba(250, 204, 21, 0.12)",
+            border: "1px solid rgba(250, 204, 21, 0.3)",
+            textDecoration: "none",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span>🛡️</span>
+          <span>Super Admin Login</span>
+        </Link>
       </div>
 
       <div

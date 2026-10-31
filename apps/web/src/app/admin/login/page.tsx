@@ -48,6 +48,7 @@ export default function SuperAdminLoginPage() {
       style={{
         minHeight: "100vh",
         display: "flex",
+        flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
         backgroundColor: "#060D1A",
@@ -59,6 +60,61 @@ export default function SuperAdminLoginPage() {
         fontFamily: "system-ui, -apple-system, sans-serif",
       }}
     >
+      {/* Portal Selection Tabs at the Start of Login */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          marginBottom: "24px",
+          padding: "5px",
+          borderRadius: "14px",
+          backgroundColor: "rgba(15, 23, 42, 0.7)",
+          border: "1px solid rgba(255, 255, 255, 0.12)",
+          backdropFilter: "blur(12px)",
+        }}
+      >
+        <Link
+          href="/sign-in"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 18px",
+            borderRadius: "10px",
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#94a3b8",
+            backgroundColor: "transparent",
+            textDecoration: "none",
+            transition: "all 0.15s ease",
+          }}
+        >
+          <span>🏫</span>
+          <span>Institute Login</span>
+        </Link>
+
+        <Link
+          href="/admin/login"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            padding: "8px 18px",
+            borderRadius: "10px",
+            fontSize: "13px",
+            fontWeight: 700,
+            color: "#0B1528",
+            backgroundColor: "#FACC15",
+            textDecoration: "none",
+            boxShadow: "0 2px 8px rgba(250, 204, 21, 0.3)",
+          }}
+        >
+          <span>🛡️</span>
+          <span>Super Admin Login</span>
+        </Link>
+      </div>
+
       <div
         style={{
           width: "100%",

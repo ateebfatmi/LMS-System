@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Plus, ShieldCheck } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { rememberActiveOrganization, resolveActiveOrganization } from "@/lib/client-org";
@@ -9,7 +9,6 @@ type Organization = { id: string; name: string; slug: string; logoUrl: string | 
 
 export function OrganizationSwitcher() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [activeSlug, setActiveSlug] = useState("");
   const [role, setRole] = useState("");
   const [busy, setBusy] = useState(true);
@@ -49,7 +48,6 @@ export function OrganizationSwitcher() {
       const data = await listResponse.json();
       const list = (data.organizations ?? []) as Organization[];
       setOrganizations(list);
-      setIsPlatformAdmin(Boolean(data.isPlatformAdmin));
       if (active?.organization?.slug) {
         setActiveSlug(active.organization.slug);
         setRole(active.role ?? "");
@@ -175,30 +173,6 @@ export function OrganizationSwitcher() {
               <Plus size={15} style={{ opacity: 0.7 }} />
               <span>Create new institute</span>
             </Link>
-
-            {isPlatformAdmin && (
-              <Link
-                href="/admin"
-                onClick={() => setOpen(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  padding: "8px 10px",
-                  borderRadius: "8px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  color: "#92400e",
-                  backgroundColor: "#fef3c7",
-                  border: "1px solid #fde68a",
-                  textDecoration: "none",
-                  transition: "background-color 0.12s ease",
-                }}
-              >
-                <ShieldCheck size={16} />
-                <span>Super Admin Control Center</span>
-              </Link>
-            )}
           </div>
         </div>
       )}
