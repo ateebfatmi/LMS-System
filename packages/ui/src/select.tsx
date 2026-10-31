@@ -270,6 +270,16 @@ export const Select: FC<SelectProps> = ({
   const fontSize = size === "sm" ? "12.5px" : size === "lg" ? "14px" : "13.5px";
   const borderRadius = size === "sm" ? "8px" : size === "lg" ? "12px" : "10px";
 
+  const displayLabelText =
+    selectedOption &&
+    (typeof selectedOption.label === "string" || typeof selectedOption.label === "number")
+      ? String(selectedOption.label)
+      : placeholder;
+
+  const computedAriaLabel = ariaLabel
+    ? `${ariaLabel}, ${displayLabelText}`
+    : undefined;
+
   return (
     <div
       ref={containerRef}
@@ -284,25 +294,9 @@ export const Select: FC<SelectProps> = ({
       {/* Hidden input for HTML form submission compatibility */}
       {name && (
         <input
-          type="text"
-          tabIndex={-1}
-          aria-hidden="true"
+          type="hidden"
           name={name}
           value={selectedValue}
-          required={required}
-          onChange={() => {}}
-          style={{
-            position: "absolute",
-            opacity: 0,
-            pointerEvents: "none",
-            width: "1px",
-            height: "1px",
-            margin: "-1px",
-            border: 0,
-            padding: 0,
-            clip: "rect(0 0 0 0)",
-            overflow: "hidden",
-          }}
         />
       )}
 
@@ -316,8 +310,8 @@ export const Select: FC<SelectProps> = ({
         onKeyDown={handleKeyDown}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-controls={listboxId}
-        aria-label={ariaLabel}
+        aria-controls={isOpen ? listboxId : undefined}
+        aria-label={computedAriaLabel}
         className={`pz-select-trigger ${isOpen ? "is-open" : ""} ${triggerClassName}`.trim()}
         style={{
           width: "100%",
@@ -327,7 +321,7 @@ export const Select: FC<SelectProps> = ({
           borderRadius,
           outline: "none",
           backgroundColor: "#ffffff",
-          color: selectedOption ? "#181e1b" : "#94a3b8",
+          color: selectedOption ? "#181e1b" : "#475569",
           fontSize,
           fontFamily: "inherit",
           fontWeight: 500,
