@@ -2344,24 +2344,46 @@ button {
   border-top: 1px solid var(--line);
 }
 
-.question-picker article strong,
+.question-picker article .question-picker-text,
 .question-picker article small {
   display: block;
 }
 
-.question-picker article strong {
-  display: -webkit-box;
+.question-picker article .question-picker-text {
   margin: 6px 0 4px;
-  overflow: hidden;
   font-size: 11px;
+  font-weight: 700;
   line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
 }
 
 .question-picker article small {
   color: var(--muted);
   font-size: 9px;
+}
+
+.math-expression {
+  max-width: 100%;
+}
+
+.math-expression-display {
+  display: block;
+  margin: 8px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.math-expression .katex {
+  font-size: 1em;
+}
+
+.math-expression-display .katex-display {
+  margin: 0;
+  text-align: left;
+}
+
+.answer-options .math-text {
+  min-width: 0;
 }
 
 .test-status-bar {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Badge, Button, DateTimePicker, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { MathText } from "@/components/math-text";
 
 type Organization = { name: string; slug: string };
 type Test = { id: string; title: string; exam: string; subject: string; chapters: string[]; difficulty: string; duration_minutes: number; total_questions: number; status: "DRAFT" | "PUBLISHED"; max_attempts: number; result_release_policy: string; solution_release_policy: string };
@@ -108,7 +109,7 @@ export function AssessmentWorkspace() {
           </>}
         </section>
 
-        {staff && <aside className="panel question-picker"><h2>PrepZii question bank</h2><form onSubmit={(event) => { event.preventDefault(); if (organization) void load(organization, questionSearch); }}><input value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} placeholder="Search question text"/><Button variant="outline">Search</Button></form>{data.bankQuestions.map((question) => <article key={question.id}><div><Badge variant="neutral">{question.question_type}</Badge><strong>{question.question_text}</strong><small>{question.subject} · {question.chapter} · {question.difficulty} · {question.marks} marks</small></div><Button disabled={busy || !selectedTest || selectedTest.status !== "DRAFT"} onClick={() => void mutate("ADD_QUESTION", { testId: selectedTestId, questionId: question.id })}>Add</Button></article>)}</aside>}
+        {staff && <aside className="panel question-picker"><h2>PrepZii question bank</h2><form onSubmit={(event) => { event.preventDefault(); if (organization) void load(organization, questionSearch); }}><input value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} placeholder="Search question text"/><Button variant="outline">Search</Button></form>{data.bankQuestions.map((question) => <article key={question.id}><div><Badge variant="neutral">{question.question_type}</Badge><MathText className="question-picker-text">{question.question_text}</MathText><small>{question.subject} · {question.chapter} · {question.difficulty} · {question.marks} marks</small></div><Button disabled={busy || !selectedTest || selectedTest.status !== "DRAFT"} onClick={() => void mutate("ADD_QUESTION", { testId: selectedTestId, questionId: question.id })}>Add</Button></article>)}</aside>}
       </div>
     </DashboardLayout>
   );
