@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Atom, Check, Dna, FlaskConical, Plus, Search, Sigma } from "lucide-react";
 import { Badge, Button, DateTimePicker, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { MathText } from "@/components/math-text";
@@ -12,23 +13,35 @@ type Schedule = { id: string; test_id: string; batch_id: string; starts_at: stri
 type Attempt = { id: string; test_id: string; user_id: string; attempt_number: number; status: string; submitted_at: string | null; score: number | null; max_score: number | null; percentage: number | null; results_released: boolean; solutions_released: boolean };
 type DescriptiveSubmission = { id: string; test_id: string; question_id: string; student_user_id: string; answer_text: string | null; file_url: string | null; max_marks: number; awarded_marks: number | null; feedback: string | null; status: string };
 type Question = { id: string; exam: string; subject: string; chapter: string; topic: string; difficulty: string; question_type: string; question_text: string; marks: number };
+type TestQuestion = Question & { link_id: string; test_id: string; question_order: number };
 type Batch = { id: string; name: string };
-type Data = { tests: Test[]; schedules: Schedule[]; attempts: Attempt[]; descriptiveSubmissions: DescriptiveSubmission[]; batches: Batch[]; bankQuestions: Question[]; role: string };
-const empty: Data = { tests: [], schedules: [], attempts: [], descriptiveSubmissions: [], batches: [], bankQuestions: [], role: "" };
+type Data = { tests: Test[]; schedules: Schedule[]; attempts: Attempt[]; descriptiveSubmissions: DescriptiveSubmission[]; batches: Batch[]; bankQuestions: Question[]; testQuestions: TestQuestion[]; role: string };
+const empty: Data = { tests: [], schedules: [], attempts: [], descriptiveSubmissions: [], batches: [], bankQuestions: [], testQuestions: [], role: "" };
+const questionBankSubjects = [
+  { name: "Physics", Icon: Atom, tone: "physics" },
+  { name: "Chemistry", Icon: FlaskConical, tone: "chemistry" },
+  { name: "Mathematics", Icon: Sigma, tone: "mathematics" },
+  { name: "Biology", Icon: Dna, tone: "biology" },
+] as const;
 
 export function AssessmentWorkspace() {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [data, setData] = useState<Data>(empty);
   const [selectedTestId, setSelectedTestId] = useState("");
+  const [selectedQuestionSubject, setSelectedQuestionSubject] = useState("Mathematics");
   const [questionSearch, setQuestionSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [currentTime, setCurrentTime] = useState(0);
+  const loadRequestId = useRef(0);
 
-  const load = useCallback(async (active: Organization, search = "") => {
-    const response = await fetch(`/api/organizations/${encodeURIComponent(active.slug)}/assessments?q=${encodeURIComponent(search)}`, { cache: "no-store" });
+  const load = useCallback(async (active: Organization, search = "", subject = "Mathematics") => {
+    const requestId = ++loadRequestId.current;
+    const params = new URLSearchParams({ q: search, subject });
+    const response = await fetch(`/api/organizations/${encodeURIComponent(active.slug)}/assessments?${params}`, { cache: "no-store" });
     const result = await response.json();
+    if (requestId !== loadRequestId.current) return;
     if (!response.ok) { setError(result.error ?? "Unable to load assessments."); return; }
     setData(result); setCurrentTime(Date.now()); setError("");
     setSelectedTestId((current) => current && result.tests.some((test: Test) => test.id === current) ? current : result.tests[0]?.id ?? "");
@@ -52,7 +65,7 @@ export function AssessmentWorkspace() {
     });
     const result = await response.json();
     if (!response.ok) setError(result.error ?? "Unable to save assessment.");
-    else { await load(organization, questionSearch); setNotice("Assessment updated."); }
+    else { await load(organization, questionSearch, selectedQuestionSubject); setNotice(action === "ADD_QUESTION" ? "Question added to the selected test." : "Assessment updated."); }
     setBusy(false);
     return response.ok;
   }
@@ -75,6 +88,8 @@ export function AssessmentWorkspace() {
   const attempts = data.attempts.filter((attempt) => attempt.test_id === selectedTestId);
   const activeSchedule = schedules.find((schedule) => new Date(schedule.starts_at).getTime() <= currentTime && new Date(schedule.ends_at).getTime() >= currentTime);
   const descriptiveQueue = data.descriptiveSubmissions.filter((submission) => submission.test_id === selectedTestId);
+  const selectedTestQuestions = data.testQuestions.filter((question) => question.test_id === selectedTestId).sort((left, right) => left.question_order - right.question_order);
+  const selectedTestQuestionIds = new Set(selectedTestQuestions.map((question) => question.id));
 
   return (
     <DashboardLayout title={staff ? "Assessments" : "My assessments"} subtitle={`${organization?.name ?? "Institute"} · PrepZii question bank with server-authoritative attempts`}>
@@ -98,6 +113,10 @@ export function AssessmentWorkspace() {
         <section className="panel assessment-detail">
           <header><div><h2>{selectedTest?.title ?? "Choose a test"}</h2><p>{selectedTest ? `${selectedTest.exam} · ${selectedTest.subject} · ${selectedTest.difficulty}` : "Assessment details will appear here."}</p></div>{staff && selectedTest && <Button variant="secondary" disabled={busy} onClick={() => void mutate("PUBLISH_TEST", { testId: selectedTest.id, published: selectedTest.status !== "PUBLISHED" })}>{selectedTest.status === "PUBLISHED" ? "Return to draft" : "Publish"}</Button>}</header>
           {selectedTest && <div className="assessment-policy"><span>{selectedTest.total_questions} questions</span><span>{selectedTest.duration_minutes} minutes</span><span>{selectedTest.max_attempts} attempt{selectedTest.max_attempts === 1 ? "" : "s"}</span><span>Results: {selectedTest.result_release_policy}</span><span>Solutions: {selectedTest.solution_release_policy}</span></div>}
+          {staff && selectedTest && <section className="selected-test-questions" aria-labelledby="selected-test-questions-title">
+            <header><div><span>Test builder</span><h3 id="selected-test-questions-title">Questions in this test</h3></div><strong>{selectedTestQuestions.length}</strong></header>
+            {selectedTestQuestions.length ? <div className="selected-test-question-list">{selectedTestQuestions.map((question, index) => <article key={question.link_id}><span className="selected-test-question-number">{index + 1}</span><div><MathText className="selected-test-question-text">{question.question_text}</MathText><small>{question.subject} · {question.chapter} · {question.difficulty} · {question.marks} marks</small></div></article>)}</div> : <div className="selected-test-questions-empty"><Plus size={18} aria-hidden="true"/><div><strong>No questions added yet</strong><p>Choose a subject from the question bank and click Add.</p></div></div>}
+          </section>}
           {!staff && selectedTest && <div className="student-test-action">{activeSchedule ? <Link className="pz-button pz-button-primary" href={`/dashboard/assessments/${selectedTest.id}`}>Start or resume test</Link> : <p>{schedules.length ? `Window: ${new Date(schedules[0].starts_at).toLocaleString()} – ${new Date(schedules[0].ends_at).toLocaleString()}` : "No schedule is available."}</p>}{attempts.map((attempt) => <div key={attempt.id}><Badge variant={attempt.status === "SUBMITTED" ? "success" : "info"}>{attempt.status}</Badge>{attempt.status === "SUBMITTED" && <Link href={`/dashboard/assessments/${selectedTest.id}?attemptId=${attempt.id}`}>View result</Link>}</div>)}</div>}
           {staff && selectedTest && <>
             <form className="compact-form assessment-schedule" onSubmit={(event) => { event.preventDefault(); const form = new FormData(event.currentTarget); void mutate("SCHEDULE_TEST", { testId: selectedTest.id, batchId: String(form.get("batchId")), startsAt: new Date(String(form.get("startsAt"))).toISOString(), endsAt: new Date(String(form.get("endsAt"))).toISOString() }); }}><h3>Schedule for batch</h3><Select name="batchId" required placeholder="Choose batch"><option value="">Choose batch</option>{data.batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}</Select><div><DateTimePicker name="startsAt" required placeholder="Starts at" /><DateTimePicker name="endsAt" required placeholder="Ends at" /></div><Button disabled={busy}>Add schedule</Button></form>
@@ -109,7 +128,16 @@ export function AssessmentWorkspace() {
           </>}
         </section>
 
-        {staff && <aside className="panel question-picker"><h2>PrepZii question bank</h2><form onSubmit={(event) => { event.preventDefault(); if (organization) void load(organization, questionSearch); }}><input value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} placeholder="Search question text"/><Button variant="outline">Search</Button></form>{data.bankQuestions.map((question) => <article key={question.id}><div><Badge variant="neutral">{question.question_type}</Badge><MathText className="question-picker-text">{question.question_text}</MathText><small>{question.subject} · {question.chapter} · {question.difficulty} · {question.marks} marks</small></div><Button disabled={busy || !selectedTest || selectedTest.status !== "DRAFT"} onClick={() => void mutate("ADD_QUESTION", { testId: selectedTestId, questionId: question.id })}>Add</Button></article>)}</aside>}
+        {staff && <aside className="panel question-picker">
+          <div className="question-picker-heading"><span>Question bank</span><h2>Add questions</h2><p>Choose a subject, find the right questions, and add them to your draft.</p></div>
+          <div className="question-subjects" role="group" aria-label="Question bank subjects">
+            {questionBankSubjects.map(({ name, Icon, tone }) => <button key={name} type="button" className={name === selectedQuestionSubject ? "active" : ""} aria-pressed={name === selectedQuestionSubject} onClick={() => { setSelectedQuestionSubject(name); setQuestionSearch(""); setData((current) => ({ ...current, bankQuestions: [] })); if (organization) void load(organization, "", name); }}><span className={`question-subject-icon ${tone}`} aria-hidden="true"><Icon size={15} strokeWidth={2.25}/></span><strong>{name}</strong></button>)}
+          </div>
+          <div className="question-picker-current"><div><span>Browsing</span><strong>{selectedQuestionSubject}</strong></div><small>{data.bankQuestions.length} loaded</small></div>
+          <form aria-label={`Search ${selectedQuestionSubject} questions`} onSubmit={(event) => { event.preventDefault(); if (organization) void load(organization, questionSearch, selectedQuestionSubject); }}><input value={questionSearch} onChange={(event) => setQuestionSearch(event.target.value)} placeholder={`Search in ${selectedQuestionSubject}`}/><Button variant="outline"><Search size={14} aria-hidden="true"/>Search</Button></form>
+          <div className="question-picker-results">{data.bankQuestions.map((question) => { const added = selectedTestQuestionIds.has(question.id); return <article key={question.id}><div className="question-picker-copy"><Badge variant="neutral">{question.question_type}</Badge><MathText className="question-picker-text">{question.question_text}</MathText><small>{question.chapter} · {question.difficulty} · {question.marks} marks</small></div><Button className={`question-add-button ${added ? "added" : ""}`} variant={added ? "outline" : undefined} disabled={busy || added || !selectedTest || selectedTest.status !== "DRAFT"} onClick={() => void mutate("ADD_QUESTION", { testId: selectedTestId, questionId: question.id })}>{added ? <Check size={14} aria-hidden="true"/> : <Plus size={14} aria-hidden="true"/>}{added ? "Added" : "Add"}</Button></article>; })}</div>
+          {!data.bankQuestions.length && <p className="question-picker-empty">No {selectedQuestionSubject.toLowerCase()} questions match this search.</p>}
+        </aside>}
       </div>
     </DashboardLayout>
   );

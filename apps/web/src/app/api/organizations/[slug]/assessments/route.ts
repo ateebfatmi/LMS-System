@@ -54,6 +54,21 @@ export async function GET(request: Request, context: Context) {
     if (!questionLinks.length && testIds.length) {
       questionLinks = await safeRows(client.from("test_questions").select("id,test_id,question_id,question_order").in("test_id", testIds).order("question_order"));
     }
+    const linkedQuestionIds = [...new Set(questionLinks.flatMap((link) => typeof link.question_id === "string" && link.question_id ? [link.question_id] : []))];
+    const linkedQuestionRows = linkedQuestionIds.length
+      ? await safeRows(client.from("questions").select("id,exam,subject,chapter,topic,difficulty,question_type,question_text,marks,negative_marks").in("id", linkedQuestionIds))
+      : [];
+    const linkedQuestionById = new Map(linkedQuestionRows.map((question) => [String(question.id), question]));
+    const testQuestions = questionLinks.flatMap((link) => {
+      const question = linkedQuestionById.get(String(link.question_id));
+      if (!question) return [];
+      return [{
+        ...question,
+        link_id: link.id,
+        test_id: link.institute_test_id ?? link.test_id,
+        question_order: link.question_order,
+      }];
+    });
     let attempts: Row[] = [];
     let descriptiveSubmissions: Row[] = [];
     if (testIds.length) {
@@ -95,15 +110,18 @@ export async function GET(request: Request, context: Context) {
     }
     let bankQuestions: Row[] = [];
     if (staff) {
-      const search = new URL(request.url).searchParams.get("q")?.trim().slice(0, 100) ?? "";
+      const searchParams = new URL(request.url).searchParams;
+      const search = searchParams.get("q")?.trim().slice(0, 100) ?? "";
+      const subject = searchParams.get("subject")?.trim().slice(0, 120) ?? "";
       let questionQuery = client.from("questions").select("id,exam,subject,chapter,topic,difficulty,question_type,question_text,marks,negative_marks").limit(50);
+      if (subject) questionQuery = questionQuery.eq("subject", subject);
       if (search) questionQuery = questionQuery.ilike("question_text", `%${search}%`);
       bankQuestions = await safeRows(questionQuery);
     }
-    return Response.json({ tests, schedules, questionLinks, attempts, descriptiveSubmissions, batches, bankQuestions, role }, { headers: { "cache-control": "private, no-store" } });
+    return Response.json({ tests, schedules, testQuestions, attempts, descriptiveSubmissions, batches, bankQuestions, role }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Assessment workspace query failed", error);
-    return Response.json({ tests: [], schedules: [], questionLinks: [], attempts: [], descriptiveSubmissions: [], batches: [], bankQuestions: [], role });
+    return Response.json({ tests: [], schedules: [], testQuestions: [], attempts: [], descriptiveSubmissions: [], batches: [], bankQuestions: [], role });
   }
 }
 

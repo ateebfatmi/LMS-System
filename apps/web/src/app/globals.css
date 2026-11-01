@@ -1986,6 +1986,22 @@ button {
   font-weight: 500;
 }
 
+.compact-form > .assignment-datetime-fields {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.assignment-datetime-fields > label,
+.assignment-datetime-fields .pz-datepicker-wrapper,
+.assignment-datetime-fields .pz-datepicker-trigger {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.assignment-datetime-fields .pz-datepicker-wrapper {
+  display: block !important;
+  width: 100% !important;
+}
+
 .assignment-list,
 .submission-review-list {
   display: grid;
@@ -2285,6 +2301,110 @@ button {
   font-weight: 650;
 }
 
+.selected-test-questions {
+  margin: 18px 0 22px;
+  overflow: hidden;
+  border: 1px solid #dfe6ef;
+  border-radius: 13px;
+  background: #fbfcfe;
+}
+
+.selected-test-questions > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid #e5eaf1;
+  background: #f8fafc;
+}
+
+.selected-test-questions > header span {
+  color: #64748b;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.selected-test-questions > header h3 {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.selected-test-questions > header > strong {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  background: #facc15;
+  color: #172033;
+  font-size: 11px;
+}
+
+.selected-test-question-list {
+  max-height: 290px;
+  overflow-y: auto;
+}
+
+.selected-test-question-list article {
+  display: grid;
+  grid-template-columns: 25px minmax(0, 1fr);
+  gap: 10px;
+  padding: 11px 14px;
+  border-top: 1px solid #edf1f5;
+}
+
+.selected-test-question-list article:first-child {
+  border-top: 0;
+}
+
+.selected-test-question-number {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef2f7;
+  color: #475569;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.selected-test-question-text {
+  display: block;
+  color: #172033;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.selected-test-question-list small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.selected-test-questions-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  color: #94a3b8;
+}
+
+.selected-test-questions-empty strong {
+  color: #475569;
+  font-size: 11px;
+}
+
+.selected-test-questions-empty p {
+  margin: 2px 0 0;
+  font-size: 9px;
+}
+
 .assessment-detail > h3 {
   margin: 20px 0 8px;
   font-size: 13px;
@@ -2325,23 +2445,173 @@ button {
 }
 
 .question-picker form {
-  gap: 6px;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.question-picker-heading > span,
+.question-picker-current span {
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.question-picker-heading h2 {
+  margin-top: 4px;
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+
+.question-picker-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.question-subjects {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
   margin: 14px 0;
+}
+
+.question-subjects button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  min-height: 45px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+  color: #334155;
+  text-align: left;
+  cursor: pointer;
+}
+
+.question-subjects button:hover,
+.question-subjects button.active {
+  border-color: #eab308;
+  background: #fffbeb;
+  color: #0f172a;
+}
+
+.question-subjects button.active {
+  box-shadow: 0 0 0 2px rgb(250 204 21 / 14%);
+}
+
+.question-subjects strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.question-subject-icon {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  flex: 0 0 29px;
+  place-items: center;
+  border-radius: 8px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.question-subject-icon.chemistry { background: #dcfce7; color: #15803d; }
+.question-subject-icon.mathematics { background: #fef3c7; color: #b45309; }
+.question-subject-icon.biology { background: #fce7f3; color: #be185d; }
+
+.question-picker-current {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid #e8edf5;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.question-picker-current strong {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.question-picker-current small {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #fff;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
 }
 
 .question-picker form input {
   min-width: 0;
-  min-height: 38px;
+  min-height: 36px;
   flex: 1;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
 }
 
+.question-picker form .pz-button {
+  min-height: 36px;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
 .question-picker article {
   align-items: flex-start;
-  padding: 12px 0;
+  padding: 13px 0;
   border-top: 1px solid var(--line);
+}
+
+.question-picker-copy {
+  min-width: 0;
+}
+
+.question-picker-results {
+  margin-top: 12px;
+}
+
+.question-picker article .question-add-button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  gap: 4px;
+  padding: 7px 9px;
+  border-radius: 9px;
+  font-size: 10px;
+  box-shadow: 0 4px 10px rgb(234 179 8 / 14%);
+}
+
+.question-picker article .question-add-button.added {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #15803d;
+  box-shadow: none;
+  opacity: 1;
+}
+
+.question-picker-empty {
+  margin: 16px 0 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .question-picker article .question-picker-text,
@@ -2350,10 +2620,10 @@ button {
 }
 
 .question-picker article .question-picker-text {
-  margin: 6px 0 4px;
+  margin: 7px 0 5px;
   font-size: 11px;
   font-weight: 700;
-  line-height: 1.45;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
