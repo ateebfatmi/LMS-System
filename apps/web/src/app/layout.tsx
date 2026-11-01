@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://institutes.prepzii.com"),
   title: "PrepZii - LMS",
   description:
-    "The all-in-one multi-tenant coaching management software for JEE, NEET, UPSC & State exam institutes across India. CBT mock simulator, admissions CRM, fee ledgers, and attendance.",
+    "A focused multi-tenant learning-management system for coaching institutes to manage courses, assignments, assessments, attendance, announcements, and academic reports.",
   icons: {
     icon: [
       { url: "/images/branding/prepzii-official-logo.png", type: "image/png" },
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     apple: "/images/branding/prepzii-official-logo.png",
   },
   openGraph: {
-    title: "PrepZii for Institutions | JEE & NEET Learning Management System",
+    title: "PrepZii - LMS for Coaching Institutes",
     description:
       "A calm, focused workspace for coaching institutes and schools to manage batches, faculty, tests, and student analytics.",
     images: ["/images/branding/prepzii-official-logo.png"],

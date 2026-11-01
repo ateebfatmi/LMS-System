@@ -1,4 +1,4 @@
-# ENVIRONMENT VARIABLES REFERENCE
+# Environment variables reference
 
 All variables required to configure and run PrepZii for Institutes across development, staging, and production environments.
 
@@ -17,14 +17,16 @@ All variables required to configure and run PrepZii for Institutes across develo
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | `https://xyz.supabase.co` | Supabase project endpoint. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | `eyJ...` | Supabase anonymous public key (protected by RLS). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | `eyJ...` | Supabase administrative backend access key. |
-| `BACKEND_API_URL` | Yes | `https://api.prepzii.com` | URL of the Python FastAPI microservice. |
-| `RAZORPAY_KEY_ID` | Optional | `rzp_live_...` | Razorpay checkout public key. |
-| `RAZORPAY_KEY_SECRET` | Optional | `live_secret_...` | Razorpay backend API secret. |
-| `RAZORPAY_WEBHOOK_SECRET` | Yes | `whsec_...` | Secret key for verifying webhook HMAC signatures. |
+| `DATABASE_URL` | Migration only | `postgresql://...` | Direct PostgreSQL connection for controlled migration tooling. |
+| `INVITATION_TOKEN_SECRET` | Yes | 32+ random characters | Signs institute invitation tokens. |
+| `PLATFORM_ADMIN_USER_IDS` | Optional | `user_...` | Comma-separated Clerk IDs allowed to use platform administration. |
+| `ALLOW_INSECURE_DEV_AUTH` | Local only | `false` | Enables the isolated demo identity only in local development. Must be false in deployed environments. |
 
 ---
 
-## 2. Python FastAPI Backend (`backend/.env`)
+## 2. Optional backend prototype (`backend/.env`)
+
+The focused LMS uses the Next.js server and shared PrepZii Supabase project as its authoritative runtime. The Python directory is retained as a non-public prototype and is not required for the V1 deployment.
 
 | Variable Name | Required | Default / Example | Purpose |
 |---|---|---|---|
@@ -32,6 +34,3 @@ All variables required to configure and run PrepZii for Institutes across develo
 | `SECRET_KEY` | Yes | Random 64-char hex string | Internal JWT/encryption key. |
 | `DATABASE_URL` | Yes | `postgresql://user:pass@host:5432/db` | Database connection string. |
 | `CORS_ORIGINS` | Yes | `["https://institutes.prepzii.com"]` | Allowed origins for cross-origin requests. |
-| `RAZORPAY_KEY_ID` | Optional | `rzp_live_...` | Razorpay public key. |
-| `RAZORPAY_KEY_SECRET` | Optional | `live_secret_...` | Razorpay API key. |
-| `RAZORPAY_WEBHOOK_SECRET` | Yes | `whsec_...` | Webhook verification secret. |

@@ -15,6 +15,11 @@ function describeDatabaseError(error: unknown): string {
   return "Unknown database error";
 }
 
+function allowsMissingSchemaCompatibility(): boolean {
+  const environment = process.env.DEPLOYMENT_ENV ?? process.env.NODE_ENV ?? "development";
+  return environment !== "production" && environment !== "staging";
+}
+
 /**
  * Resolve a Supabase query without hiding infrastructure or schema failures.
  * A null data value is still allowed for maybeSingle() and empty-result queries.
@@ -27,7 +32,7 @@ export async function requireDatabaseQuery<T>(
   const result = await query;
   if (result.error) {
     const msg = describeDatabaseError(result.error);
-    if (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("relation")) {
+    if (allowsMissingSchemaCompatibility() && (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("relation"))) {
       return fallback;
     }
     throw new Error(`${operation}: ${msg}`);
@@ -43,7 +48,7 @@ export async function requireDatabaseCount(
   const result = await query;
   if (result.error) {
     const msg = describeDatabaseError(result.error);
-    if (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("relation")) {
+    if (allowsMissingSchemaCompatibility() && (msg.includes("schema cache") || msg.includes("does not exist") || msg.includes("relation"))) {
       return fallback;
     }
     throw new Error(`${operation}: ${msg}`);

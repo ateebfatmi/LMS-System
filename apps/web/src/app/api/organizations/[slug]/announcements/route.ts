@@ -1,16 +1,17 @@
 import { z } from "zod";
+import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const uuid = z.uuid();
 const mutationSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("CREATE"), payload: z.object({ title: z.string().trim().min(3).max(180), content: z.string().trim().min(3).max(5000), category: z.enum(["ACADEMIC", "EXAM", "HOLIDAY", "FEE", "GENERAL"]), priority: z.enum(["NORMAL", "HIGH", "URGENT"]), targetAudience: z.enum(["ALL", "BATCH", "FACULTY", "PARENTS"]), batchId: uuid.nullable(), status: z.enum(["DRAFT", "PUBLISHED"]), channels: z.array(z.enum(["PORTAL", "EMAIL", "SMS", "WHATSAPP"])).min(1).max(4) }) }),
+  z.object({ action: z.literal("CREATE"), payload: z.object({ title: z.string().trim().min(3).max(180), content: z.string().trim().min(3).max(5000), category: z.enum(["ACADEMIC", "EXAM", "HOLIDAY", "GENERAL"]), priority: z.enum(["NORMAL", "HIGH", "URGENT"]), targetAudience: z.enum(["ALL", "BATCH", "FACULTY"]), batchId: uuid.nullable(), status: z.enum(["DRAFT", "PUBLISHED"]), channels: z.tuple([z.literal("PORTAL")]) }) }),
   z.object({ action: z.literal("PUBLISH"), payload: z.object({ announcementId: uuid }) }),
   z.object({ action: z.literal("MARK_READ"), payload: z.object({ notificationId: uuid }) }),
 ]);
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
-async function safeMany(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> { try { const result = await query; if (result.error) return []; return result.data ?? []; } catch { return []; } }
+async function safeMany(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> { return requireDatabaseQuery(query, [], "Load announcement workspace"); }
 
 export async function GET(_request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug); if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
@@ -21,18 +22,14 @@ export async function GET(_request: Request, context: Context) {
     let allowedBatchIds = new Set<string>();
     if (["STUDENT", "TEACHER"].includes(role)) { const memberships = await safeMany(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId)); allowedBatchIds = new Set(memberships.map((row) => String(row.batch_id))); }
     if (role === "STUDENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && (item.target_audience === "ALL" || (item.target_audience === "BATCH" && allowedBatchIds.has(String(item.batch_id)))));
-    else if (role === "PARENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && ["ALL", "PARENTS"].includes(String(item.target_audience)));
     else if (role === "TEACHER") announcements = announcements.filter((item) => item.status === "PUBLISHED" || item.created_by === userId);
-    let batches = role === "STUDENT" || role === "PARENT" ? [] : await safeMany(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
-    if (!batches.length && role !== "STUDENT" && role !== "PARENT") {
+    let batches = role === "STUDENT" ? [] : await safeMany(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+    if (!batches.length && role !== "STUDENT") {
       batches = await safeMany(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
     }
-    const [notifications, deliveries] = await Promise.all([
-      safeMany(client.from("organization_notifications").select("id,announcement_id,kind,title,body,action_url,read_at,created_at").eq("organization_id", organizationId).eq("recipient_user_id", userId).order("created_at", { ascending: false }).limit(100)),
-      ["OWNER", "COACHING_ADMIN"].includes(role) ? safeMany(client.from("organization_delivery_jobs").select("id,announcement_id,channel,status,provider,recipient_count,delivered_count,failed_count,last_error,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(100)) : Promise.resolve([]),
-    ]);
-    return Response.json({ role, announcements, notifications, batches, deliveries }, { headers: { "cache-control": "private, no-store" } });
-  } catch (error) { console.error("Announcement workspace query failed", error); return Response.json({ role, announcements: [], notifications: [], batches: [], deliveries: [] }); }
+    const notifications = await safeMany(client.from("organization_notifications").select("id,announcement_id,kind,title,body,action_url,read_at,created_at").eq("organization_id", organizationId).eq("recipient_user_id", userId).order("created_at", { ascending: false }).limit(100));
+    return Response.json({ role, announcements, notifications, batches }, { headers: { "cache-control": "private, no-store" } });
+  } catch (error) { console.error("Announcement workspace query failed", error); return Response.json({ error: "Announcements are temporarily unavailable." }, { status: 503 }); }
 }
 
 export async function POST(request: Request, context: Context) {

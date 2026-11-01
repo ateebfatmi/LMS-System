@@ -30,19 +30,17 @@ test("rejects development authentication and test identity keys in production", 
   assert.match(result.errors.join(" "), /Clerk test/);
 });
 
-test("rejects insecure and partial provider configuration", () => {
+test("rejects insecure provider configuration", () => {
   const result = validateEnvironment({
     ...production,
     NEXT_PUBLIC_APP_URL: "http://localhost:3000",
     NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
     INVITATION_TOKEN_SECRET: "short",
-    RAZORPAY_KEY_ID: "rzp_live_example",
   });
   assert.equal(result.isConfigured, false);
   assert.match(result.errors.join(" "), /HTTPS/);
   assert.match(result.errors.join(" "), /local Supabase/);
   assert.match(result.errors.join(" "), /32 characters/);
-  assert.match(result.errors.join(" "), /partial/);
 });
 
 test("allows an intentionally unconfigured local development environment", () => {

@@ -12,7 +12,7 @@
 | **API Availability** | 99.9% uptime | Synthetics pinging `/api/v1/health` and `/api/health` every 60s |
 | **API Latency (p95)** | < 250ms | HTTP request logging via middleware |
 | **Exam Evaluation Latency** | < 150ms per submission | Fast scoring microservice timer |
-| **Webhook Delivery & Idempotency** | 99.99% successful processing | Razorpay webhook event delivery dashboard |
+| **Assessment submission success** | 99.9% successful processing | Attempt API status and error-rate telemetry |
 | **Tenant Isolation Breaches** | Zero (0.00%) | Immediate P0 alert on any 403 authorization breach anomalies |
 
 ---
@@ -43,9 +43,9 @@
 1. **Database Disconnected (`503 Service Unavailable`):**
    - Severity: **P0 (Critical)**
    - Action: Check Supabase DB compute and connection pooler (PgBouncer/Supavisor).
-2. **Webhook Verification Failures (`401 Unauthorized` spike):**
+2. **Authentication or authorization failures (`401`/`403` spike):**
    - Severity: **P1 (High)**
-   - Action: Verify `RAZORPAY_WEBHOOK_SECRET` matches the active webhook configuration in Razorpay Dashboard.
+   - Action: Check Clerk verification, membership resolution, origin controls, and possible abuse.
 3. **High HTTP 5xx Error Rate (> 1% in 5 minutes):**
    - Severity: **P1 (High)**
    - Action: Inspect application crash traces in logging platform (Sentry / CloudWatch).

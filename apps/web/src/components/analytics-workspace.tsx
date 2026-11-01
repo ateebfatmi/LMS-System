@@ -7,12 +7,11 @@ import { DashboardLayout, type AppRole } from "@/components/dashboard-layout";
 import { resolveActiveOrganization } from "@/lib/client-org";
 
 type Organization = { name: string; slug: string };
-type Summary = { students: number | null; activeBatches: number; attendanceRate: number | null; assessmentAverage: number | null; assignments: number; submittedAssignments: number; feeCollectedPaise: number | null; feeOutstandingPaise: number | null };
+type Summary = { students: number | null; activeBatches: number; attendanceRate: number | null; assessmentAverage: number | null; assignments: number; submittedAssignments: number };
 type Data = { role: string; summary: Summary; batches: { id: string; name: string; target_exam: string; grade_level: string | null; student_count: number }[]; attendanceTrend: { date: string; rate: number }[]; attempts: { id: string; percentage: number | string | null; submitted_at: string | null }[]; assignments: { id: string; title: string; status: string; due_at: string }[] };
-const empty: Data = { role: "", summary: { students: null, activeBatches: 0, attendanceRate: null, assessmentAverage: null, assignments: 0, submittedAssignments: 0, feeCollectedPaise: null, feeOutstandingPaise: null }, batches: [], attendanceTrend: [], attempts: [], assignments: [] };
-const money = (paise: number | null) => paise === null ? "Restricted" : new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(paise / 100);
+const empty: Data = { role: "", summary: { students: null, activeBatches: 0, attendanceRate: null, assessmentAverage: null, assignments: 0, submittedAssignments: 0 }, batches: [], attendanceTrend: [], attempts: [], assignments: [] };
 const display = (value: number | null, suffix = "") => value === null ? "No data" : `${value}${suffix}`;
-const appRole = (role: string): AppRole => role === "STUDENT" ? "STUDENT" : role === "PARENT" ? "PARENT" : role === "TEACHER" ? "FACULTY" : role === "ACADEMIC_COORDINATOR" ? "COORDINATOR" : role === "ACCOUNTANT" ? "ACCOUNTANT" : "DIRECTOR";
+const appRole = (role: string): AppRole => role === "STUDENT" || role === "PARENT" || role === "ACCOUNTANT" ? "STUDENT" : role === "TEACHER" ? "FACULTY" : role === "ACADEMIC_COORDINATOR" ? "COORDINATOR" : "DIRECTOR";
 
 export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolean }) {
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -74,7 +73,7 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
   }
 
   const submissionRate = data.summary.assignments ? Math.min(100, Math.round(data.summary.submittedAssignments / data.summary.assignments * 100)) : 0;
-  const title = reportMode ? "Reports & analytics" : data.role === "STUDENT" ? "My learning overview" : data.role === "TEACHER" ? "My teaching overview" : data.role === "ACCOUNTANT" ? "Finance overview" : "Institute overview";
+  const title = reportMode ? "Reports & analytics" : data.role === "STUDENT" ? "My learning overview" : data.role === "TEACHER" ? "My teaching overview" : "Institute overview";
   return <DashboardLayout title={title} subtitle={`${organization?.name ?? "Institute"} · Live, role-scoped operational data`} currentRole={appRole(data.role)} action={reportMode && data.batches.length ? <Button onClick={exportCsv}>Download batch CSV</Button> : undefined}>
     {error && <div className="form-error directory-error" role="alert">{error}</div>}
     {loading ? <p className="empty-state">Loading tenant analytics…</p> : <>
@@ -83,11 +82,9 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
         <MetricCard label="Attendance" value={display(data.summary.attendanceRate, "%")} detail="Visible recorded sessions" accent="green"/>
         <MetricCard label="Assessment average" value={display(data.summary.assessmentAverage, "%")} detail="Submitted visible attempts" accent="navy"/>
         <MetricCard label="Assignment submissions" value={String(data.summary.submittedAssignments)} detail={`${data.summary.assignments} visible assignments`} accent="blue"/>
-        {data.summary.feeCollectedPaise !== null && <MetricCard label="Fees collected" value={money(data.summary.feeCollectedPaise)} detail={`${money(data.summary.feeOutstandingPaise)} outstanding`} accent="orange"/>}
       </div>
-      {data.role === "PARENT" && <Panel title="Guardian access pending"><p className="empty-state">Attendance, fees and results remain private until a reviewed guardian–student relationship is configured.</p></Panel>}
       <div className="dashboard-grid">
-        <Panel title="Attendance trend" action={<Link className="text-link" href="/dashboard/attendance">Open register →</Link>}><div className="analytics-trend">{data.attendanceTrend.map((point) => <div key={point.date}><span title={`${point.rate}%`} style={{ height: `${Math.max(3, point.rate)}%` }}/><small>{new Date(`${point.date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</small></div>)}{!data.attendanceTrend.length && <p className="empty-state">No visible attendance sessions yet.</p>}</div></Panel>
+        <Panel title="Attendance trend" action={<Link className="text-link" href="/dashboard/attendance/workspace">Open register →</Link>}><div className="analytics-trend">{data.attendanceTrend.map((point) => <div key={point.date}><span title={`${point.rate}%`} style={{ height: `${Math.max(3, point.rate)}%` }}/><small>{new Date(`${point.date}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}</small></div>)}{!data.attendanceTrend.length && <p className="empty-state">No visible attendance sessions yet.</p>}</div></Panel>
         <Panel title="Assignment completion"><div className="analytics-completion"><strong>{submissionRate}%</strong><ProgressBar value={submissionRate} variant={submissionRate >= 75 ? "success" : "warning"}/><small>Submission records across assignments visible to your role.</small></div></Panel>
       </div>
       <div className="dashboard-grid">

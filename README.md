@@ -1,6 +1,6 @@
 # PrepZii LMS
 
-PrepZii LMS is a separate multi-tenant B2B learning and institute-management application for Indian schools, coaching institutes, and tutors. It shares selected PrepZii infrastructure—Clerk identity, the canonical Supabase tenant/question data, assessment rules, storage, and Gemini configuration—without importing the consumer web application.
+PrepZii LMS is a separate multi-tenant B2B learning-management application for Indian schools, coaching institutes, and tutors. It shares selected PrepZii infrastructure—Clerk identity, the canonical Supabase tenant/question data, assessment rules, and storage—without importing the consumer web application.
 
 The repository is an implementation candidate for isolated staging. It is **not yet approved for production or paying customers**; see [Production readiness](docs/PRODUCTION_READINESS.md).
 
@@ -8,16 +8,14 @@ The repository is an implementation candidate for isolated staging. It is **not 
 
 - Tenant onboarding, active-institute selection, memberships, hashed invitations, and CSV imports.
 - Permission-based server authorization, RLS migrations, composite tenant constraints, and audit records.
-- Student/faculty directories, academic years, campuses, rooms, courses, batches, enrolment, and conflict-safe timetable slots.
+- Student/faculty directories, academic years, courses, batches, and enrolment.
 - Private learning resources, signed downloads, lesson progress, assignments, submissions, feedback, and grading.
 - PrepZii question/test reuse, server-timed objective attempts, autosave, scoring, and result/solution release controls.
 - Session attendance with assigned-teacher scope and immutable correction history.
-- Institute fee plans, instalments, concessions, invoices, manual payments/refunds, and separate SaaS subscription controls.
-- Portal announcements/notifications and quota-metered, review-only Gemini drafts.
-- Role-scoped dashboards/reports and owner/admin-only audited admissions CRM.
-- Server-allowlisted platform administration, entitlements, branding, quotas, and feature flags.
+- Portal announcements and role-scoped dashboards/reports.
+- Institute subscription controls and server-allowlisted platform administration.
 
-External delivery, payment reconciliation, parent data, subjective grading, PDF documents, and staging verification are explicitly gated—not simulated.
+Admissions CRM, institute fee accounting, OMR scanning, parent portals, doubt workflows, speculative AI features, advanced campus scheduling, external messaging, and payment collection are outside the focused V1 product. Historical additive database migrations remain immutable, but retired modules are not exposed by the web application. See [Product scope](docs/PRODUCT_SCOPE.md).
 
 ## Repository layout
 
@@ -27,7 +25,7 @@ packages/authorization/  Shared permission evaluation
 packages/assessment-core Shared deterministic objective scoring
 packages/contracts/      Shared domain contracts
 packages/learning/       Learning validation and release rules
-packages/membership/     Invitation and CSV rules
+packages/membership/     Focused invitation and CSV rules
 packages/ui/             Shared UI primitives
 supabase/migrations/     Additive LMS migrations (0001–0018)
 supabase/tests/          Transactional tenant-isolation test
@@ -60,6 +58,7 @@ Copy `.env.example` to `.env.local` for local configuration. Never commit real c
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Product scope](docs/PRODUCT_SCOPE.md)
 - [Codebase audit](docs/CODEBASE_AUDIT.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Phase 8 staging handoff](docs/PHASE_8_READINESS.md)

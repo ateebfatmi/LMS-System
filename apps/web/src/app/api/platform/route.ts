@@ -113,11 +113,8 @@ const mutationSchema = z.discriminatedUnion("action", [
       role: z.enum([
         "OWNER",
         "COACHING_ADMIN",
-        "ACADEMIC_COORDINATOR",
         "TEACHER",
-        "ACCOUNTANT",
         "STUDENT",
-        "PARENT",
       ]),
       status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).default("ACTIVE"),
     }),
@@ -130,11 +127,8 @@ const mutationSchema = z.discriminatedUnion("action", [
       role: z.enum([
         "OWNER",
         "COACHING_ADMIN",
-        "ACADEMIC_COORDINATOR",
         "TEACHER",
-        "ACCOUNTANT",
         "STUDENT",
-        "PARENT",
       ]),
       status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]),
     }),
@@ -151,14 +145,6 @@ const mutationSchema = z.discriminatedUnion("action", [
     payload: z.object({
       organizationId: z.string().uuid(),
       decision: z.enum(["APPROVE", "REJECT"]),
-    }),
-  }),
-  z.object({
-    action: z.literal("RESET_USAGE_COUNTER"),
-    payload: z.object({
-      organizationId: z.string().uuid(),
-      metric: z.enum(["AI_CREDITS", "STORAGE_BYTES", "EMAILS", "SMS", "WHATSAPP"]),
-      newQuantity: z.number().int().min(0).default(0),
     }),
   }),
   z.object({
@@ -189,7 +175,7 @@ const mutationSchema = z.discriminatedUnion("action", [
       title: z.string().trim().min(3).max(200),
       content: z.string().trim().min(5).max(4000),
       priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("HIGH"),
-      targetAudience: z.enum(["ALL", "STUDENTS", "TEACHERS", "PARENTS"]).default("ALL"),
+      targetAudience: z.enum(["ALL", "STUDENTS", "TEACHERS"]).default("ALL"),
     }),
   }),
   z.object({
@@ -245,11 +231,9 @@ export async function GET() {
       members,
       profiles,
       batches,
-      usageCounters,
       brandings,
       demoRequests,
       supportRequests,
-      aiDrafts,
     ] = await Promise.all([
       safeMany(
         client
@@ -309,11 +293,6 @@ export async function GET() {
       safeMany(client.from("organization_batches").select("organization_id,is_active")),
       safeMany(
         client
-          .from("organization_usage_counters")
-          .select("organization_id,metric,period_start,period_end,quantity,updated_at")
-      ),
-      safeMany(
-        client
           .from("organization_branding")
           .select(
             "organization_id,logo_url,primary_color,support_email,support_phone,subdomain,subdomain_verified_at"
@@ -335,13 +314,6 @@ export async function GET() {
           .order("created_at", { ascending: false })
           .limit(100)
       ),
-      safeMany(
-        client
-          .from("organization_ai_drafts")
-          .select("id,organization_id,feature,status,model,created_by,created_at")
-          .order("created_at", { ascending: false })
-          .limit(100)
-      ),
     ]);
 
     // Count canonical questions safely
@@ -354,14 +326,6 @@ export async function GET() {
     const dbLatencyMs = Date.now() - startTime;
 
     const counts = institutes.map((institute) => {
-      const orgUsage = usageCounters.filter((u) => u.organization_id === institute.id);
-      const aiUsed = orgUsage
-        .filter((u) => u.metric === "AI_CREDITS")
-        .reduce((acc, u) => acc + Number(u.quantity ?? 0), 0);
-      const storageBytes = orgUsage
-        .filter((u) => u.metric === "STORAGE_BYTES")
-        .reduce((acc, u) => acc + Number(u.quantity ?? 0), 0);
-
       return {
         organizationId: institute.id,
         activeStudents: members.filter(
@@ -373,8 +337,6 @@ export async function GET() {
         activeBatches: batches.filter(
           (b) => b.organization_id === institute.id && b.is_active
         ).length,
-        aiCreditsUsed: aiUsed,
-        storageBytesUsed: storageBytes,
       };
     });
 
@@ -397,8 +359,6 @@ export async function GET() {
       databaseStatus: "OPERATIONAL",
       databaseLatencyMs: dbLatencyMs,
       storageStatus: "OPERATIONAL",
-      aiModelStatus: "OPERATIONAL",
-      aiModelName: process.env.ZI_AI_MODEL || "gemini-2.5-flash",
       environment: process.env.NODE_ENV || "development",
       questionBankCount,
     };
@@ -413,11 +373,9 @@ export async function GET() {
         audits,
         counts,
         members: enrichedMembers,
-        usageCounters,
         brandings,
         demoRequests,
         supportRequests,
-        aiDrafts,
         systemHealth,
       },
       { headers: { "cache-control": "private, no-store" } }
@@ -823,36 +781,6 @@ export async function POST(request: Request) {
       });
 
       return Response.json({ result: { organizationId, decision } });
-    }
-
-    // 9. RESET_USAGE_COUNTER
-    if (parsed.data.action === "RESET_USAGE_COUNTER") {
-      const { organizationId, metric, newQuantity } = parsed.data.payload;
-      const now = new Date();
-      const periodStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-      const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10);
-
-      await client.from("organization_usage_counters").upsert(
-        {
-          organization_id: organizationId,
-          metric,
-          period_start: periodStart,
-          period_end: periodEnd,
-          quantity: newQuantity,
-          updated_at: now.toISOString(),
-        },
-        { onConflict: "organization_id,metric,period_start" }
-      );
-
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
-        target_organization_id: organizationId,
-        action: "reset_usage_counter",
-        details: { metric, newQuantity },
-      });
-
-      return Response.json({ result: { organizationId, metric, newQuantity } });
     }
 
     // 10. DEMO REQUESTS MANAGEMENT & 1-CLICK PROVISIONING

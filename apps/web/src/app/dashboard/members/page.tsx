@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 
@@ -15,12 +16,9 @@ type Invitation = {
 };
 
 const roles = [
+  ["COACHING_ADMIN", "Institute administrator"],
   ["TEACHER", "Teacher"],
   ["STUDENT", "Student"],
-  ["ACADEMIC_COORDINATOR", "Academic coordinator"],
-  ["ACCOUNTANT", "Accountant"],
-  ["PARENT", "Parent"],
-  ["COACHING_ADMIN", "Coaching admin"],
 ] as const;
 
 export default function MembersPage() {
@@ -90,7 +88,11 @@ export default function MembersPage() {
   }
 
   return (
-    <DashboardLayout title="Members & invitations" subtitle={organization ? `${organization.name} · Access management` : "Select an institute"}>
+    <DashboardLayout
+      title="Settings & access"
+      subtitle={organization ? `${organization.name} · Members, roles and subscription` : "Select an institute"}
+      action={<Link className="pz-button pz-button-outline" href="/dashboard/billing">Subscription</Link>}
+    >
       <div className="members-grid">
         <section className="panel invitation-panel">
           <h2>Invite a member</h2>

@@ -43,7 +43,6 @@ const createMemberSchema = z.object({
   qualification: z.string().trim().max(240).nullable().default(null),
   subjectSpecialization: z.string().trim().max(240).nullable().default(null),
   joinedOn: z.iso.date().nullable().default(null),
-  leadId: z.uuid().nullable().optional(),
 });
 type Context = { params: Promise<{ slug: string }> };
 type MemberRow = {
@@ -363,22 +362,12 @@ export async function POST(request: Request, context: Context) {
     }, { onConflict: "batch_id,user_id" });
   }
 
-  // If converting from an Admissions CRM lead, mark the lead as CONVERTED
-  if (value.leadId && memberId) {
-    await client.from("organization_leads").update({
-      stage: "CONVERTED",
-      converted_student_id: memberId,
-      converted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq("id", value.leadId).eq("organization_id", organizationId);
-  }
-
   // Audit log
   await client.from("organization_audit_logs").insert({
     organization_id: organizationId,
     actor_user_id: resolved.context.userId,
     actor_role: resolved.context.role,
-    action: value.leadId ? "lead.converted_to_student" : "member.enrolled",
+    action: "member.enrolled",
     entity_type: "institute_member",
     entity_id: memberId,
     after_state: {
@@ -387,7 +376,6 @@ export async function POST(request: Request, context: Context) {
       email: value.email,
       batchId: value.batchId,
       rollNumber: value.rollNumber,
-      leadId: value.leadId,
     },
   });
 

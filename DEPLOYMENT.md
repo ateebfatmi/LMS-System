@@ -8,7 +8,6 @@ This guide prepares an isolated staging deployment. It does not authorize a prod
 - A Clerk test instance or isolated test users in the shared instance
 - A disposable Supabase/PostgreSQL clone of the actual PrepZii schema
 - A private deployment target for the Next.js application
-- Optional provider sandbox credentials for Razorpay and Gemini
 
 The FastAPI directory is an optional prototype, not the authoritative public API. Do not deploy it unless a reviewed server-to-server use case requires it and `INTERNAL_API_KEY` is set.
 
@@ -27,12 +26,9 @@ Required for the core application:
 - `DATABASE_URL` for controlled migration tooling only
 - `INVITATION_TOKEN_SECRET`
 
-Optional, feature-gated values:
+Optional:
 
 - `PLATFORM_ADMIN_USER_IDS`
-- `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`
-- `GEMINI_API_KEY`, `ZI_AI_MODEL`
-- `FASTAPI_INTERNAL_URL`, `INTERNAL_API_KEY`
 
 Do not use production provider credentials during the staging rehearsal.
 
@@ -65,12 +61,6 @@ psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/tenant_isolation.
 7. Review locks, query plans, RLS policies, audit rows, storage policies, and rollback duration.
 
 Do not use `supabase db push` against the shared production project until this rehearsal is signed off. Migrations are forward-only; recovery uses the verified database backup plus a reviewed corrective migration.
-
-## Provider verification
-
-- Register the exact staging Razorpay webhook URL and secret. Verify HMAC failures, replay idempotency, amount/currency checks, and delayed events before enabling any ledger transition.
-- Use a Gemini test key. Confirm structured-output validation, timeouts, redacted logs, quota idempotency, and the policy for failed calls.
-- Leave email/SMS/WhatsApp jobs in `BLOCKED_CONFIG` until an adapter, consent model, suppression list, retries, and delivery receipts are tested.
 
 ## Promotion
 

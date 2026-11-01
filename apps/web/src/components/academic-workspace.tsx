@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Badge, Button, DatePicker, MetricCard, Select, TimePicker } from "@prepzii/ui";
+import { Badge, Button, DatePicker, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
 
-type View = "BATCHES" | "COURSES" | "CAMPUSES";
+type View = "BATCHES" | "COURSES";
 type Organization = { name: string; slug: string };
 type Data = {
   academicYears: Record<string, unknown>[]; campuses: Record<string, unknown>[]; batches: Record<string, unknown>[];
@@ -57,16 +57,15 @@ export function AcademicWorkspace({ view }: { view: View }) {
     if (await mutate(action, builder(new FormData(event.currentTarget)))) event.currentTarget.reset();
   }
 
-  const title = view === "BATCHES" ? "Batches & enrolments" : view === "COURSES" ? "Courses & subjects" : "Campuses & timetable";
+  const title = view === "BATCHES" ? "Batches & enrolments" : "Courses & subjects";
   return (
     <DashboardLayout title={title} subtitle={`${organization?.name ?? "Institute"} · Authoritative academic operations`}>
       <nav className="academic-workspace-nav" aria-label="Academic workspace sections">
         <Link className={view === "BATCHES" ? "active" : ""} href="/dashboard/batches/workspace">Batches & enrolments</Link>
-        <Link className={view === "CAMPUSES" ? "active" : ""} href="/dashboard/campuses">Campuses & timetable</Link>
+        <Link className={view === "COURSES" ? "active" : ""} href="/dashboard/courses">Courses & materials</Link>
       </nav>
       <div className="metrics-grid academic-metrics">
         <MetricCard label="Academic sessions" value={String(data.academicYears.length)} detail="Configured years" accent="yellow" />
-        <MetricCard label="Campuses" value={String(data.campuses.length)} detail={`${data.rooms.length} rooms`} accent="navy" />
         <MetricCard label="Batches" value={String(data.batches.length)} detail={`${data.students.length} active students`} accent="green" />
         <MetricCard label="Courses" value={String(data.courses.length)} detail={`${data.subjects.length} subjects`} accent="blue" />
       </div>
@@ -84,15 +83,10 @@ export function AcademicWorkspace({ view }: { view: View }) {
             <form onSubmit={(e) => void submit(e, "CREATE_SUBJECT", (f) => ({ name: value(f,"name"), code: value(f,"code") || null }))} className="compact-form"><h3>Subject</h3><input name="name" required placeholder="Physics"/><input name="code" placeholder="PHY"/><Button disabled={busy}>Create subject</Button></form>
             <form onSubmit={(e) => void submit(e, "CREATE_COURSE", (f) => ({ title: value(f,"title"), description: value(f,"description") || null, subjectId: value(f,"subjectId") || null }))} className="compact-form"><h3>Draft course</h3><input name="title" required placeholder="JEE Electrodynamics"/><Select name="subjectId" defaultValue=""><option value="">No subject</option>{data.subjects.map((x) => <option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</Select><textarea name="description" placeholder="Course description"/><Button disabled={busy}>Create draft</Button></form>
           </>}
-          {view === "CAMPUSES" && <>
-            <form onSubmit={(e) => void submit(e, "CREATE_CAMPUS", (f) => ({ name: value(f,"name"), address: { city: value(f,"city"), state: value(f,"state") } }))} className="compact-form"><h3>Campus</h3><input name="name" required placeholder="North Campus"/><div><input name="city" placeholder="Kota"/><input name="state" placeholder="Rajasthan"/></div><Button disabled={busy}>Create campus</Button></form>
-            <form onSubmit={(e) => void submit(e, "CREATE_ROOM", (f) => ({ campusId: value(f,"campusId"), name: value(f,"name"), capacity: Number(value(f,"capacity")), facilities: [] }))} className="compact-form"><h3>Room</h3><Select name="campusId" required placeholder="Choose campus"><option value="">Choose campus</option>{data.campuses.map((x) => <option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</Select><input name="name" required placeholder="Hall 101"/><input name="capacity" required type="number" min="1" placeholder="Capacity"/><Button disabled={busy}>Create room</Button></form>
-            <form onSubmit={(e) => void submit(e, "CREATE_SCHEDULE", (f) => ({ roomId: value(f,"roomId"), batchId: value(f,"batchId"), facultyMemberId: value(f,"facultyMemberId"), subject: value(f,"subject"), dayOfWeek: value(f,"dayOfWeek"), startsAt: value(f,"startsAt"), endsAt: value(f,"endsAt") }))} className="compact-form"><h3>Timetable slot</h3><Select name="roomId" required placeholder="Choose room"><option value="">Choose room</option>{data.rooms.map((x) => <option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</Select><Select name="batchId" required placeholder="Choose batch"><option value="">Choose batch</option>{data.batches.map((x) => <option key={String(x.id)} value={String(x.id)}>{String(x.name)}</option>)}</Select><Select name="facultyMemberId" required placeholder="Choose faculty"><option value="">Choose faculty</option>{data.faculty.map((x) => <option key={String(x.member_id)} value={String(x.member_id)}>{String(x.display_name)}</option>)}</Select><input name="subject" required placeholder="Physics"/><Select name="dayOfWeek" defaultValue="MON"><option value="MON">MON</option><option value="TUE">TUE</option><option value="WED">WED</option><option value="THU">THU</option><option value="FRI">FRI</option><option value="SAT">SAT</option><option value="SUN">SUN</option></Select><div><TimePicker name="startsAt" required placeholder="Starts at" /><TimePicker name="endsAt" required placeholder="Ends at" /></div><Button disabled={busy}>Schedule class</Button></form>
-          </>}
         </section>
 
         <section className="panel academic-records">
-          <h2>{view === "BATCHES" ? "Current batches" : view === "COURSES" ? "Course catalogue" : "Rooms & weekly timetable"}</h2>
+          <h2>{view === "BATCHES" ? "Current batches" : "Course catalogue"}</h2>
           {view === "BATCHES" && data.batches.map((x) => (
             <article key={String(x.id)}>
               <div>
@@ -103,8 +97,7 @@ export function AcademicWorkspace({ view }: { view: View }) {
             </article>
           ))}
           {view === "COURSES" && data.courses.map((x) => <article key={String(x.id)}><div><strong>{String(x.title)}</strong><small>{String(x.description ?? "No description")}</small></div><Badge variant="neutral">{String(x.status)}</Badge></article>)}
-          {view === "CAMPUSES" && <>{data.rooms.map((x) => <article key={String(x.id)}><div><strong>{String(x.name)}</strong><small>Capacity {String(x.capacity)} · {String(x.status)}</small></div></article>)}<h3>Schedule</h3>{data.schedules.map((x) => <article key={String(x.id)}><div><strong>{String(x.day_of_week)} · {String(x.time_slot)}</strong><small>{String(x.subject)} · {String(data.batches.find((b) => b.id === x.batch_id)?.name ?? "Batch")}</small></div></article>)}</>}
-          {((view === "BATCHES" && !data.batches.length) || (view === "COURSES" && !data.courses.length) || (view === "CAMPUSES" && !data.rooms.length)) && <p className="empty-state">No records yet. Use the forms to create the first one.</p>}
+          {((view === "BATCHES" && !data.batches.length) || (view === "COURSES" && !data.courses.length)) && <p className="empty-state">No records yet. Use the forms to create the first one.</p>}
         </section>
       </div>
     </DashboardLayout>

@@ -11,25 +11,19 @@ import {
   CalendarCheck2,
   ClipboardCheck,
   ClipboardPenLine,
-  ContactRound,
-  Gem,
   GraduationCap,
-  IndianRupee,
   LayoutDashboard,
-  LifeBuoy,
   Menu,
-  MessagesSquare,
-  Printer,
   School,
+  Settings,
   UserCog,
-  UsersRound,
   type LucideIcon,
 } from "lucide-react";
 import { PrepziiMark } from "@prepzii/ui";
 import { DashboardSidebar } from "@/components/ui/dashboard-sidebar";
 import { resolveActiveOrganization } from "@/lib/client-org";
 
-export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT" | "ACCOUNTANT";
+export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT";
 
 let rememberedSidebarCollapsed = false;
 let rememberedMembershipRole: AppRole = "DIRECTOR";
@@ -38,78 +32,50 @@ let rememberedOrganizationStatus: "checking" | "available" | "missing" = "checki
 const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideIcon }[]> = {
   DIRECTOR: [
     { href: "/dashboard/workspace", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/crm", label: "Admissions", icon: ContactRound },
     { href: "/dashboard/students/workspace", label: "Students", icon: GraduationCap },
     { href: "/dashboard/teachers", label: "Faculty", icon: UserCog },
-    { href: "/dashboard/batches/workspace", label: "Batches & Academics", icon: School },
-    { href: "/dashboard/courses", label: "Courses", icon: BookOpen },
+    { href: "/dashboard/batches/workspace", label: "Batches & Courses", icon: School },
     { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
-    { href: "/dashboard/doubts", label: "Doubt Desk", icon: MessagesSquare },
     { href: "/dashboard/assessments/workspace", label: "Assessments", icon: ClipboardCheck },
-    { href: "/dashboard/omr", label: "OMR Generator & Scan", icon: Printer },
     { href: "/dashboard/attendance/workspace", label: "Attendance", icon: CalendarCheck2 },
-    { href: "/dashboard/fees/workspace", label: "Fees", icon: IndianRupee },
     { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
     { href: "/dashboard/reports/workspace", label: "Reports", icon: BarChart3 },
-    { href: "/dashboard/student-success", label: "Student Success", icon: LifeBuoy },
-    { href: "/dashboard/members", label: "Members & Access", icon: UsersRound },
-    { href: "/dashboard/billing", label: "Subscription", icon: Gem },
+    { href: "/dashboard/members", label: "Settings", icon: Settings },
   ],
   FACULTY: [
     { href: "/dashboard/workspace", label: "My Overview", icon: LayoutDashboard },
     { href: "/dashboard/batches/workspace", label: "My Batches", icon: School },
-    { href: "/dashboard/attendance/workspace", label: "Mark Attendance", icon: CalendarCheck2 },
-    { href: "/dashboard/courses", label: "Upload DPPs & Notes", icon: BookOpen },
-    { href: "/dashboard/assignments", label: "Assignments & Grading", icon: ClipboardPenLine },
-    { href: "/dashboard/doubts", label: "Doubt Desk", icon: MessagesSquare },
-    { href: "/dashboard/assessments/workspace", label: "Create & Evaluate Tests", icon: ClipboardCheck },
-    { href: "/dashboard/omr", label: "OMR Generator & Scan", icon: Printer },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
-    { href: "/dashboard/reports/workspace", label: "Batch Performance", icon: BarChart3 },
-    { href: "/dashboard/student-success", label: "Student Success", icon: LifeBuoy },
+    { href: "/dashboard/courses", label: "Courses & Materials", icon: BookOpen },
+    { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
+    { href: "/dashboard/assessments/workspace", label: "Assessments", icon: ClipboardCheck },
+    { href: "/dashboard/attendance/workspace", label: "Attendance", icon: CalendarCheck2 },
+    { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
   ],
   STUDENT: [
-    { href: "/dashboard/workspace", label: "My Learning Dashboard", icon: LayoutDashboard },
-    { href: "/dashboard/assessments/workspace", label: "CBT Mock Tests & PYQs", icon: ClipboardCheck },
-    { href: "/dashboard/courses", label: "My Courses & DPPs", icon: BookOpen },
+    { href: "/dashboard/workspace", label: "Home", icon: LayoutDashboard },
+    { href: "/dashboard/courses", label: "My Courses", icon: BookOpen },
     { href: "/dashboard/assignments", label: "My Assignments", icon: ClipboardPenLine },
-    { href: "/dashboard/doubts", label: "Ask a Doubt", icon: MessagesSquare },
-    { href: "/dashboard/fees/workspace", label: "My Fee Installments", icon: IndianRupee },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
-    { href: "/dashboard/attendance/workspace", label: "My Attendance Log", icon: CalendarCheck2 },
-    { href: "/dashboard/student-success", label: "My Success Plan", icon: LifeBuoy },
-  ],
-  PARENT: [
-    { href: "/dashboard/workspace", label: "Guardian Overview", icon: LayoutDashboard },
-    { href: "/dashboard/student-success", label: "Success Plans", icon: LifeBuoy },
-    { href: "/dashboard/announcements", label: "Circulars & Notices", icon: Bell },
+    { href: "/dashboard/assessments/workspace", label: "My Assessments", icon: ClipboardCheck },
+    { href: "/dashboard/attendance/workspace", label: "My Attendance", icon: CalendarCheck2 },
+    { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
   ],
   COORDINATOR: [
     { href: "/dashboard/workspace", label: "Academic Overview", icon: LayoutDashboard },
-    { href: "/dashboard/batches/workspace", label: "Batches & Classrooms", icon: School },
-    { href: "/dashboard/students/workspace", label: "Student Directory", icon: GraduationCap },
-    { href: "/dashboard/teachers", label: "Faculty Directory", icon: UserCog },
-    { href: "/dashboard/courses", label: "Courses & DPPs", icon: BookOpen },
+    { href: "/dashboard/students/workspace", label: "Students", icon: GraduationCap },
+    { href: "/dashboard/teachers", label: "Faculty", icon: UserCog },
+    { href: "/dashboard/batches/workspace", label: "Batches & Courses", icon: School },
     { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
-    { href: "/dashboard/doubts", label: "Doubt Desk", icon: MessagesSquare },
-    { href: "/dashboard/assessments/workspace", label: "Assessments & PYQs", icon: ClipboardCheck },
-    { href: "/dashboard/omr", label: "OMR Generator & Scan", icon: Printer },
-    { href: "/dashboard/attendance/workspace", label: "Daily Attendance", icon: CalendarCheck2 },
-    { href: "/dashboard/announcements", label: "Notice Board", icon: Bell },
-    { href: "/dashboard/reports/workspace", label: "Reports & Analytics", icon: BarChart3 },
-    { href: "/dashboard/student-success", label: "Student Success", icon: LifeBuoy },
-  ],
-  ACCOUNTANT: [
-    { href: "/dashboard/workspace", label: "Finance Overview", icon: LayoutDashboard },
-    { href: "/dashboard/fees/workspace", label: "Fee Management", icon: IndianRupee },
-    { href: "/dashboard/reports/workspace", label: "Financial Reports", icon: BarChart3 },
+    { href: "/dashboard/assessments/workspace", label: "Assessments", icon: ClipboardCheck },
+    { href: "/dashboard/attendance/workspace", label: "Attendance", icon: CalendarCheck2 },
+    { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
+    { href: "/dashboard/reports/workspace", label: "Reports", icon: BarChart3 },
   ],
 };
 
 export function mapMembershipRole(role: string): AppRole {
   if (role === "TEACHER") return "FACULTY";
   if (role === "ACADEMIC_COORDINATOR") return "COORDINATOR";
-  if (role === "STUDENT" || role === "PARENT" || role === "ACCOUNTANT") return role;
+  if (role === "STUDENT" || role === "PARENT" || role === "ACCOUNTANT") return "STUDENT";
   return "DIRECTOR";
 }
 

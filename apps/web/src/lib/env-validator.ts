@@ -64,16 +64,6 @@ export function validateEnvironment(source: NodeJS.ProcessEnv = process.env): En
     errors.push("A local Supabase URL cannot be used outside local development.");
   }
 
-  const paymentVariables = [source.RAZORPAY_KEY_ID, source.RAZORPAY_KEY_SECRET, source.RAZORPAY_WEBHOOK_SECRET];
-  const configuredPaymentVariables = paymentVariables.filter(Boolean).length;
-  if (configuredPaymentVariables > 0 && configuredPaymentVariables < paymentVariables.length) {
-    errors.push("Razorpay configuration is partial; key ID, key secret, and webhook secret must be configured together.");
-  }
-  if (configuredPaymentVariables === paymentVariables.length) {
-    if (!source.FASTAPI_INTERNAL_URL) errors.push("FASTAPI_INTERNAL_URL is required when Razorpay is enabled.");
-    if (!source.INTERNAL_API_KEY || source.INTERNAL_API_KEY.length < 32) errors.push("INTERNAL_API_KEY must contain at least 32 characters when Razorpay is enabled.");
-  }
-
   return {
     isConfigured: missing.length === 0 && errors.length === 0,
     environment: env,

@@ -5,7 +5,8 @@ test.describe("PrepZii LMS release smoke tests", () => {
     await page.goto("/");
     await expect(page).toHaveTitle(/PrepZii/i);
     await expect(page.getByText("PrepZii for Institutes", { exact: false }).first()).toBeVisible();
-    await expect(page.getByText("JEE & NEET", { exact: false }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: /focused learning-management system/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Only the tools required to teach and learn" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Request a 1-on-1 Walkthrough" })).toBeVisible();
     await expect(page.getByPlaceholder("e.g. Dr. Rajesh Agrawal")).toBeVisible();
     await expect(page.getByPlaceholder("e.g. Apex IIT Academy")).toBeVisible();
@@ -34,7 +35,7 @@ test.describe("PrepZii LMS release smoke tests", () => {
 
   test("legacy dashboard URLs resolve to canonical workspaces", async ({ page }) => {
     await page.goto("/dashboard/admissions");
-    await expect(page).toHaveURL(/\/dashboard\/crm$/);
+    await expect(page).toHaveURL(/\/dashboard\/workspace$/);
     await expect(page.getByRole("heading", { name: "Get started" })).toBeVisible();
 
     await page.goto("/dashboard/assessments");
@@ -46,6 +47,8 @@ test.describe("PrepZii LMS release smoke tests", () => {
     await expect(page.getByRole("heading", { name: "Create your institute to open the workspace" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Create institute" })).toHaveAttribute("href", "/onboarding");
     await expect(page.locator('a[href="/dashboard/crm"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/dashboard/fees/workspace"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/dashboard/omr"]')).toHaveCount(0);
   });
 
   test("dashboard navigation is accessible on mobile", async ({ page }) => {
@@ -68,5 +71,10 @@ test.describe("PrepZii LMS release smoke tests", () => {
       data: {},
     });
     expect(rejected.status()).toBe(403);
+
+    const forgedAdmin = await request.get("/api/platform", {
+      headers: { cookie: "prepzii_superadmin_session=sa_forged" },
+    });
+    expect(forgedAdmin.status()).toBe(403);
   });
 });

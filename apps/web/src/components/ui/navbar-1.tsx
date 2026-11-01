@@ -6,9 +6,9 @@ import { AnimatePresence, motion } from "motion/react";
 import { Menu, X } from "lucide-react";
 
 const navigation = [
-  { label: "Live Simulator", href: "/#interactive-suite" },
-  { label: "Core Modules", href: "/#features" },
-  { label: "Pricing", href: "/#pricing" },
+  { label: "Product", href: "/#product" },
+  { label: "Core Modules", href: "/#modules" },
+  { label: "Security", href: "/#security" },
   { label: "FAQs", href: "/#faqs" },
 ];
 

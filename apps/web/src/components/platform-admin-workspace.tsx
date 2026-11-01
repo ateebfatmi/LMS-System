@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useClerk } from "@clerk/nextjs";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -34,8 +35,6 @@ type SystemHealth = {
   databaseStatus: string;
   databaseLatencyMs: number;
   storageStatus: string;
-  aiModelStatus: string;
-  aiModelName: string;
   environment: string;
   questionBankCount?: number;
 };
@@ -49,11 +48,9 @@ type Data = {
   audits: Row[];
   counts: Row[];
   members: Row[];
-  usageCounters: Row[];
   brandings: Row[];
   demoRequests: Row[];
   supportRequests: Row[];
-  aiDrafts: Row[];
   systemHealth?: SystemHealth;
 };
 
@@ -77,21 +74,16 @@ const empty: Data = {
   audits: [],
   counts: [],
   members: [],
-  usageCounters: [],
   brandings: [],
   demoRequests: [],
   supportRequests: [],
-  aiDrafts: [],
 };
 
 const ROLES = [
   "OWNER",
   "COACHING_ADMIN",
-  "ACADEMIC_COORDINATOR",
   "TEACHER",
-  "ACCOUNTANT",
   "STUDENT",
-  "PARENT",
 ] as const;
 
 const INSTITUTE_TYPES = [
@@ -104,13 +96,9 @@ const INSTITUTE_TYPES = [
 ] as const;
 
 const ENTITLEMENT_KEYS = [
-  { key: "assessments", label: "CBT & OMR Assessments" },
+  { key: "assessments", label: "CBT Assessments" },
   { key: "assignments", label: "Assignments & Submissions" },
   { key: "attendance", label: "Session Attendance" },
-  { key: "fees", label: "Fee Ledger & Receipts" },
-  { key: "advancedAnalytics", label: "Advanced Analytics" },
-  { key: "ai", label: "Gemini AI Assistant" },
-  { key: "whiteLabel", label: "White-Label & Custom Domain" },
 ] as const;
 
 const SECTION_META: Record<AdminSection, { title: string; subtitle: string; icon: LucideIcon }> = {
@@ -170,6 +158,7 @@ const money = (paise: unknown) =>
 
 export function PlatformAdminWorkspace() {
   const router = useRouter();
+  const { signOut } = useClerk();
   const [data, setData] = useState<Data>(empty);
   const [activeTab, setActiveTab] = useState<AdminSection>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -217,7 +206,6 @@ export function PlatformAdminWorkspace() {
   const [newPlanStudents, setNewPlanStudents] = useState("1000");
   const [newPlanBranches, setNewPlanBranches] = useState("5");
   const [newPlanStorage, setNewPlanStorage] = useState("100");
-  const [newPlanAi, setNewPlanAi] = useState("500");
 
   // Provision User Modal
   const [showProvisionUserModal, setShowProvisionUserModal] = useState(false);
@@ -307,8 +295,8 @@ export function PlatformAdminWorkspace() {
   }
 
   async function handleLockSession() {
-    await fetch("/api/platform/auth", { method: "DELETE" });
-    router.push("/admin/login");
+    await signOut();
+    router.push("/sign-in");
     router.refresh();
   }
 
@@ -367,15 +355,11 @@ export function PlatformAdminWorkspace() {
         studentLimit: Number(newPlanStudents),
         branchLimit: Number(newPlanBranches),
         storageGb: Number(newPlanStorage),
-        aiCreditsPerMonth: Number(newPlanAi),
+        aiCreditsPerMonth: 0,
         entitlements: {
           assessments: true,
           assignments: true,
           attendance: true,
-          fees: true,
-          advancedAnalytics: true,
-          ai: Number(newPlanAi) > 0,
-          whiteLabel: false,
         },
       },
       `Commercial plan "${newPlanName.trim()}" created.`
@@ -511,7 +495,7 @@ export function PlatformAdminWorkspace() {
         studentLimit: Number(form.get("students")),
         branchLimit: Number(form.get("branches")),
         storageGb: Number(form.get("storage")),
-        aiCreditsPerMonth: Number(form.get("ai")),
+        aiCreditsPerMonth: 0,
         entitlements: updatedEntitlements,
         isActive: form.get("active") === "on",
       },
@@ -559,7 +543,6 @@ export function PlatformAdminWorkspace() {
   const totalStudents = data.counts.reduce((sum, item) => sum + Number(item.activeStudents ?? 0), 0);
   const totalStaff = data.counts.reduce((sum, item) => sum + Number(item.activeStaff ?? 0), 0);
   const totalBatches = data.counts.reduce((sum, item) => sum + Number(item.activeBatches ?? 0), 0);
-  const totalAiCreditsUsed = data.counts.reduce((sum, item) => sum + Number(item.aiCreditsUsed ?? 0), 0);
 
   const mrr = data.subscriptions
     .filter((sub) => ["ACTIVE", "TRIAL"].includes(String(sub.status)))
@@ -863,8 +846,6 @@ export function PlatformAdminWorkspace() {
               <span>
                 Q-Bank: {(data.systemHealth?.questionBankCount ?? 14200).toLocaleString("en-IN")} Qs
               </span>
-              <span style={{ color: "#cbd5e1" }}>|</span>
-              <span>AI: {data.systemHealth?.aiModelName ?? "gemini-2.5-flash"}</span>
             </div>
 
             <button
@@ -994,9 +975,9 @@ export function PlatformAdminWorkspace() {
                 accent="green"
               />
               <MetricCard
-                label="AI & Question Bank"
+                label="Question Bank"
                 value={(data.systemHealth?.questionBankCount ?? 14200).toLocaleString("en-IN")}
-                detail={`${totalAiCreditsUsed} AI credits used · ${data.aiDrafts.length} AI drafts`}
+                detail="Canonical assessment questions"
                 accent="navy"
               />
             </div>
@@ -1172,33 +1153,7 @@ export function PlatformAdminWorkspace() {
                     <Badge variant="success">ONLINE</Badge>
                   </div>
                   <div style={{ fontSize: "12px", color: "#64748b" }}>
-                    Secure RLS bucket for assignments, OMR, & documents
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "14px",
-                    border: "1px solid #f1f5f9",
-                    backgroundColor: "#f8fafc",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#334155" }}>
-                      Gemini AI Academic Assistant
-                    </span>
-                    <Badge variant="success">OPERATIONAL</Badge>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#64748b" }}>
-                    Model: {data.systemHealth?.aiModelName ?? "gemini-2.5-flash"} · Draft promotion enabled
+                    Secure RLS bucket for assignments and learning documents
                   </div>
                 </div>
 
@@ -1431,9 +1386,6 @@ export function PlatformAdminWorkspace() {
                 const activeStus = Number(count?.activeStudents ?? 0);
                 const quotaPercent = Math.min(100, Math.round((activeStus / studentLimit) * 100));
 
-                const aiLimit = Number(plan?.ai_credits_per_month ?? 50);
-                const aiUsed = Number(count?.aiCreditsUsed ?? 0);
-
                 return (
                   <div
                     key={String(inst.id)}
@@ -1514,10 +1466,7 @@ export function PlatformAdminWorkspace() {
                         />
                       </div>
                       <div style={{ fontSize: "11px", color: "#64748b", marginTop: "5px" }}>
-                        {Number(count?.activeStaff ?? 0)} Staff · {Number(count?.activeBatches ?? 0)} Batches · AI:{" "}
-                        <strong>
-                          {aiUsed}/{aiLimit}
-                        </strong>
+                        {Number(count?.activeStaff ?? 0)} Staff · {Number(count?.activeBatches ?? 0)} Batches
                       </div>
                     </div>
 
@@ -1881,15 +1830,6 @@ export function PlatformAdminWorkspace() {
                           defaultValue={Number(plan.storage_gb)}
                         />
                       </label>
-                      <label>
-                        <span>AI Credits / Month</span>
-                        <input
-                          name="ai"
-                          type="number"
-                          min="0"
-                          defaultValue={Number(plan.ai_credits_per_month)}
-                        />
-                      </label>
                     </div>
 
                     <div
@@ -1909,7 +1849,7 @@ export function PlatformAdminWorkspace() {
                         const checked =
                           entitlements[item.key] !== undefined
                             ? Boolean(entitlements[item.key])
-                            : item.key !== "whiteLabel";
+                            : true;
                         return (
                           <label
                             key={item.key}
@@ -3031,18 +2971,6 @@ export function PlatformAdminWorkspace() {
                     style={{ width: "100%", height: "40px", padding: "0 10px", borderRadius: "8px", border: "1px solid #dce2de", boxSizing: "border-box" }}
                   />
                 </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "11.5px", fontWeight: 700, marginBottom: "4px" }}>
-                    AI Credits
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    value={newPlanAi}
-                    onChange={(e) => setNewPlanAi(e.target.value)}
-                    style={{ width: "100%", height: "40px", padding: "0 10px", borderRadius: "8px", border: "1px solid #dce2de", boxSizing: "border-box" }}
-                  />
-                </div>
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
@@ -3839,45 +3767,9 @@ function InstituteGovernanceModal({
                 }}
               >
                 <strong style={{ fontSize: "14.5px", color: "#0f172a" }}>
-                  Resource Consumption & Quota Reset
+                  Current institute usage
                 </strong>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                  <div
-                    style={{
-                      padding: "14px",
-                      borderRadius: "10px",
-                      backgroundColor: "#f8fafc",
-                      border: "1px solid #f1f5f9",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>AI Credits Used (This Month)</div>
-                      <strong style={{ fontSize: "18px", color: "#0f172a" }}>
-                        {Number(counts?.aiCreditsUsed ?? 0)} Credits
-                      </strong>
-                    </div>
-                    <Button
-                      variant="secondary"
-                      disabled={busy}
-                      onClick={() =>
-                        void onMutate(
-                          "RESET_USAGE_COUNTER",
-                          {
-                            organizationId: institute.id,
-                            metric: "AI_CREDITS",
-                            newQuantity: 0,
-                          },
-                          "Monthly AI credit counter reset to 0."
-                        )
-                      }
-                    >
-                      Reset AI Counter
-                    </Button>
-                  </div>
-
+                <div style={{ display: "grid", gap: "12px" }}>
                   <div
                     style={{
                       padding: "14px",

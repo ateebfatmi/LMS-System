@@ -2,11 +2,8 @@ import type { OrganizationRole } from "@prepzii/contracts";
 
 export const invitationRoles = [
   "COACHING_ADMIN",
-  "ACADEMIC_COORDINATOR",
   "TEACHER",
   "STUDENT",
-  "PARENT",
-  "ACCOUNTANT",
 ] as const satisfies readonly OrganizationRole[];
 
 export type InvitationRole = (typeof invitationRoles)[number];
