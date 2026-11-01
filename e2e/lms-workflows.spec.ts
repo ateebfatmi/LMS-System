@@ -20,6 +20,23 @@ test.describe("PrepZii LMS release smoke tests", () => {
     await expect(page.getByRole("button", { name: /Create institute workspace/ })).toBeVisible();
   });
 
+  test("authentication entry points are separated by account role", async ({ page }) => {
+    await page.goto("/sign-in");
+    await expect(page.getByRole("heading", { name: "Choose your sign-in portal" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Institute admin/ })).toHaveAttribute("href", "/institute/login");
+    await expect(page.getByRole("link", { name: /Faculty & students/ })).toHaveAttribute("href", "/portal/login");
+    await expect(page.getByRole("link", { name: /Platform super admin/ })).toHaveAttribute("href", "/admin/login");
+
+    await page.goto("/institute/login");
+    await expect(page.getByRole("heading", { name: "Institute administration" })).toBeVisible();
+
+    await page.goto("/portal/login");
+    await expect(page.getByRole("heading", { name: "Faculty & student portal" })).toBeVisible();
+
+    await page.goto("/admin/login");
+    await expect(page.getByRole("heading", { name: "Platform super admin" })).toBeVisible();
+  });
+
   test("unconfigured dependencies fail readiness without failing liveness", async ({ request }) => {
     const live = await request.get("/api/health");
     expect(live.status()).toBe(200);

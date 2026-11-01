@@ -32,10 +32,10 @@ export default function SignUpPage() {
             letterSpacing: "-0.02em",
           }}
         >
-          Create Your PrepZii Account
+          Create an Institute Owner Account
         </h1>
         <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
-          Join your coaching institute or establish a new institutional workspace.
+          Register as the owner of a new institutional workspace.
         </p>
       </div>
 
@@ -65,8 +65,9 @@ export default function SignUpPage() {
             }}
             routing="path"
             path="/sign-up"
-            signInUrl="/sign-in"
-            fallbackRedirectUrl="/auth/resolve"
+            signInUrl="/institute/login"
+            forceRedirectUrl="/auth/resolve?portal=institute-admin"
+            fallbackRedirectUrl="/auth/resolve?portal=institute-admin"
           />
         ) : (
           <section
@@ -90,8 +91,8 @@ export default function SignUpPage() {
 
       <div style={{ marginTop: "24px", textAlign: "center" }}>
         <p style={{ color: "#64748b", fontSize: "13px" }}>
-          Already have an institute account?{" "}
-          <Link href="/sign-in" style={{ color: "#facc15", fontWeight: 700, textDecoration: "none" }}>
+          Already manage an institute?{" "}
+          <Link href="/institute/login" style={{ color: "#facc15", fontWeight: 700, textDecoration: "none" }}>
             Sign in here →
           </Link>
         </p>

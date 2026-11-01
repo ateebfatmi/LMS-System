@@ -1,7 +1,16 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-const publicRoutes = ["/", "/onboarding", "/sign-in", "/sign-up", "/dashboard/workspace"];
+const publicRoutes = [
+  "/",
+  "/onboarding",
+  "/sign-in",
+  "/institute/login",
+  "/portal/login",
+  "/admin/login",
+  "/sign-up",
+  "/dashboard/workspace",
+];
 
 for (const route of publicRoutes) {
   test(`${route} has no serious or critical WCAG violations`, async ({ page }) => {

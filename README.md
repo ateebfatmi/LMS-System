@@ -17,6 +17,17 @@ The repository is an implementation candidate for isolated staging. It is **not 
 
 Admissions CRM, institute fee accounting, OMR scanning, parent portals, doubt workflows, speculative AI features, advanced campus scheduling, external messaging, and payment collection are outside the focused V1 product. Historical additive database migrations remain immutable, but retired modules are not exposed by the web application. See [Product scope](docs/PRODUCT_SCOPE.md).
 
+## Authentication portals
+
+Authentication uses one Clerk identity service with separate, server-verified entry points:
+
+- `/institute/login` — institute owners and administrators;
+- `/portal/login` — invited faculty and enrolled students;
+- `/admin/login` — allowlisted PrepZii platform super administrators;
+- `/sign-in` — neutral portal chooser only.
+
+Completing authentication does not grant a role. `/auth/resolve` verifies the selected portal against the authenticated platform allowlist or active institute membership before assigning a workspace.
+
 ## Repository layout
 
 ```text

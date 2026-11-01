@@ -296,7 +296,7 @@ export function PlatformAdminWorkspace() {
 
   async function handleLockSession() {
     await signOut();
-    router.push("/sign-in");
+    router.push("/admin/login");
     router.refresh();
   }
 
