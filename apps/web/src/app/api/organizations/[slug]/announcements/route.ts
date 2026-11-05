@@ -1,3 +1,4 @@
+import { getAssignedBatchIds } from "@/lib/dal/resource-scope";
 import { z } from "zod";
 import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
@@ -19,14 +20,16 @@ export async function GET(_request: Request, context: Context) {
   const client = getPrepziiAdmin(); const { organizationId, userId, role } = resolved.context;
   try {
     let announcements = await safeMany(client.from("organization_announcements").select("id,batch_id,title,content,target_audience,priority,category,status,channels,created_by,published_at,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(200));
-    let allowedBatchIds = new Set<string>();
-    if (["STUDENT", "TEACHER"].includes(role)) { const memberships = await safeMany(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId)); allowedBatchIds = new Set(memberships.map((row) => String(row.batch_id))); }
+    const allowedBatchIds = new Set(await getAssignedBatchIds(resolved.context));
     if (role === "STUDENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && (item.target_audience === "ALL" || (item.target_audience === "BATCH" && allowedBatchIds.has(String(item.batch_id)))));
-    else if (role === "TEACHER") announcements = announcements.filter((item) => item.status === "PUBLISHED" || item.created_by === userId);
-    let batches = role === "STUDENT" ? [] : await safeMany(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
-    if (!batches.length && role !== "STUDENT") {
+    else if (role === "PARENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && ["ALL", "PARENTS"].includes(String(item.target_audience)));
+    else if (role === "TEACHER") announcements = announcements.filter((item) => item.status === "PUBLISHED" &&
+      (["ALL", "FACULTY"].includes(String(item.target_audience)) || (item.target_audience === "BATCH" && allowedBatchIds.has(String(item.batch_id)))));
+    let batches = role === "STUDENT" || role === "PARENT" ? [] : await safeMany(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name"));
+    if (!batches.length && role !== "STUDENT" && role !== "PARENT") {
       batches = await safeMany(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
     }
+    if (role === "TEACHER") batches = batches.filter(({ id }) => allowedBatchIds.has(String(id)));
     const notifications = await safeMany(client.from("organization_notifications").select("id,announcement_id,kind,title,body,action_url,read_at,created_at").eq("organization_id", organizationId).eq("recipient_user_id", userId).order("created_at", { ascending: false }).limit(100));
     return Response.json({ role, announcements, notifications, batches }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) { console.error("Announcement workspace query failed", error); return Response.json({ error: "Announcements are temporarily unavailable." }, { status: 503 }); }

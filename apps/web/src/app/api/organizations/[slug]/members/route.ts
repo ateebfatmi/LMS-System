@@ -203,7 +203,8 @@ export async function PATCH(request: Request, context: Context) {
   }
   if (!target) return Response.json({ error: "Member not found." }, { status: 404 });
   if (
-    (resolved.context.role !== "OWNER" && target.role === "COACHING_ADMIN")
+    (["OWNER", "PLATFORM_SUPER_ADMIN"].includes(target.role))
+    || (resolved.context.role !== "OWNER" && target.role === "COACHING_ADMIN")
     || (target.role !== parsed.data.role && !canGrantRole(resolved.context.role, parsed.data.role))
   ) {
     return Response.json({ error: "You cannot modify that member role." }, { status: 403 });
@@ -229,6 +230,7 @@ export async function PATCH(request: Request, context: Context) {
     p_joined_on: value.joinedOn,
   });
   if (error) {
+    if (error.code === "42501") return Response.json({ error: "You cannot make that membership change." }, { status: 403 });
     if (error.code === "23505") return Response.json({ error: "Roll number or employee code is already in use." }, { status: 409 });
     console.error("Member profile update failed", error);
     return Response.json({ error: "Unable to update member." }, { status: 503 });

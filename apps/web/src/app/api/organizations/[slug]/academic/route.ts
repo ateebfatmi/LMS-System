@@ -1,3 +1,4 @@
+import { getAssignedBatchIds } from "@/lib/dal/resource-scope";
 import { z } from "zod";
 import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
@@ -97,6 +98,24 @@ export async function GET(_request: Request, context: Context) {
     }));
   }
 
+    if (resolved.context.role === "TEACHER" || resolved.context.role === "STUDENT") {
+      const assigned = await getAssignedBatchIds(resolved.context);
+      const allowed = new Set(assigned);
+      const scopedBatches = batches.filter((batch) => allowed.has(String(batch.id)));
+      const scopedSchedules = schedules.filter((schedule) => allowed.has(String(schedule.batch_id)));
+      const { data: enrolments, error } = resolved.context.role === "TEACHER" && assigned.length
+        ? await client.from("organization_batch_members").select("user_id").eq("organization_id", organizationId)
+          .eq("role", "STUDENT").in("batch_id", assigned)
+        : { data: [], error: null };
+      if (error) return Response.json({ error: "Unable to load assigned students." }, { status: 503 });
+      const studentIds = new Set((enrolments ?? []).map(({ user_id }) => user_id));
+      return Response.json({
+        academicYears: [], campuses: [], batches: scopedBatches, subjects: [], courses: [], rooms: [],
+        schedules: scopedSchedules, students: students.filter((student: Record<string, unknown>) => studentIds.has(student.user_id)),
+        faculty: [], readOnly: true,
+      });
+    }
+
     return Response.json({
       academicYears: years, campuses, batches,
       subjects, courses, rooms, schedules,
@@ -112,7 +131,7 @@ export async function POST(request: Request, context: Context) {
   const parsedSlug = slugSchema.safeParse((await context.params).slug);
   const parsed = mutationSchema.safeParse(await request.json().catch(() => null));
   if (!parsedSlug.success || !parsed.success) return Response.json({ error: "Invalid academic operation." }, { status: 400 });
-  const permission = parsed.data.action === "CREATE_COURSE" ? "content:manage" : "academics:manage";
+  const permission = "academics:manage";
   const resolved = await getAuthorizedOrganizationContext(parsedSlug.data, permission);
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
   if (parsed.data.action === "CREATE_SCHEDULE" && parsed.data.payload.endsAt <= parsed.data.payload.startsAt) {

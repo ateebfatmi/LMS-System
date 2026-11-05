@@ -1,5 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { cookies } from "next/headers";
+import { setActiveWorkspace } from "@/lib/dal/auth-context";
 import { z } from "zod";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
 import { guardRateLimit } from "@/lib/rate-limit";
@@ -183,6 +183,7 @@ export async function POST(request: Request) {
     }
     organization = fallback.organization;
   } else if (error) {
+    if (error.code === "42501") return Response.json({ error: "This membership cannot be activated." }, { status: 403 });
     if (error.code === "23505") {
       return Response.json({ error: "That institute URL is already in use." }, { status: 409 });
     }
@@ -194,13 +195,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Institute onboarding did not complete." }, { status: 500 });
   }
 
-  (await cookies()).set("prepzii_active_organization", organization.slug, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  await setActiveWorkspace(organization.slug);
 
   return Response.json({ organization }, { status: 201 });
 }

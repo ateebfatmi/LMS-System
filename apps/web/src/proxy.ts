@@ -10,6 +10,7 @@ const protectedPathPrefixes = [
   "/invite",
   "/api/invitations",
   "/api/organizations",
+  "/api/me",
   "/api/platform",
   "/admin",
   "/auth/resolve",
@@ -27,6 +28,10 @@ const retiredProductionApiPaths = new Set([
   "/api/fees",
   "/api/onboarding",
   "/api/questions",
+  "/api/demo/reset",
+  "/api/parent/children",
+  "/api/parent/summary",
+  "/api/parent/report",
   "/api/students",
 ]);
 
@@ -77,7 +82,15 @@ export default function proxy(req: NextRequest, ev: NextFetchEvent) {
 
   // Local UI development can render without Clerk. Production deployment
   // validation rejects missing Clerk configuration before release.
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
+  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
+    const previewPage = environment.environment === "development"
+      && ["localhost", "127.0.0.1", "[::1]"].includes(req.nextUrl.hostname)
+      && !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && !process.env.CLERK_SECRET_KEY
+      && !process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SUPABASE_SERVICE_ROLE_KEY
+      && /^\/(dashboard|onboarding)(?:\/|$)/.test(req.nextUrl.pathname);
+    if (isProtectedRoute(req) && !previewPage) {
+      return NextResponse.json({ error: "Authentication is not configured. Please contact the administrator." }, { status: 503 });
+    }
     return NextResponse.next();
   }
 
@@ -88,7 +101,13 @@ export default function proxy(req: NextRequest, ev: NextFetchEvent) {
     ) {
       return;
     }
-    if (isProtectedRoute(request)) await auth.protect();
+    if (!isProtectedRoute(request)) return;
+    if (request.nextUrl.pathname.startsWith("/api/")) {
+      const { userId } = await auth();
+      if (!userId) return NextResponse.json({ error: "Unauthorized. Please sign in again." }, { status: 401 });
+      return;
+    }
+    await auth.protect();
   })(req, ev);
 }
 

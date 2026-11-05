@@ -1,5 +1,6 @@
 import { adaptPrepziiQuestion, gradeAssessment, type PrepziiQuestionRow } from "@prepzii/assessment-core";
 import type { AnswerSubmission, QuestionDefinition } from "@prepzii/contracts";
+import { getAssignedBatchIds } from "@/lib/dal/resource-scope";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
@@ -145,16 +146,21 @@ export async function GET(request: Request, context: Context) {
   if (attempt.error || !attempt.data) return Response.json({ error: "Attempt not found." }, { status: 404 });
   const [test, schedule] = await Promise.all([
     client.from("institute_tests").select("result_release_policy,solution_release_policy,created_by").eq("id", testId).eq("institute_id", authorized.context.organizationId).single(),
-    client.from("organization_test_schedules").select("ends_at").eq("id", attempt.data.schedule_id).eq("organization_id", authorized.context.organizationId).single(),
+    client.from("organization_test_schedules").select("ends_at,batch_id").eq("id", attempt.data.schedule_id).eq("organization_id", authorized.context.organizationId).single(),
   ]);
   if (test.error || schedule.error) return Response.json({ error: "Unable to load attempt policy." }, { status: 503 });
-  if (authorized.context.role === "TEACHER" && test.data.created_by !== authorized.context.userId) return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (authorized.context.role === "TEACHER" &&
+      (test.data.created_by !== authorized.context.userId ||
+        !(await getAssignedBatchIds(authorized.context)).includes(schedule.data.batch_id))) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
   const windowEnded = new Date(schedule.data.ends_at).getTime() <= Date.now();
   const staff = authorized.context.role !== "STUDENT";
-  const resultsReleased = staff || attempt.data.results_released || test.data.result_release_policy === "IMMEDIATE" || (test.data.result_release_policy === "AFTER_WINDOW" && windowEnded);
-  const solutionsReleased = staff || attempt.data.solutions_released || test.data.solution_release_policy === "IMMEDIATE" || (test.data.solution_release_policy === "AFTER_WINDOW" && windowEnded);
+  const submitted = attempt.data.status === "SUBMITTED";
+  const resultsReleased = staff || (submitted && (attempt.data.results_released || test.data.result_release_policy === "IMMEDIATE" || (test.data.result_release_policy === "AFTER_WINDOW" && windowEnded)));
+  const solutionsReleased = staff || (submitted && (attempt.data.solutions_released || test.data.solution_release_policy === "IMMEDIATE" || (test.data.solution_release_policy === "AFTER_WINDOW" && windowEnded)));
   const response: Record<string, unknown> = { id: attempt.data.id, status: attempt.data.status, submittedAt: attempt.data.submitted_at, resultsReleased, solutionsReleased };
-  if (resultsReleased) response.result = { score: attempt.data.score, maxScore: attempt.data.max_score, percentage: attempt.data.percentage, correctCount: attempt.data.correct_count, incorrectCount: attempt.data.incorrect_count, unansweredCount: attempt.data.unanswered_count, questionResults: attempt.data.question_results };
+  if (resultsReleased) response.result = { score: attempt.data.score, maxScore: attempt.data.max_score, percentage: attempt.data.percentage, correctCount: attempt.data.correct_count, incorrectCount: attempt.data.incorrect_count, unansweredCount: attempt.data.unanswered_count, questionResults: solutionsReleased ? attempt.data.question_results : undefined };
   if (solutionsReleased) response.solutions = await loadQuestions(authorized.context.organizationId, testId);
   return Response.json(response, { headers: { "cache-control": "private, no-store" } });
 }

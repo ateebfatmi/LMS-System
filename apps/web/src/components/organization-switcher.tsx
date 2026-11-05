@@ -16,25 +16,30 @@ export function OrganizationSwitcher() {
   const [error, setError] = useState("");
   const switcherRef = useRef<HTMLDivElement>(null);
 
-  const select = useCallback(async (slug: string, refresh = true) => {
+  const select = useCallback(async (slug: string) => {
     setBusy(true);
     setError("");
-    const response = await fetch("/api/organizations/active", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ slug }),
-    });
-    if (response.ok) {
-      const result = await response.json();
-      rememberActiveOrganization(result);
-      setActiveSlug(result.organization.slug);
-      setRole(result.role);
-      window.dispatchEvent(new CustomEvent("prepzii:organization-changed", { detail: { role: result.role } }));
-      if (refresh) window.location.reload();
-    } else {
+    try {
+      const response = await fetch("/api/organizations/active", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug }),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        rememberActiveOrganization(result);
+        setActiveSlug(result.organization.slug);
+        setRole(result.role);
+        window.dispatchEvent(new CustomEvent("prepzii:organization-changed", { detail: { role: result.role } }));
+        window.location.assign("/dashboard/workspace");
+      } else {
+        setError("Unable to switch workspace");
+      }
+    } catch {
       setError("Unable to switch workspace");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }, []);
 
   useEffect(() => {
@@ -54,15 +59,16 @@ export function OrganizationSwitcher() {
         setBusy(false);
         return;
       }
-      if (list[0]) {
-        await select(list[0].slug, false);
-      } else {
+      setBusy(false);
+    }
+    void load().catch(() => {
+      if (!cancelled) {
+        setError("Unable to load workspaces.");
         setBusy(false);
       }
-    }
-    void load();
+    });
     return () => { cancelled = true; };
-  }, [select]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -95,7 +101,7 @@ export function OrganizationSwitcher() {
   const canSwitch = !busy;
   const accessLabel = role
     ? `${role.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase())} access`
-    : "Create an institute";
+    : organizations.length ? "Select a workspace" : "Create an institute";
 
   return (
     <div ref={switcherRef} className={`org-switcher real-org-switcher${open ? " is-open" : ""}`}>

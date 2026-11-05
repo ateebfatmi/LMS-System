@@ -7,36 +7,26 @@ if (typeof runtimeGlobal.WebSocket === "undefined") {
 
 import { auth } from "@clerk/nextjs/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import {
-  AuthorizationError,
-  authorizeTenantAction,
-  isDevelopmentAuthOverrideEnabled,
-  type Permission,
-} from "@prepzii/authorization";
+import { hasPermission, isDevelopmentAuthOverrideEnabled, resolveInstituteMembership, type InstituteRole, type Permission } from "@prepzii/authorization";
 import { type OrganizationRole, type TenantContext } from "@prepzii/contracts";
-import { normalizeOrganizationRole } from "@prepzii/assessment-core";
+
 
 type Institute = {
   id: string;
   name: string;
   slug: string;
   logo_url: string | null;
-  owner_user_id: string;
+  owner_user_id: string | null;
   status: string;
-  userRole?: OrganizationRole;
+
 };
 
-type InstituteMember = {
+export type InstituteMember = {
   id: string;
   institute_id: string;
   user_id: string | null;
   role: string;
   status: string;
-};
-
-type MembershipInstituteRow = {
-  role: string;
-  institutes: Institute | null;
 };
 
 let adminClient: SupabaseClient | undefined;
@@ -89,107 +79,85 @@ export async function isPlatformAdmin(authenticatedUserId?: string | null): Prom
   return allowedUserIds.has(userId);
 }
 
-/** @deprecated Use isPlatformAdmin. Kept for compatibility with older imports. */
-export const isPlatformSuperAdmin = isPlatformAdmin;
+const instituteFields = "id,name,slug,logo_url,owner_user_id,status";
+const memberFields = "id,institute_id,user_id,role,status";
 
-export async function listMyOrganizations(userId: string): Promise<Institute[]> {
-  const supabase = getPrepziiAdmin();
-  const [{ data: owned, error: ownedError }, { data: memberships, error: membershipsError }] =
-    await Promise.all([
-      supabase
-        .from("institutes")
-        .select("id,name,slug,logo_url,owner_user_id,status")
-        .eq("owner_user_id", userId)
-        .eq("status", "ACTIVE"),
-      supabase
-        .from("institute_members")
-        .select("role, institutes!inner(id,name,slug,logo_url,owner_user_id,status)")
-        .eq("user_id", userId)
-        .eq("status", "ACTIVE")
-        .eq("institutes.status", "ACTIVE"),
-    ]);
+export type Workspace = {
+  institute: Institute;
+  context: TenantContext & { role: InstituteRole };
+  member: InstituteMember | null;
+};
 
-  if (ownedError) throw ownedError;
-  if (membershipsError) throw membershipsError;
-
-  const organizations = new Map<string, Institute>();
-  for (const institute of (owned ?? []) as Institute[]) {
-    organizations.set(institute.id, { ...institute, userRole: "OWNER" });
-  }
-  for (const row of (memberships ?? []) as unknown as MembershipInstituteRow[]) {
-    const institute = row.institutes;
-    const memberRole = normalizeOrganizationRole(row.role);
-    if (institute) {
-      const existing = organizations.get(institute.id);
-      if (!existing) {
-        organizations.set(institute.id, { ...institute, userRole: memberRole });
-      } else if (existing.userRole !== "OWNER" && memberRole === "COACHING_ADMIN") {
-        organizations.set(institute.id, { ...institute, userRole: "COACHING_ADMIN" });
-      }
-    }
-  }
-  return [...organizations.values()];
-}
-
-export async function getOrganizationContext(
-  slug: string,
-  allowedRoles: readonly OrganizationRole[],
-): Promise<{ context: TenantContext; institute: Institute; member: InstituteMember | null } | null> {
-  const userId = await getActingUserId();
-  if (!userId) return null;
-
-  const supabase = getPrepziiAdmin();
-  const { data: institute, error: instituteError } = await supabase
-    .from("institutes")
-    .select("id,name,slug,logo_url,owner_user_id,status")
-    .eq("slug", slug)
-    .eq("status", "ACTIVE")
-    .maybeSingle<Institute>();
-
-  if (instituteError) throw instituteError;
-  if (!institute) return null;
-
-  const isOwner = institute.owner_user_id === userId;
-  const { data: member, error: memberError } = isOwner
-    ? { data: null, error: null }
-    : await supabase
-        .from("institute_members")
-        .select("id,institute_id,user_id,role,status")
-        .eq("institute_id", institute.id)
-        .eq("user_id", userId)
-        .eq("status", "ACTIVE")
-        .maybeSingle<InstituteMember>();
-
-  if (memberError) throw memberError;
-  const rawRole = isOwner ? "OWNER" : member?.role ?? null;
-  if (!rawRole) return null;
-  const role = normalizeOrganizationRole(rawRole);
-  if (!allowedRoles.includes(role)) return null;
-
+export function publicWorkspace({ institute, context }: Workspace) {
   return {
-    context: { organizationId: institute.id, userId, role },
-    institute,
-    member,
+    id: institute.id,
+    name: institute.name,
+    slug: institute.slug,
+    logoUrl: institute.logo_url,
+    status: institute.status,
+    userRole: context.role,
   };
 }
 
-export async function getAuthorizedOrganizationContext(slug: string, permission: Permission) {
-  const resolved = await getOrganizationContext(slug, [
-    "OWNER",
-    "COACHING_ADMIN",
-    "ACADEMIC_COORDINATOR",
-    "TEACHER",
-    "STUDENT",
-    "PARENT",
-    "ACCOUNTANT",
-  ]);
+function toWorkspace(institute: Institute, userId: string, members: InstituteMember[]): Workspace | null {
+  const resolved = resolveInstituteMembership(userId, institute, members);
   if (!resolved) return null;
-  try {
-    authorizeTenantAction(resolved.context, resolved.institute.id, permission);
-  } catch (error) {
-    if (error instanceof AuthorizationError) return null;
-    throw error;
-  }
-  return resolved;
+  return {
+    institute,
+    context: { organizationId: institute.id, organizationName: institute.name, userId, ...resolved },
+    member: members.find(({ id }) => id === resolved.memberId) ?? null,
+  };
 }
 
+export async function listMyOrganizations(userId: string): Promise<Workspace[]> {
+  const client = getPrepziiAdmin();
+  const [{ data: owned, error: ownerError }, { data: members, error: memberError }] = await Promise.all([
+    client.from("institutes").select(instituteFields).eq("owner_user_id", userId).eq("status", "ACTIVE").returns<Institute[]>(),
+    client.from("institute_members").select(`${memberFields},institutes!inner(${instituteFields})`)
+      .eq("user_id", userId).eq("institutes.status", "ACTIVE")
+      .returns<(InstituteMember & { institutes: Institute })[]>(),
+  ]);
+  if (ownerError) throw ownerError;
+  if (memberError) throw memberError;
+
+  const institutes = new Map((owned ?? []).map((institute) => [institute.id, institute]));
+  const memberGroups = new Map<string, InstituteMember[]>();
+  for (const member of members ?? []) {
+    institutes.set(member.institute_id, member.institutes);
+    const group = memberGroups.get(member.institute_id) ?? [];
+    group.push(member);
+    memberGroups.set(member.institute_id, group);
+  }
+
+  return Array.from(institutes.values()).flatMap((institute) => {
+    const workspace = toWorkspace(institute, userId, memberGroups.get(institute.id) ?? []);
+    return workspace ? [workspace] : [];
+  });
+}
+
+export async function findWorkspace(userId: string, field: "id" | "slug", value: string): Promise<Workspace | null> {
+  const client = getPrepziiAdmin();
+  const { data: institute, error } = await client.from("institutes").select(instituteFields)
+    .eq(field, value).eq("status", "ACTIVE").maybeSingle<Institute>();
+  if (error) throw error;
+  if (!institute) return null;
+
+  const { data: members, error: memberError } = await client.from("institute_members").select(memberFields)
+    .eq("institute_id", institute.id).eq("user_id", userId).returns<InstituteMember[]>();
+  if (memberError) throw memberError;
+  return toWorkspace(institute, userId, members ?? []);
+}
+
+export async function getOrganizationContext(slug: string, allowedRoles: readonly OrganizationRole[]): Promise<Workspace | null> {
+  const userId = await getActingUserId();
+  if (!userId) return null;
+  const workspace = await findWorkspace(userId, "slug", slug);
+  return workspace && allowedRoles.includes(workspace.context.role) ? workspace : null;
+}
+
+export async function getAuthorizedOrganizationContext(slug: string, permission: Permission) {
+  const userId = await getActingUserId();
+  if (!userId) return null;
+  const workspace = await findWorkspace(userId, "slug", slug);
+  return workspace && hasPermission(workspace.context.role, permission) ? workspace : null;
+}

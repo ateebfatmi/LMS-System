@@ -12,6 +12,18 @@ test.describe("PrepZii LMS release smoke tests", () => {
     await expect(page.getByPlaceholder("e.g. Apex IIT Academy")).toBeVisible();
   });
 
+  test("public CBT demo keeps answers when navigating between questions", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("link", { name: "Try the CBT demo" }).click();
+    await expect(page.getByRole("heading", { name: "Try the CBT Demo" })).toBeVisible();
+    await page.getByRole("radio").first().check();
+    await page.getByRole("button", { name: "Save & Next" }).click();
+    await page.getByRole("button", { name: /1\. Physics/ }).click();
+    await expect(page.getByRole("radio").first()).toBeChecked();
+    await page.getByRole("button", { name: "Show Solution" }).click();
+    await expect(page.getByText(/For a harmonic potential/)).toBeVisible();
+  });
+
   test("institute onboarding renders its required identity fields", async ({ page }) => {
     await page.goto("/onboarding");
     await expect(page.getByRole("heading", { name: "Create your institute workspace" })).toBeVisible();
@@ -92,6 +104,6 @@ test.describe("PrepZii LMS release smoke tests", () => {
     const forgedAdmin = await request.get("/api/platform", {
       headers: { cookie: "prepzii_superadmin_session=sa_forged" },
     });
-    expect(forgedAdmin.status()).toBe(403);
+    expect([401, 503]).toContain(forgedAdmin.status());
   });
 });

@@ -49,6 +49,7 @@ docs/                    Architecture, audit, phases, and readiness evidence
 Use Node.js 22 or newer.
 
 ```bash
+nvm use
 npm ci
 npm test
 npm run typecheck
@@ -64,7 +65,7 @@ python3 -m venv .venv
 .venv/bin/python -m pytest backend/tests -q
 ```
 
-Copy `.env.example` to `.env.local` for local configuration. Never commit real credentials or point SQL tests at production.
+Copy `.env.example` to `apps/web/.env.local` for local configuration. Next.js loads environment files from the web application directory. Set both `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`, then restart the development server after changing them. Without Clerk configuration, local pages can render for UI development, but protected APIs return a configuration error. Never commit real credentials or point SQL tests at production.
 
 ## Documentation
 

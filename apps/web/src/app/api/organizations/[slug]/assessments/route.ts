@@ -1,3 +1,4 @@
+import { getAssignedBatchIds } from "@/lib/dal/resource-scope";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
@@ -41,17 +42,15 @@ export async function GET(request: Request, context: Context) {
       const batchIds = enrolments.map((row) => String(row.batch_id));
       schedules = allSchedules.filter((schedule) => batchIds.includes(String(schedule.batch_id)));
       const testIds = new Set(schedules.map((schedule) => String(schedule.test_id)));
-      if (schedules.length) {
-        tests = tests.filter((test) => test.status === "PUBLISHED" && testIds.has(String(test.id)));
-      }
+      tests = tests.filter((test) => test.status === "PUBLISHED" && testIds.has(String(test.id)));
     } else if (role === "TEACHER") {
       tests = tests.filter((test) => test.created_by === userId);
       const testIds = new Set(tests.map((test) => String(test.id)));
       schedules = allSchedules.filter((schedule) => testIds.has(String(schedule.test_id)));
     }
     const testIds = tests.map((test) => String(test.id));
-    let questionLinks = testIds.length ? await safeRows(client.from("institute_test_questions").select("id,institute_test_id,question_id,question_order").eq("institute_id", organizationId).in("institute_test_id", testIds).order("question_order")) : [];
-    if (!questionLinks.length && testIds.length) {
+    let questionLinks = role !== "STUDENT" && testIds.length ? await safeRows(client.from("institute_test_questions").select("id,institute_test_id,question_id,question_order").eq("institute_id", organizationId).in("institute_test_id", testIds).order("question_order")) : [];
+    if (role !== "STUDENT" && !questionLinks.length && testIds.length) {
       questionLinks = await safeRows(client.from("test_questions").select("id,test_id,question_id,question_order").in("test_id", testIds).order("question_order"));
     }
     const linkedQuestionIds = [...new Set(questionLinks.flatMap((link) => typeof link.question_id === "string" && link.question_id ? [link.question_id] : []))];
@@ -75,9 +74,13 @@ export async function GET(request: Request, context: Context) {
       let query = client.from("organization_assessment_attempts").select("id,test_id,schedule_id,user_id,attempt_number,status,started_at,expires_at,submitted_at,score,max_score,percentage,correct_count,incorrect_count,unanswered_count,results_released,solutions_released").eq("organization_id", organizationId).in("test_id", testIds).order("started_at", { ascending: false });
       if (role === "STUDENT") query = query.eq("user_id", userId);
       attempts = await safeRows(query);
-      if (!attempts.length) {
-        let legacyQuery = client.from("test_attempts").select("id,test_id,user_id,score,total_marks,started_at,submitted_at,status,correct,wrong,skipped,accuracy").in("test_id", testIds);
-        if (role === "STUDENT") legacyQuery = legacyQuery.eq("user_id", userId);
+      if (role === "STUDENT") {
+        attempts = attempts.map((attempt) => attempt.status === "SUBMITTED" && attempt.results_released
+          ? attempt
+          : { ...attempt, score: null, max_score: null, percentage: null, correct_count: null, incorrect_count: null, unanswered_count: null });
+      }
+      if (!attempts.length && role !== "STUDENT") {
+        const legacyQuery = client.from("test_attempts").select("id,test_id,user_id,score,total_marks,started_at,submitted_at,status,correct,wrong,skipped,accuracy").in("test_id", testIds);
         const rawLegacy = await safeRows(legacyQuery);
         attempts = rawLegacy.map((a) => ({
           id: a.id,
@@ -107,6 +110,13 @@ export async function GET(request: Request, context: Context) {
     let batches = staff ? await safeRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
     if (!batches.length && staff) {
       batches = await safeRows(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
+    }
+    if (role === "TEACHER") {
+      const assigned = new Set(await getAssignedBatchIds(resolved.context));
+      batches = batches.filter(({ id }) => assigned.has(String(id)));
+      schedules = schedules.filter(({ batch_id }) => assigned.has(String(batch_id)));
+      const scheduleIds = new Set(schedules.map(({ id }) => id));
+      attempts = attempts.filter(({ schedule_id }) => scheduleIds.has(schedule_id));
     }
     let bankQuestions: Row[] = [];
     if (staff) {

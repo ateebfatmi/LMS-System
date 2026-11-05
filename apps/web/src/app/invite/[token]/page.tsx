@@ -13,19 +13,24 @@ export default function AcceptInvitationPage() {
   async function accept() {
     setBusy(true);
     setError("");
-    const response = await fetch("/api/invitations/accept", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ token: params.token }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setError(result.error ?? "Unable to accept invitation.");
+    try {
+      const response = await fetch("/api/invitations/accept", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: params.token }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? "Unable to accept invitation.");
+        return;
+      }
+      router.replace("/dashboard");
+      router.refresh();
+    } catch {
+      setError("Unable to accept invitation. Check your connection and try again.");
+    } finally {
       setBusy(false);
-      return;
     }
-    router.replace("/dashboard");
-    router.refresh();
   }
 
   return (

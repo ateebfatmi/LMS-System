@@ -16,6 +16,8 @@ import {
   isPaymentUnique,
   isDevelopmentAuthOverrideEnabled,
   isTrustedMutationRequest,
+  resolveInstituteMembership,
+  selectWorkspace,
 } from "./index.ts";
 
 const teacherA: TenantContext = {
@@ -205,3 +207,41 @@ test("mutation origin policy rejects cross-site browser requests", () => {
   assert.equal(isTrustedMutationRequest({ method: "POST", origin: null, fetchSite: null, allowedOrigins }), true);
 });
 
+
+test("suspended owners and ambiguous memberships lose institute access", () => {
+  const institute = { owner_user_id: "owner-a", status: "ACTIVE" };
+  assert.deepEqual(resolveInstituteMembership("owner-a", institute, []), { role: "OWNER" });
+  assert.equal(resolveInstituteMembership("owner-a", institute, [{ id: "m1", role: "OWNER", status: "SUSPENDED" }]), null);
+  assert.equal(resolveInstituteMembership("teacher-a", institute, [
+    { id: "m2", role: "TEACHER", status: "ACTIVE" }, { id: "m3", role: "PARENT", status: "ACTIVE" },
+  ]), null);
+});
+
+test("only canonical institute roles can authorize an active membership", () => {
+  const institute = { owner_user_id: "owner-a", status: "ACTIVE" };
+  for (const role of ["COACHING_ADMIN", "TEACHER", "STUDENT", "PARENT"]) {
+    assert.deepEqual(resolveInstituteMembership("other", institute, [{ id: "m", role, status: "ACTIVE" }]), { role, memberId: "m" });
+  }
+  for (const role of ["OWNER", "PLATFORM_SUPER_ADMIN", "UNKNOWN"]) {
+    assert.equal(resolveInstituteMembership("other", institute, [{ id: "m", role, status: "ACTIVE" }]), null);
+  }
+  assert.equal(resolveInstituteMembership("owner-a", { ...institute, status: "SUSPENDED" }, []), null);
+});
+
+test("workspace selection requires an explicit authorized choice when there are multiple institutes", () => {
+  const workspaces = [{ slug: "institute-a", role: "STUDENT" }, { slug: "institute-b", role: "TEACHER" }];
+  assert.equal(selectWorkspace(workspaces), null);
+  assert.equal(selectWorkspace(workspaces, "unrelated"), null);
+  assert.equal(selectWorkspace(workspaces, "institute-b"), workspaces[1]);
+  assert.equal(selectWorkspace([workspaces[0]]), workspaces[0]);
+  assert.equal(hasPermission("COACHING_ADMIN", "subscriptions:manage"), false);
+});
+
+test("recognizes the consumer's legacy owner row only for the canonical active owner", () => {
+  const institute = { owner_user_id: "legacy-owner", status: "ACTIVE" };
+  const legacy = { id: "member", role: "COACHING_ADMIN", status: "ACTIVE" };
+  assert.deepEqual(resolveInstituteMembership("legacy-owner", institute, [legacy]), { role: "OWNER", memberId: "member" });
+  assert.equal(resolveInstituteMembership("other", institute, [legacy])?.role, "COACHING_ADMIN");
+  assert.equal(resolveInstituteMembership("legacy-owner", institute, [{ ...legacy, status: "SUSPENDED" }]), null);
+  assert.equal(resolveInstituteMembership("legacy-owner", institute, [legacy, { id: "owner", role: "OWNER", status: "SUSPENDED" }]), null);
+});

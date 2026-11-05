@@ -1,3 +1,4 @@
+import { getAssignedBatchIds } from "@/lib/dal/resource-scope";
 import { z } from "zod";
 import { requireDatabaseQuery } from "@/lib/database-query";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
@@ -41,15 +42,15 @@ export async function GET(request: Request, context: Context) {
     }
 
     if (["TEACHER", "STUDENT"].includes(role)) {
-      const assigned = await requireDatabaseQuery(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", role), [], "Load assigned attendance batches");
-      if (assigned.length) {
-        const ids = new Set(assigned.map((row: Record<string, unknown>) => String(row.batch_id)));
-        batches = batches.filter((batch: Record<string, unknown>) => ids.has(String(batch.id)));
-      }
+      const ids = new Set(await getAssignedBatchIds(resolved.context));
+      batches = batches.filter((batch: Row) => ids.has(String(batch.id)));
     }
 
     const allowedIds = new Set(batches.map((batch: Record<string, unknown>) => String(batch.id)));
-    const selectedBatchId = batchId.success && allowedIds.has(batchId.data) ? batchId.data : String(batches[0]?.id ?? "");
+    if (params.has("batchId") && (!batchId.success || !allowedIds.has(batchId.data))) {
+      return Response.json({ error: "Batch not available." }, { status: 403 });
+    }
+    const selectedBatchId = batchId.success ? batchId.data : String(batches[0]?.id ?? "");
 
     let students: Row[] = [];
     if (selectedBatchId && role !== "STUDENT") {
@@ -66,7 +67,7 @@ export async function GET(request: Request, context: Context) {
       const byUser = new Map(((directory ?? []) as Row[]).map((member) => [String(member.user_id), member]));
       students = enrolments.length
         ? enrolments.map((enrolment: Record<string, unknown>) => ({ ...enrolment, ...(byUser.get(String(enrolment.user_id)) ?? {}), user_id: enrolment.user_id, roll_number: enrolment.roll_number }))
-        : (directory as Row[]);
+        : [];
     }
 
     let sessions: Row[] = [];

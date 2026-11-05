@@ -30,7 +30,8 @@ export default function Home() {
     event.preventDefault();
     setSubmitting(true);
     setResult(null);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch("/api/demo-request", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -53,7 +54,7 @@ export default function Home() {
         success: response.ok,
         message: response.ok ? payload.message ?? "Your walkthrough request was received." : payload.error ?? "Unable to submit the request.",
       });
-      if (response.ok) event.currentTarget.reset();
+      if (response.ok) formElement.reset();
     }
     setSubmitting(false);
   }
@@ -72,6 +73,7 @@ export default function Home() {
         <div className="focused-actions">
           <Link className="primary-link" href="/onboarding">Create institute workspace</Link>
           <Link className="secondary-link" href="/sign-in">Sign in</Link>
+          <Link className="secondary-link" href="/cbt-demo">Try the CBT demo</Link>
         </div>
         <div className="trust-row" aria-label="Platform guarantees">
           <span>Tenant-isolated data</span>

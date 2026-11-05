@@ -65,7 +65,7 @@ export class AuthorizationError extends Error {
 }
 
 export function hasPermission(role: OrganizationRole, permission: Permission): boolean {
-  return rolePermissions[role].has(permission);
+  return rolePermissions[role]?.has(permission) ?? false;
 }
 
 export function authorizeTenantAction(
@@ -234,3 +234,48 @@ export function isTrustedMutationRequest(input: {
   });
 }
 
+
+export const instituteRoles = [
+  "OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "TEACHER", "STUDENT", "PARENT", "ACCOUNTANT",
+] as const satisfies readonly OrganizationRole[];
+
+export type InstituteRole = (typeof instituteRoles)[number];
+
+export function permissionsForRole(role: OrganizationRole): Permission[] {
+  return [...(rolePermissions[role] ?? [])];
+}
+
+export function resolveInstituteMembership(
+  userId: string,
+  institute: { owner_user_id: string | null; status: string },
+  memberships: readonly { id: string; role: string; status: string }[],
+): { role: InstituteRole; memberId?: string } | null {
+  if (institute.status !== "ACTIVE") return null;
+
+  // The consumer app can store its canonical owner as COACHING_ADMIN.
+  // An explicit OWNER record always takes precedence over the legacy row.
+  if (institute.owner_user_id === userId) {
+    const owners = memberships.filter(({ role }) => role === "OWNER");
+    if (owners.length === 1 && owners[0].status === "ACTIVE") {
+      return { role: "OWNER", memberId: owners[0].id };
+    }
+    if (memberships.length === 0) return { role: "OWNER" };
+    const legacy = memberships[0];
+    return memberships.length === 1 && legacy.role === "COACHING_ADMIN" && legacy.status === "ACTIVE"
+      ? { role: "OWNER", memberId: legacy.id }
+      : null;
+  }
+
+  const active = memberships.filter(({ status }) => status === "ACTIVE");
+  if (active.length !== 1) return null;
+  const role = instituteRoles.find((candidate) => candidate === active[0].role && candidate !== "OWNER");
+  return role ? { role, memberId: active[0].id } : null;
+}
+
+export function selectWorkspace<T extends { slug: string }>(
+  workspaces: readonly T[],
+  slug?: string,
+): T | null {
+  if (slug) return workspaces.find((workspace) => workspace.slug === slug) ?? null;
+  return workspaces.length === 1 ? workspaces[0] : null;
+}

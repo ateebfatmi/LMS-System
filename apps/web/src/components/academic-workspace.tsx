@@ -8,6 +8,7 @@ import { DashboardLayout } from "@/components/dashboard-layout";
 type View = "BATCHES" | "COURSES";
 type Organization = { name: string; slug: string };
 type Data = {
+  readOnly?: boolean;
   academicYears: Record<string, unknown>[]; campuses: Record<string, unknown>[]; batches: Record<string, unknown>[];
   subjects: Record<string, unknown>[]; courses: Record<string, unknown>[]; rooms: Record<string, unknown>[];
   schedules: Record<string, unknown>[]; students: Record<string, unknown>[]; faculty: Record<string, unknown>[];
@@ -71,7 +72,12 @@ export function AcademicWorkspace({ view }: { view: View }) {
       </div>
       {error && <div className="form-error directory-error" role="alert">{error}</div>}
 
-      <div className="academic-layout">
+      {data.readOnly ? <section className="panel">
+        <h2>Assigned batches</h2>
+        {data.batches.length ? <ul>{data.batches.map((batch) => <li key={String(batch.id)}>{String(batch.name)}</li>)}</ul> : <p>No batches assigned yet.</p>}
+        {data.students.length > 0 && <><h2>Assigned students</h2><ul>{data.students.map((student) =>
+          <li key={String(student.member_id)}>{String(student.display_name)}</li>)}</ul></>}
+      </section> : <div className="academic-layout">
         <section className="panel academic-create-panel">
           <h2>Quick create</h2>
           {view === "BATCHES" && <>
@@ -99,7 +105,7 @@ export function AcademicWorkspace({ view }: { view: View }) {
           {view === "COURSES" && data.courses.map((x) => <article key={String(x.id)}><div><strong>{String(x.title)}</strong><small>{String(x.description ?? "No description")}</small></div><Badge variant="neutral">{String(x.status)}</Badge></article>)}
           {((view === "BATCHES" && !data.batches.length) || (view === "COURSES" && !data.courses.length)) && <p className="empty-state">No records yet. Use the forms to create the first one.</p>}
         </section>
-      </div>
+      </div>}
     </DashboardLayout>
   );
 }

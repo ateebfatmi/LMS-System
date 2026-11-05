@@ -36,26 +36,42 @@ export default function InstituteOnboardingPage() {
     setError("");
     setSubmitting(true);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/onboarding/institute", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        name,
-        slug: suggestedSlug,
-        instituteType: form.get("instituteType"),
-        phone: form.get("phone"),
-        city: form.get("city"),
-        state: form.get("state"),
-      }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setError(result.error ?? "Unable to create the institute.");
+    try {
+      const response = await fetch("/api/onboarding/institute", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          slug: suggestedSlug,
+          instituteType: form.get("instituteType"),
+          phone: form.get("phone"),
+          city: form.get("city"),
+          state: form.get("state"),
+        }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(
+          typeof result?.error === "string"
+            ? result.error
+            : response.status === 401
+              ? "Your session has expired. Please sign in again."
+              : "Unable to create the institute. Please try again.",
+        );
+        return;
+      }
+      if (!result?.organization?.id) {
+        setError("The server returned an incomplete response. Please reload before trying again.");
+        return;
+      }
+      rememberActiveOrganization({ organization: result.organization, role: "OWNER" });
+      router.push("/dashboard/workspace");
+      router.refresh();
+    } catch {
+      setError("Unable to reach the server. Please check your connection and try again.");
+    } finally {
       setSubmitting(false);
-      return;
     }
-    rememberActiveOrganization({ organization: result.organization, role: "OWNER" });
-    router.replace("/dashboard/workspace");
   }
 
   return (

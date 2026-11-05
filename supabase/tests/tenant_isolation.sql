@@ -634,6 +634,10 @@ reset role;
 select set_config('request.jwt.claims', '', true);
 
 -- Phase 8 tests: Guardian linking & parent scope
+insert into public.institute_members (institute_id, user_id, email, role, status) values
+  ('10000000-0000-0000-0000-000000000001', 'parent-a', 'parent-a@example.invalid', 'PARENT', 'ACTIVE'),
+  ('20000000-0000-0000-0000-000000000002', 'parent-b', 'parent-b@example.invalid', 'PARENT', 'ACTIVE');
+
 insert into public.organization_guardian_links (
   organization_id, guardian_user_id, student_user_id, relationship, status
 ) values

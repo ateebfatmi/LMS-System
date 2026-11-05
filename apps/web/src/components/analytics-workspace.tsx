@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
-import { DashboardLayout, type AppRole } from "@/components/dashboard-layout";
+import { DashboardLayout, mapMembershipRole } from "@/components/dashboard-layout";
 import { resolveActiveOrganization } from "@/lib/client-org";
 
 type Organization = { name: string; slug: string };
@@ -11,59 +11,52 @@ type Summary = { students: number | null; activeBatches: number; attendanceRate:
 type Data = { role: string; summary: Summary; batches: { id: string; name: string; target_exam: string; grade_level: string | null; student_count: number }[]; attendanceTrend: { date: string; rate: number }[]; attempts: { id: string; percentage: number | string | null; submitted_at: string | null }[]; assignments: { id: string; title: string; status: string; due_at: string }[] };
 const empty: Data = { role: "", summary: { students: null, activeBatches: 0, attendanceRate: null, assessmentAverage: null, assignments: 0, submittedAssignments: 0 }, batches: [], attendanceTrend: [], attempts: [], assignments: [] };
 const display = (value: number | null, suffix = "") => value === null ? "No data" : `${value}${suffix}`;
-const appRole = (role: string): AppRole => role === "STUDENT" || role === "PARENT" || role === "ACCOUNTANT" ? "STUDENT" : role === "TEACHER" ? "FACULTY" : role === "ACADEMIC_COORDINATOR" ? "COORDINATOR" : "DIRECTOR";
 
 export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolean }) {
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [data, setData] = useState<Data>(empty);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const load = useCallback(async (active: Organization) => {
-    const response = await fetch(`/api/organizations/${encodeURIComponent(active.slug)}/analytics`, { cache: "no-store" });
-    const result = await response.json();
-    if (!response.ok) setError(result.error ?? "Unable to load analytics."); else { setData(result); setError(""); }
-    setLoading(false);
-  }, []);
   useEffect(() => {
-    let cancelled = false;
-    async function fetchActive() {
-      const result = await resolveActiveOrganization();
-      if (cancelled) return;
-      const active = result?.organization ?? null;
-      setOrganization(active);
-      if (active) {
-        await load(active);
-      } else {
-        // Fallback: fetch available organizations and auto-select first one
-        const orgsRes = await fetch("/api/organizations", { cache: "no-store" });
-        if (orgsRes.ok) {
-          const list = (await orgsRes.json()).organizations as Organization[];
-          if (list && list[0]) {
-            setOrganization(list[0]);
-            await load(list[0]);
-            return;
-          }
+    let pending: AbortController | undefined;
+    async function load() {
+      pending?.abort();
+      const controller = new AbortController();
+      pending = controller;
+      setLoading(true);
+      setError("");
+      setData(empty);
+      try {
+        const selection = await resolveActiveOrganization();
+        if (controller.signal.aborted) return;
+        const active = selection?.organization ?? null;
+        setOrganization(active);
+        if (!active) {
+          setError("Select an institute to view analytics.");
+          return;
         }
-        setError("Select an institute to view analytics.");
-        setLoading(false);
+        const response = await fetch(`/api/organizations/${encodeURIComponent(active.slug)}/analytics`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const result = await response.json().catch(() => null);
+        if (controller.signal.aborted) return;
+        if (!response.ok || !result) setError(result?.error ?? "Unable to load analytics.");
+        else setData(result);
+      } catch {
+        if (!controller.signal.aborted) setError("Unable to load analytics.");
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
-    void fetchActive();
 
-    const handleOrgChange = () => {
-      void resolveActiveOrganization().then((result) => {
-        if (cancelled) return;
-        const active = result?.organization ?? null;
-        setOrganization(active);
-        if (active) void load(active);
-      });
-    };
-    window.addEventListener("prepzii:organization-changed", handleOrgChange);
+    void load();
+    window.addEventListener("prepzii:organization-changed", load);
     return () => {
-      cancelled = true;
-      window.removeEventListener("prepzii:organization-changed", handleOrgChange);
+      pending?.abort();
+      window.removeEventListener("prepzii:organization-changed", load);
     };
-  }, [load]);
+  }, []);
 
   function exportCsv() {
     const rows = [["Batch", "Target exam", "Grade", "Students"], ...data.batches.map((batch) => [batch.name, batch.target_exam, batch.grade_level ?? "", String(batch.student_count)])];
@@ -74,7 +67,7 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
 
   const submissionRate = data.summary.assignments ? Math.min(100, Math.round(data.summary.submittedAssignments / data.summary.assignments * 100)) : 0;
   const title = reportMode ? "Reports & analytics" : data.role === "STUDENT" ? "My learning overview" : data.role === "TEACHER" ? "My teaching overview" : "Institute overview";
-  return <DashboardLayout title={title} subtitle={`${organization?.name ?? "Institute"} · Live, role-scoped operational data`} currentRole={appRole(data.role)} action={reportMode && data.batches.length ? <Button onClick={exportCsv}>Download batch CSV</Button> : undefined}>
+  return <DashboardLayout title={title} subtitle={`${organization?.name ?? "Institute"} · Live, role-scoped operational data`} currentRole={data.role ? mapMembershipRole(data.role) : undefined} action={reportMode && data.batches.length ? <Button onClick={exportCsv}>Download batch CSV</Button> : undefined}>
     {error && <div className="form-error directory-error" role="alert">{error}</div>}
     {loading ? <p className="empty-state">Loading tenant analytics…</p> : <>
       <div className="metrics-grid">

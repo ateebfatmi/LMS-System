@@ -1,6 +1,6 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { isPlatformAdmin, listMyOrganizations } from "@/lib/prepzii-backend";
+import { isPlatformAdmin, listMyOrganizations, publicWorkspace } from "@/lib/prepzii-backend";
 
 const ACTIVE_ORGANIZATION_COOKIE = "prepzii_active_organization";
 type Portal = "platform" | "institute-admin" | "member";
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
 
   let organizations;
   try {
-    organizations = await listMyOrganizations(userId);
+    organizations = (await listMyOrganizations(userId)).map(publicWorkspace);
   } catch (error) {
     console.error("Unable to resolve the signed-in workspace", error);
     return new NextResponse("Unable to resolve your account workspace. Please try again.", {
@@ -101,9 +101,13 @@ export async function GET(request: NextRequest) {
     return mismatchRedirect(request, requestedPortal, returnTo);
   }
 
-  const organization =
-    eligibleOrganizations.find((item) => item.slug === requestedSlug) ?? eligibleOrganizations[0];
+  const organization = eligibleOrganizations.find((item) => item.slug === requestedSlug)
+    ?? (eligibleOrganizations.length === 1 ? eligibleOrganizations[0] : null);
   const response = NextResponse.redirect(new URL(returnTo ?? "/dashboard/workspace", request.url));
+  if (!organization) {
+    response.cookies.delete(ACTIVE_ORGANIZATION_COOKIE);
+    return response;
+  }
   response.cookies.set(ACTIVE_ORGANIZATION_COOKIE, organization.slug, {
     httpOnly: true,
     sameSite: "lax",

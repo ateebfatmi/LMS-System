@@ -1,5 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { cookies } from "next/headers";
+import { setActiveWorkspace } from "@/lib/dal/auth-context";
 import { z } from "zod";
 import { hashInvitationToken } from "@/lib/invitation-token";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
@@ -42,6 +42,7 @@ export async function POST(request: Request) {
   });
 
   if (error) {
+    if (error.code === "42501") return Response.json({ error: "This membership cannot be activated." }, { status: 403 });
     if (error.code === "P0002") return Response.json({ error: "Invitation is invalid for this account." }, { status: 404 });
     if (error.code === "23505") return Response.json({ error: "This membership belongs to another account." }, { status: 409 });
     console.error("Invitation acceptance failed", error);
@@ -57,13 +58,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invitation cannot be accepted." }, { status: 409 });
   }
 
-  (await cookies()).set("prepzii_active_organization", acceptance.organization_slug, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-  });
+  await setActiveWorkspace(acceptance.organization_slug);
 
   return Response.json({
     organization: { id: acceptance.organization_id, slug: acceptance.organization_slug },

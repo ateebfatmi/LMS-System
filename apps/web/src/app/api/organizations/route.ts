@@ -1,4 +1,4 @@
-import { getActingUserId, isPlatformAdmin, listMyOrganizations } from "@/lib/prepzii-backend";
+import { getActingUserId, isPlatformAdmin, listMyOrganizations, publicWorkspace } from "@/lib/prepzii-backend";
 
 export async function GET() {
   const userId = await getActingUserId();
@@ -11,17 +11,10 @@ export async function GET() {
     ]);
     return Response.json({
       isPlatformAdmin: platformAdmin,
-      organizations: organizations.map(({ id, name, slug, logo_url, status }) => ({
-        id,
-        name,
-        slug,
-        logoUrl: logo_url,
-        status,
-      })),
+      organizations: organizations.map(publicWorkspace),
     });
   } catch (error) {
     console.error("Failed to load Prepzii organizations", error);
-    return Response.json({ error: "Failed to load organizations" }, { status: 500 });
+    return Response.json({ error: "Failed to load organizations" }, { status: 503 });
   }
 }
-

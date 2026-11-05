@@ -92,28 +92,34 @@ export async function GET(_request: Request, context: Context) {
     })();
 
     const attemptsPromise = (async () => {
+      let attempts: Row[] = [];
       if (leadership) {
-        const canonical = await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).order("started_at", { ascending: false }).limit(100));
-        if (canonical.length) return canonical;
-        const legacy = await rows(client.from("test_attempts").select("id,user_id,status,score,total_marks,submitted_at").order("started_at", { ascending: false }).limit(20));
-        return legacy.map((attempt) => ({
-          id: attempt.id,
-          user_id: attempt.user_id,
-          status: attempt.status === "completed" || attempt.submitted_at ? "SUBMITTED" : "IN_PROGRESS",
-          score: attempt.score,
-          max_score: attempt.total_marks || 100,
-          percentage: attempt.total_marks ? Math.round(((Number(attempt.score) || 0) / Number(attempt.total_marks)) * 100) : 0,
-          submitted_at: attempt.submitted_at,
-        }));
-      }
-      if (teacher) {
+        attempts = await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).order("started_at", { ascending: false }).limit(100));
+        if (!attempts.length) {
+          const tests = await rows(client.from("institute_tests").select("id").eq("institute_id", organizationId));
+          const testIds = tests.map(({ id }) => String(id));
+          const legacy = testIds.length ? await rows(client.from("test_attempts").select("id,user_id,status,score,total_marks,submitted_at").in("test_id", testIds).order("started_at", { ascending: false }).limit(20)) : [];
+          attempts = legacy.map((a) => ({
+            id: a.id,
+            user_id: a.user_id,
+            status: a.status === "completed" || a.submitted_at ? "SUBMITTED" : "IN_PROGRESS",
+            score: a.score,
+            max_score: a.total_marks || 100,
+            percentage: a.total_marks ? Math.round(((Number(a.score) || 0) / Number(a.total_marks)) * 100) : 0,
+            submitted_at: a.submitted_at,
+          }));
+        }
+      } else if (teacher) {
         const tests = await rows(client.from("institute_tests").select("id,title").eq("institute_id", organizationId).eq("created_by", userId));
         const testIds = tests.map((test) => String(test.id));
-        return testIds.length ? rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).in("test_id", testIds).order("started_at", { ascending: false }).limit(100)) : [];
+        const schedules = visibleBatchIds.length ? await rows(client.from("organization_test_schedules").select("id")
+          .eq("organization_id", organizationId).in("batch_id", visibleBatchIds)) : [];
+        const scheduleIds = schedules.map(({ id }) => String(id));
+        attempts = testIds.length && scheduleIds.length ? await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).in("test_id", testIds).in("schedule_id", scheduleIds).order("started_at", { ascending: false }).limit(100)) : [];
+      } else if (student) {
+        attempts = await rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).eq("user_id", userId).eq("status", "SUBMITTED").eq("results_released", true).order("started_at", { ascending: false }).limit(50));
       }
-      return student
-        ? rows(client.from("organization_assessment_attempts").select("id,test_id,user_id,status,score,max_score,percentage,submitted_at").eq("organization_id", organizationId).eq("user_id", userId).order("started_at", { ascending: false }).limit(50))
-        : [];
+      return attempts;
     })();
 
     const assignmentsPromise = (async () => {
