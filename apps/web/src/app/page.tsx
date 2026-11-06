@@ -1,164 +1,191 @@
-"use client";
-
-import { type FormEvent, useState } from "react";
 import Link from "next/link";
+import {
+  ArrowDown, ArrowRight, ArrowUpRight, BarChart3, BookOpen, CalendarCheck2, Check,
+  ChevronDown, ClipboardCheck, FileLock2, GraduationCap, KeyRound, Megaphone,
+  Play, Presentation, School, ShieldCheck, UsersRound,
+} from "lucide-react";
 import { PrepziiMark } from "@prepzii/ui";
 import { Navbar1 } from "@/components/ui/navbar-1";
+import { DashboardPreview } from "./_landing/dashboard-preview";
+import { DemoForm } from "./_landing/demo-form";
+import styles from "./_landing/landing.module.css";
 
-const modules = [
-  ["People", "Manage students and faculty with secure invitations and CSV imports."],
-  ["Batches & courses", "Organize academic sessions, batches, subjects, courses and learning materials."],
-  ["Assignments", "Publish work, collect files, enforce deadlines and return grades with feedback."],
-  ["Assessments", "Build question banks, schedule CBT tests and grade objective or descriptive responses."],
-  ["Attendance", "Record batch attendance and retain an auditable correction history."],
-  ["Announcements", "Send role- and batch-scoped notices through the institute workspace."],
-  ["Reports", "Review attendance, assignment completion and assessment performance."],
-  ["Access control", "Give owners, administrators, faculty and students only the permissions they need."],
+const features = [
+  [UsersRound, "Student & Faculty Management", "Invite staff and add students individually or through CSV imports."],
+  [School, "Batches & Courses", "Organize batches, subjects, and course enrolments in one workspace."],
+  [ClipboardCheck, "Tests & Assessments", "Build question banks and schedule computer-based tests."],
+  [CalendarCheck2, "Attendance Tracking", "Mark attendance by batch and review records over time."],
+  [BookOpen, "Assignments & Study Materials", "Share resources, collect submissions, and give feedback."],
+  [BarChart3, "Results & Performance Reports", "Review test results, attendance, and assignment completion."],
+  [Megaphone, "Announcements", "Share notices with the right batches and roles."],
+  [ShieldCheck, "Secure Role-Based Access", "Give each member access to the tools their role requires."],
+] as const;
+
+const steps = [
+  ["Create Your Institute", "Set up a workspace with your institute’s name and details."],
+  ["Add Teachers, Students & Batches", "Invite your team and organize learners into their batches."],
+  ["Start Teaching, Testing & Tracking Progress", "Share materials, run tests, and follow attendance and results."],
 ] as const;
 
 const roles = [
-  ["Institute administrators", "Configure the institute, manage people and monitor academic operations."],
-  ["Faculty", "Manage assigned batches, materials, assignments, assessments and attendance."],
-  ["Students", "Access courses, submit assignments, take assessments and review attendance."],
+  [School, "Institute Owners", "Manage people and batches, and track attendance and performance across your institute."],
+  [Presentation, "Teachers", "Manage assigned classes, record attendance, and run assignments and assessments."],
+  [GraduationCap, "Students", "Access study materials, take assigned tests, and view released results."],
+] as const;
+
+const security = [
+  [School, "Separate institute workspaces"],
+  [KeyRound, "Role-based access"],
+  [FileLock2, "Protected academic records"],
+] as const;
+
+const faqs = [
+  ["Can we import our existing student and faculty lists?", "Yes. Institute administrators can upload CSV files and validate the records before importing them."],
+  ["Can teachers manage their own batches?", "Teachers can manage learning materials, assignments, assessments, and attendance for the batches they’re assigned to."],
+  ["Can I try a computer-based test before signing up?", "Yes. The public CBT demo lets you answer sample questions, move between them, and review solutions without an account."],
+  ["Can another institute access our records?", "Access is tied to verified membership in your institute, and permissions control what each role can see and do."],
 ] as const;
 
 export default function Home() {
-  const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
-
-  async function submitDemo(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setResult(null);
-    const formElement = event.currentTarget;
-    const form = new FormData(formElement);
-    const response = await fetch("/api/demo-request", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fullName: form.get("fullName"),
-        instituteName: form.get("instituteName"),
-        email: form.get("email"),
-        phone: form.get("phone"),
-        city: form.get("city"),
-        studentCount: form.get("studentCount"),
-        notes: form.get("notes"),
-      }),
-    }).catch(() => null);
-
-    if (!response) {
-      setResult({ success: false, message: "Unable to submit the request. Please try again." });
-    } else {
-      const payload = await response.json().catch(() => ({}));
-      setResult({
-        success: response.ok,
-        message: response.ok ? payload.message ?? "Your walkthrough request was received." : payload.error ?? "Unable to submit the request.",
-      });
-      if (response.ok) formElement.reset();
-    }
-    setSubmitting(false);
-  }
-
   return (
-    <main className="landing focused-landing">
-      <div className="hero-glow" aria-hidden="true" />
+    <div className={styles.landing}>
+      <a className={styles.skipLink} href="#main-content">Skip to content</a>
       <Navbar1 />
 
-      <section className="hero focused-hero" id="product">
-        <div className="premium-badge"><span aria-hidden="true">●</span> PREPZII FOR INSTITUTES</div>
-        <h1 className="hero-title">A focused learning-management system for coaching institutes.</h1>
-        <p>
-          Run courses, assignments, assessments, attendance and academic communication from one secure workspace—without unnecessary ERP complexity.
-        </p>
-        <div className="focused-actions">
-          <Link className="primary-link" href="/onboarding">Create institute workspace</Link>
-          <Link className="secondary-link" href="/sign-in">Sign in</Link>
-          <Link className="secondary-link" href="/cbt-demo">Try the CBT demo</Link>
-        </div>
-        <div className="trust-row" aria-label="Platform guarantees">
-          <span>Tenant-isolated data</span>
-          <span>Role-based access</span>
-          <span>Audited academic records</span>
-          <span>CSV member imports</span>
-        </div>
-      </section>
-
-      <section className="focused-section" id="modules">
-        <header className="focused-section-heading">
-          <p className="eyebrow">CORE LMS</p>
-          <h2>Only the tools required to teach and learn</h2>
-          <p>Every module belongs to the daily academic workflow. CRM, accounting, OMR scanning and speculative AI features are intentionally outside the core product.</p>
-        </header>
-        <div className="focused-module-grid">
-          {modules.map(([title, description], index) => (
-            <article className="bento-card" key={title}>
-              <span className="focused-card-number">{String(index + 1).padStart(2, "0")}</span>
-              <h3>{title}</h3>
-              <p>{description}</p>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="focused-band" id="roles">
-        <div className="focused-section focused-role-section">
-          <header className="focused-section-heading">
-            <p className="eyebrow">ROLE-SCOPED WORKSPACES</p>
-            <h2>A simpler experience for every user</h2>
-          </header>
-          <div className="focused-role-grid">
-            {roles.map(([title, description]) => <article key={title}><h3>{title}</h3><p>{description}</p></article>)}
+      <main id="main-content" tabIndex={-1}>
+        <section className={styles.hero} id="product">
+          <div className={styles.container}>
+            <div className={styles.heroCopy}>
+              <p className={styles.kicker}>Learning management for coaching institutes</p>
+              <h1>Manage Your Entire <span className={styles.heroSubject}>Coaching Institute</span> in <span className={styles.heroAccent}>One Place.</span></h1>
+              <p className={styles.heroDescription}>Manage students, batches, classes, attendance, tests, and performance — all from one simple platform.</p>
+              <div className={styles.heroActions}>
+                <Link className={styles.primaryButton} href="/onboarding">Get Started <ArrowRight size={18} aria-hidden="true" /></Link>
+                <a className={styles.secondaryButton} href="#modules">Explore Features <ArrowDown size={17} aria-hidden="true" /></a>
+              </div>
+              <Link className={styles.cbtLink} href="/cbt-demo"><Play size={14} aria-hidden="true" /> Try the CBT demo <ArrowUpRight size={14} aria-hidden="true" /></Link>
+            </div>
+            <DashboardPreview />
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="focused-section focused-security" id="security">
-        <div>
-          <p className="eyebrow">SECURITY BY DEFAULT</p>
-          <h2>Institute data stays inside its institute</h2>
-          <p>Tenant-owned records carry an organization identifier and are protected by database row-level security. Server-side membership checks determine every organization-scoped request.</p>
-        </div>
-        <ul>
-          <li>Server-authoritative assessment attempts and grading</li>
-          <li>Permission-scoped routes and mutations</li>
-          <li>Private files with controlled access</li>
-          <li>Health checks, backups and deployment validation</li>
-        </ul>
-      </section>
-
-      <section className="focused-section focused-demo" id="demo-request">
-        <div className="focused-demo-copy">
-          <p className="eyebrow">PERSONALIZED WALKTHROUGH</p>
-          <h2>See PrepZii with your institute workflow</h2>
-          <p>Tell us about your institute and we’ll arrange a focused walkthrough of the core LMS.</p>
-        </div>
-        <form className="focused-demo-form" onSubmit={submitDemo}>
-          <h3>Request a 1-on-1 Walkthrough</h3>
-          <div className="focused-form-grid">
-            <label>Your full name<input name="fullName" required placeholder="e.g. Dr. Rajesh Agrawal" /></label>
-            <label>Institute name<input name="instituteName" required placeholder="e.g. Apex IIT Academy" /></label>
-            <label>Work email<input name="email" type="email" required placeholder="director@institute.in" /></label>
-            <label>Phone number<input name="phone" type="tel" required placeholder="+91 98765 43210" /></label>
-            <label>City<input name="city" required placeholder="Kota" /></label>
-            <label>Enrolled students<select name="studentCount" defaultValue="100-500"><option value="under-100">Under 100</option><option value="100-500">100–500</option><option value="500-1500">500–1,500</option><option value="1500+">1,500+</option></select></label>
+        <section className={styles.section} id="modules">
+          <div className={styles.container}>
+            <header className={styles.sectionHeading}>
+              <p className={styles.kicker}>Features</p>
+              <h2>Everything You Need to Run Your Institute</h2>
+              <p>Simple tools for teachers, students, and institute administrators.</p>
+            </header>
+            <div className={styles.featureGrid}>
+              {features.map(([Icon, title, description]) => (
+                <article className={styles.featureCard} key={title}>
+                  <span className={styles.iconTile}><Icon size={21} aria-hidden="true" /></span>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </article>
+              ))}
+            </div>
           </div>
-          <label>What would you like to evaluate?<textarea name="notes" rows={3} placeholder="Courses, assessments, attendance, reporting…" /></label>
-          {result && <p className={result.success ? "focused-form-success" : "form-error"} role="status">{result.message}</p>}
-          <button className="pz-button pz-button-primary" disabled={submitting}>{submitting ? "Submitting…" : "Request walkthrough"}</button>
-        </form>
-      </section>
+        </section>
 
-      <section className="focused-section focused-faq" id="faqs">
-        <header className="focused-section-heading"><p className="eyebrow">FAQ</p><h2>Common questions</h2></header>
-        <details open><summary>Can we import existing students and faculty?</summary><p>Yes. Administrators can validate CSV files before committing student or faculty records.</p></details>
-        <details><summary>Can one institute see another institute’s records?</summary><p>No. Organization membership is verified server-side and tenant data is protected by row-level security.</p></details>
-        <details><summary>Which users are supported?</summary><p>The focused product supports institute administrators, faculty and students.</p></details>
-      </section>
+        <section className={styles.stepsSection} id="how-it-works">
+          <div className={styles.container}>
+            <header className={styles.sectionHeading}>
+              <p className={styles.kicker}>How it works</p>
+              <h2>Get Started in Three Simple Steps</h2>
+            </header>
+            <ol className={styles.steps}>
+              {steps.map(([title, description], index) => (
+                <li key={title}>
+                  <div className={styles.stepMarker}><span aria-hidden="true">{index + 1}</span></div>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
 
-      <footer className="focused-footer">
-        <div><PrepziiMark theme="dark" /><p>Focused learning management for coaching institutes.</p></div>
-        <nav aria-label="Footer navigation"><Link href="/sign-in">Sign in</Link><Link href="/onboarding">Create workspace</Link><a href="#demo-request">Request walkthrough</a></nav>
+        <section className={styles.roleSection} id="roles">
+          <div className={styles.container}>
+            <header className={styles.sectionHeading}>
+              <p className={styles.kicker}>Your institute, connected</p>
+              <h2>One Platform. A Personalized Experience for Everyone.</h2>
+            </header>
+            <div className={styles.roleGrid}>
+              {roles.map(([Icon, title, description]) => (
+                <article className={styles.roleCard} key={title}>
+                  <span className={styles.iconTile}><Icon size={22} aria-hidden="true" /></span>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.section} id="security">
+          <div className={styles.container}>
+            <div className={styles.securityPanel}>
+              <div>
+                <span className={styles.iconTile}><ShieldCheck size={24} aria-hidden="true" /></span>
+                <h2>Your Institute&apos;s Data, Protected.</h2>
+                <p>Access is controlled by institute membership, user roles, and permissions.</p>
+              </div>
+              <ul className={styles.securityList}>
+                {security.map(([Icon, label]) => <li key={label}><Icon size={19} aria-hidden="true" />{label}</li>)}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className={styles.demoSection} id="demo-request">
+          <div className={`${styles.container} ${styles.demoLayout}`}>
+            <div className={styles.demoCopy}>
+              <p className={styles.kicker}>Personalized walkthrough</p>
+              <h2>See How Prepzii Works for Your Institute</h2>
+              <p>Tell us a little about your institute. We’ll tailor the walkthrough to how your team teaches and manages classes.</p>
+              <ul>
+                <li><Check size={17} aria-hidden="true" /> See how to set up your batches</li>
+                <li><Check size={17} aria-hidden="true" /> Explore attendance and test workflows</li>
+                <li><Check size={17} aria-hidden="true" /> Ask questions about getting started</li>
+              </ul>
+            </div>
+            <DemoForm />
+          </div>
+        </section>
+
+        <section className={styles.section} id="faqs">
+          <div className={`${styles.container} ${styles.faqLayout}`}>
+            <header>
+              <p className={styles.kicker}>FAQs</p>
+              <h2>Common questions</h2>
+              <a className={styles.textLink} href="#demo-request">Request a walkthrough <ArrowUpRight size={16} aria-hidden="true" /></a>
+            </header>
+            <div className={styles.faqList}>
+              {faqs.map(([question, answer], index) => (
+                <details key={question} name="landing-faq" open={index === 0}>
+                  <summary>{question}<ChevronDown size={19} aria-hidden="true" /></summary>
+                  <p>{answer}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className={styles.footer}>
+        <div className={`${styles.container} ${styles.footerInner}`}>
+          <div><Link href="/" aria-label="Prepzii home"><PrepziiMark /></Link><p>Learning management for coaching institutes.</p></div>
+          <nav aria-label="Footer navigation">
+            <a href="#modules">Features</a>
+            <Link href="/sign-in">Sign In</Link>
+            <Link href="/onboarding">Create Workspace</Link>
+            <Link href="/dashboard">Open Workspace</Link>
+            <a href="#demo-request">Request Demo</a>
+          </nav>
+        </div>
       </footer>
-    </main>
+    </div>
   );
 }
