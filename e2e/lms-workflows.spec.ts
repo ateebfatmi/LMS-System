@@ -5,8 +5,8 @@ test.describe("PrepZii LMS release smoke tests", () => {
     await page.goto("/");
     await expect(page).toHaveTitle(/PrepZii/i);
     await expect(page.getByText("PrepZii for Institutes", { exact: false }).first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: /focused learning-management system/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Only the tools required to teach and learn" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Manage Your Entire Coaching Institute in One Place." })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 2, name: "Everything You Need to Run Your Institute" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Request a 1-on-1 Walkthrough" })).toBeVisible();
     await expect(page.getByPlaceholder("e.g. Dr. Rajesh Agrawal")).toBeVisible();
     await expect(page.getByPlaceholder("e.g. Apex IIT Academy")).toBeVisible();
