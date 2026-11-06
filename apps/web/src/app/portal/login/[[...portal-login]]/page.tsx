@@ -1,20 +1,11 @@
-import { RoleSignIn } from "@/components/role-sign-in";
+import { redirect } from "next/navigation";
+import { withSignInReturn } from "@/lib/sign-in-navigation";
 
-export default async function MemberLoginPage({
+export default async function LegacySignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ return_to?: string }>;
+  searchParams: Promise<{ return_to?: string; redirect_url?: string }>;
 }) {
-  const query = await searchParams;
-  return (
-    <RoleSignIn
-      portal="member"
-      path="/portal/login"
-      eyebrow="FACULTY & STUDENT WORKSPACE"
-      title="Faculty & student portal"
-      description="Open the role-scoped workspace assigned to you by your institute."
-      guidance="Invited faculty members and enrolled students"
-      returnTo={query.return_to}
-    />
-  );
+  const { return_to, redirect_url } = await searchParams;
+  redirect(withSignInReturn("/sign-in", return_to ?? redirect_url));
 }

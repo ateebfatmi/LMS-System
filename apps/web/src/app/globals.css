@@ -4544,82 +4544,38 @@ textarea:focus {
   box-shadow: 0 0 0 4px rgb(250 204 21 / 18%) !important;
 }
 
-/* --- Role-separated authentication portals --- */
-.portal-chooser,
-.role-login {
-  min-height: 100vh;
-  color: #0f172a;
-  background:
-    radial-gradient(circle at 12% 12%, rgba(250, 204, 21, 0.16), transparent 32%),
-    linear-gradient(145deg, #f8fafc 0%, #ffffff 52%, #eef2ff 100%);
+/* --- Sign-in --- */
+.sign-in-page {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 24px 16px;
+  background: #fff;
+  color: #0b1528;
 }
 
-.portal-chooser {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
+.sign-in-card {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  width: min(100%, 440px);
+  padding: clamp(20px, 6vw, 36px);
+  border: 1px solid #e2e8f0;
+  border-top: 4px solid #facc15;
+  border-radius: 22px;
+  box-shadow: 0 18px 48px rgb(15 23 42 / 8%);
+  text-align: center;
 }
 
-.portal-chooser-brand,
-.role-login-brand { display: inline-flex; text-decoration: none; }
-
-.portal-chooser-heading { max-width: 680px; margin: 28px auto 30px; text-align: center; }
-.portal-chooser-heading > p,
-.role-login-eyebrow { margin: 0 0 10px; font-size: 12px; font-weight: 800; letter-spacing: .16em; }
-.portal-chooser-heading > p { color: #a16207; }
-.role-login-eyebrow { color: #fde047; }
-.portal-chooser-heading h1,
-.role-login-intro h1 { margin: 0; color: #0b1528; font-family: var(--font-display); font-size: clamp(34px, 5vw, 54px); line-height: 1; }
-.portal-chooser-heading span { display: block; margin-top: 14px; color: #64748b; font-size: 15px; }
-
-.portal-error { width: min(100%, 760px); margin: 0 auto 22px; padding: 16px 18px; border: 1px solid #fecaca; border-radius: 14px; background: #fff7f7; text-align: center; }
-.portal-error strong,
-.portal-error span { display: block; }
-.portal-error strong { color: #991b1b; }
-.portal-error span { margin-top: 4px; color: #7f1d1d; font-size: 13px; }
-.portal-signout { margin-top: 12px; padding: 8px 12px; border: 1px solid #fca5a5; border-radius: 8px; background: #fff; color: #991b1b; font-weight: 700; cursor: pointer; }
-
-.portal-grid { width: min(100%, 1100px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
-.portal-card { position: relative; min-height: 310px; display: flex; flex-direction: column; padding: 26px; overflow: hidden; border: 1px solid #e2e8f0; border-radius: 22px; background: rgba(255, 255, 255, .92); box-shadow: 0 18px 45px rgba(15, 23, 42, .08); color: #0f172a; text-decoration: none; transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-.portal-card:hover { transform: translateY(-5px); border-color: #94a3b8; box-shadow: 0 24px 54px rgba(15, 23, 42, .13); }
-.portal-card-icon { width: 50px; height: 50px; display: grid; place-items: center; margin-bottom: 28px; border-radius: 14px; background: #f8fafc; font-size: 24px; }
-.portal-card small { color: #64748b; font-size: 10px; font-weight: 800; letter-spacing: .13em; }
-.portal-card h2 { margin: 8px 0 10px; font-family: var(--font-display); font-size: 28px; }
-.portal-card p { margin: 0; color: #64748b; font-size: 13px; line-height: 1.65; }
-.portal-card > strong { margin-top: auto; padding-top: 24px; font-size: 13px; }
-.portal-card-admin { border-top: 4px solid #facc15; }
-.portal-card-member { border-top: 4px solid #2563eb; }
-.portal-card-platform { border-top: 4px solid #0f172a; background: #0f172a; color: #f8fafc; }
-.portal-card-platform p,
-.portal-card-platform small { color: #cbd5e1; }
-.portal-card-platform .portal-card-icon { background: #1e293b; }
-.portal-help { margin: 26px 0 0; color: #64748b; font-size: 13px; }
-.portal-help a { color: #0f172a; font-weight: 800; }
-
-.role-login { display: grid; grid-template-columns: minmax(320px, .85fr) minmax(430px, 1.15fr); }
-.role-login-intro { display: flex; flex-direction: column; justify-content: center; padding: clamp(40px, 7vw, 100px); background: #0b1528; color: #fff; }
-.role-login-member .role-login-intro { background: #172554; }
-.role-login-platform .role-login-intro { background: #050914; }
-.role-login-brand { width: fit-content; margin-bottom: 54px; }
-.role-login-intro h1 { color: #fff; }
-.role-login-intro > p:not(.role-login-eyebrow) { max-width: 520px; margin: 18px 0 0; color: #cbd5e1; line-height: 1.7; }
-.role-login-guidance { max-width: 520px; display: grid; gap: 5px; margin-top: 34px; padding: 16px 18px; border: 1px solid rgba(255,255,255,.15); border-radius: 12px; background: rgba(255,255,255,.06); }
-.role-login-guidance strong { color: #facc15; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
-.role-login-guidance span { color: #e2e8f0; font-size: 13px; }
-.role-login-switch { width: fit-content; margin-top: 30px; color: #cbd5e1; font-size: 13px; font-weight: 700; text-decoration: none; }
-.role-login-switch:hover { color: #fff; }
-.role-login-form { display: grid; place-items: center; padding: 40px 24px; }
-.role-login-unconfigured { width: min(100%, 440px); padding: 30px; border: 1px solid #e2e8f0; border-radius: 22px; background: #fff; text-align: center; box-shadow: 0 20px 45px rgba(15,23,42,.09); }
-.role-login-unconfigured h2 { margin: 0 0 9px; }
-.role-login-unconfigured p { margin: 0; color: #64748b; line-height: 1.6; }
-
-@media (max-width: 900px) {
-  .portal-grid { grid-template-columns: 1fr; max-width: 620px; }
-  .portal-card { min-height: 240px; }
-  .role-login { grid-template-columns: 1fr; }
-  .role-login-intro { padding: 38px 24px; }
-  .role-login-brand { margin-bottom: 30px; }
-  .role-login-form { min-height: 620px; }
-}
+.sign-in-brand { display: inline-flex; }
+.sign-in-brand .pz-accent-yellow { color: #a16207 !important; }
+.sign-in-card h1 { margin: 0; font-family: var(--font-display); font-size: clamp(26px, 6vw, 32px); line-height: 1.2; }
+.sign-in-card > p { margin: 0; color: #475569; line-height: 1.55; }
+.sign-in-card .org-switcher { display: block; width: 100%; margin: 0; border-color: #e2e8f0; text-align: left; }
+.sign-in-card .org-switcher-copy strong { color: #0b1528; }
+.sign-in-card .org-switcher-copy small { color: #475569; }
+.sign-in-card .org-switcher-menu { position: static; box-shadow: none; border: 0; }
+.sign-in-card .org-switcher-menu-label, .sign-in-card .org-option-copy small { color: #475569; }
+.sign-in-footer { width: 100%; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 14px; }
+.sign-in-workspace-link { color: #0b1528; font-weight: 700; text-decoration: underline; text-decoration-color: #ca8a04; text-underline-offset: 4px; }
+.sign-in-account-switch { border: 0; background: transparent; color: #0b1528; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 4px; }

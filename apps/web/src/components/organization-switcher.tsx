@@ -7,7 +7,7 @@ import { rememberActiveOrganization, resolveActiveOrganization } from "@/lib/cli
 
 type Organization = { id: string; name: string; slug: string; logoUrl: string | null; status: string };
 
-export function OrganizationSwitcher() {
+export function OrganizationSwitcher({ returnTo }: { returnTo?: string } = {}) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [activeSlug, setActiveSlug] = useState("");
   const [role, setRole] = useState("");
@@ -31,7 +31,7 @@ export function OrganizationSwitcher() {
         setActiveSlug(result.organization.slug);
         setRole(result.role);
         window.dispatchEvent(new CustomEvent("prepzii:organization-changed", { detail: { role: result.role } }));
-        window.location.assign("/dashboard/workspace");
+        window.location.assign(returnTo ?? "/dashboard/workspace");
       } else {
         setError("Unable to switch workspace");
       }
@@ -40,7 +40,7 @@ export function OrganizationSwitcher() {
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [returnTo]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +139,7 @@ export function OrganizationSwitcher() {
                 onClick={() => {
                   setOpen(false);
                   if (!isActive) void select(organization.slug);
+                  else if (returnTo) window.location.assign(returnTo);
                 }}
               >
                 <span className="org-option-avatar" aria-hidden="true">{initialsFor(organization.name)}</span>

@@ -66,7 +66,7 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
   }
 
   const submissionRate = data.summary.assignments ? Math.min(100, Math.round(data.summary.submittedAssignments / data.summary.assignments * 100)) : 0;
-  const title = reportMode ? "Reports & analytics" : data.role === "STUDENT" ? "My learning overview" : data.role === "TEACHER" ? "My teaching overview" : "Institute overview";
+  const title = reportMode ? "Reports & analytics" : data.role === "STUDENT" ? "My learning overview" : data.role === "TEACHER" ? "My teaching overview" : data.role === "PARENT" ? "Parent overview" : "Institute overview";
   return <DashboardLayout title={title} subtitle={`${organization?.name ?? "Institute"} · Live, role-scoped operational data`} currentRole={data.role ? mapMembershipRole(data.role) : undefined} action={reportMode && data.batches.length ? <Button onClick={exportCsv}>Download batch CSV</Button> : undefined}>
     {error && <div className="form-error directory-error" role="alert">{error}</div>}
     {loading ? <p className="empty-state">Loading tenant analytics…</p> : <>

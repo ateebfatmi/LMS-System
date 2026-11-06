@@ -158,7 +158,6 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
     } else {
       setShowAddModal(false);
       setSuccessMessage(`${isStudent ? "Student" : "Faculty member"} enrolled successfully.`);
-      event.currentTarget.reset();
       await load(organization, search, page);
     }
     setSaving(false);

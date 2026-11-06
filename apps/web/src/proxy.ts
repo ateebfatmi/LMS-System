@@ -107,8 +107,21 @@ export default function proxy(req: NextRequest, ev: NextFetchEvent) {
       if (!userId) return NextResponse.json({ error: "Unauthorized. Please sign in again." }, { status: 401 });
       return;
     }
+    const pathname = request.nextUrl.pathname;
+    // The resolver authenticates the session itself so it can carry forward return_to.
+    if (pathname === "/auth/resolve") return;
+    if (pathname === "/admin" || pathname === "/super-admin"
+      || pathname.startsWith("/admin/") || pathname.startsWith("/super-admin/")) {
+      await auth.protect({ unauthenticatedUrl: new URL("/admin/login", request.url).href });
+      return;
+    }
+    const session = await auth();
+    if (!session.userId && (request.headers.get("accept")?.includes("text/html") ||
+      request.headers.get("sec-fetch-dest") === "document" || request.headers.has("next-url"))) {
+      return session.redirectToSignIn({ returnBackUrl: request.url });
+    }
     await auth.protect();
-  })(req, ev);
+  }, { signInUrl: "/sign-in" })(req, ev);
 }
 
 export const config = {

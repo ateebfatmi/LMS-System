@@ -65,9 +65,9 @@ export default function SignUpPage() {
             }}
             routing="path"
             path="/sign-up"
-            signInUrl="/institute/login"
-            forceRedirectUrl="/auth/resolve?portal=institute-admin"
-            fallbackRedirectUrl="/auth/resolve?portal=institute-admin"
+            signInUrl="/sign-in"
+            forceRedirectUrl="/auth/resolve?return_to=%2Fonboarding"
+            fallbackRedirectUrl="/auth/resolve?return_to=%2Fonboarding"
           />
         ) : (
           <section
@@ -92,7 +92,7 @@ export default function SignUpPage() {
       <div style={{ marginTop: "24px", textAlign: "center" }}>
         <p style={{ color: "#64748b", fontSize: "13px" }}>
           Already manage an institute?{" "}
-          <Link href="/institute/login" style={{ color: "#facc15", fontWeight: 700, textDecoration: "none" }}>
+          <Link href="/sign-in" style={{ color: "#facc15", fontWeight: 700, textDecoration: "none" }}>
             Sign in here →
           </Link>
         </p>

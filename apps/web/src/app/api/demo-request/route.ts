@@ -14,6 +14,50 @@ const demoRequestSchema = z.object({
   notes: z.string().trim().max(2_000).optional(),
 });
 
+async function notifyPrepzii(requestId: string, details: z.infer<typeof demoRequestSchema>) {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const from = process.env.DEMO_REQUEST_FROM_EMAIL?.trim();
+  if (!apiKey || !from) return false;
+
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `demo-request/${requestId}`,
+      },
+      signal: AbortSignal.timeout(5000),
+      body: JSON.stringify({
+        from,
+        to: ["contact@prepzii.com"],
+        reply_to: details.email,
+        subject: "New Prepzii walkthrough request",
+        text: [
+          `Request ID: ${requestId}`,
+          `Name: ${details.fullName}`,
+          `Institute: ${details.instituteName}`,
+          `Work email: ${details.email}`,
+          `Phone: ${details.phone}`,
+          `City: ${details.city}`,
+          `Enrolled students: ${details.studentCount}`,
+          `Interested plan: ${details.interestedPlan}`,
+          "",
+          "Notes:",
+          details.notes || "None",
+        ].join("\n"),
+      }),
+    });
+    if (!response.ok) {
+      console.warn("Demo request email rejected", { requestId, status: response.status });
+    }
+    return response.ok;
+  } catch {
+    console.warn("Demo request email could not be sent", { requestId });
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   const limited = await guardRateLimit({ request, scope: "demo-request", limit: 5, windowSeconds: 3600 });
   if (limited) return limited;
@@ -43,10 +87,14 @@ export async function POST(request: Request) {
       .single();
 
     if (error) throw error;
+    const emailNotification = await notifyPrepzii(data.id, parsed.data);
     return NextResponse.json(
       {
         success: true,
-        message: "Your demo request has been received. The PrepZii team will contact you shortly.",
+        message: emailNotification
+          ? "Your demo request has been received. The PrepZii team will contact you shortly."
+          : "Your walkthrough request was saved. Email notification is currently unavailable.",
+        emailNotification,
         requestId: data.id,
       },
       { status: 201 },

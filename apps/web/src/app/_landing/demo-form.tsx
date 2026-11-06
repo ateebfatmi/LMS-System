@@ -5,7 +5,11 @@ import styles from "./landing.module.css";
 
 export function DemoForm() {
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [result, setResult] = useState<{
+    success: boolean;
+    message: string;
+    offerEmail?: boolean;
+  } | null>(null);
 
   async function submitDemo(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -28,12 +32,13 @@ export function DemoForm() {
     }).catch(() => null);
 
     if (!response) {
-      setResult({ success: false, message: "Unable to submit the request. Please try again." });
+      setResult({ success: false, message: "Unable to submit the request. Please try again.", offerEmail: true });
     } else {
       const payload = await response.json().catch(() => ({}));
       setResult({
         success: response.ok,
         message: response.ok ? payload.message ?? "Your walkthrough request was received." : payload.error ?? "Unable to submit the request.",
+        offerEmail: payload.emailNotification === false || response.status >= 500,
       });
       if (response.ok) formElement.reset();
     }
@@ -52,7 +57,12 @@ export function DemoForm() {
         <label>Enrolled students<select name="studentCount" defaultValue="100-500"><option value="under-100">Under 100</option><option value="100-500">100–500</option><option value="500-1500">500–1,500</option><option value="1500+">1,500+</option></select></label>
       </div>
       <label>What would you like to evaluate? (optional)<textarea name="notes" rows={3} placeholder="Courses, assessments, attendance, reporting…" /></label>
-      {result && <p className={result.success ? styles.formSuccess : "form-error"} role="status">{result.message}</p>}
+      {result && (
+        <p className={result.success ? styles.formSuccess : "form-error"} role="status">
+          {result.message}
+          {result.offerEmail && <> You can also email <a className="underline" href="mailto:contact@prepzii.com">contact@prepzii.com</a>.</>}
+        </p>
+      )}
       <button className={styles.primaryButton} disabled={submitting}>{submitting ? "Submitting…" : "Request walkthrough"}</button>
     </form>
   );

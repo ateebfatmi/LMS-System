@@ -33,8 +33,19 @@ test("a signed-out mobile visitor cannot open a dashboard by supplying a role", 
   if (response?.status() === 503) {
     await expect(page.getByText("Authentication is not configured.", { exact: false })).toBeVisible();
   } else if (page.url().includes("/sign-in")) {
-    await expect(page.getByRole("heading", { name: /choose your sign-in portal/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /your institute workspace/i })).toBeVisible();
   } else {
     await expect(page.getByRole("heading", { name: "Create your institute to open the workspace" })).toBeVisible();
+  }
+});
+
+test("platform administration stays protected and separate from institute sign-in", async ({ request }) => {
+  const denied = await request.get("/super-admin", {
+    headers: { ...forgedIdentity, accept: "text/html" },
+    maxRedirects: 0,
+  });
+  expect([307, 503]).toContain(denied.status());
+  if (denied.status() === 307) {
+    expect(new URL(denied.headers().location, denied.url()).pathname).toBe("/admin/login");
   }
 });

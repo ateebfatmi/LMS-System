@@ -32,21 +32,22 @@ test.describe("PrepZii LMS release smoke tests", () => {
     await expect(page.getByRole("button", { name: /Create institute workspace/ })).toBeVisible();
   });
 
-  test("authentication entry points are separated by account role", async ({ page }) => {
+  test("one mobile-friendly sign-in is shared by institute users", async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
     await page.goto("/sign-in");
-    await expect(page.getByRole("heading", { name: "Choose your sign-in portal" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Institute admin/ })).toHaveAttribute("href", "/institute/login");
-    await expect(page.getByRole("link", { name: /Faculty & students/ })).toHaveAttribute("href", "/portal/login");
-    await expect(page.getByRole("link", { name: /Platform super admin/ })).toHaveAttribute("href", "/admin/login");
+    await expect(page.getByRole("heading", { level: 1, name: "Your institute workspace" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Own a coaching institute? Create your workspace." })).toHaveAttribute("href", "/sign-up");
+    await expect(page.getByRole("link", { name: /platform|faculty|institute admin/i })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  });
 
-    await page.goto("/institute/login");
-    await expect(page.getByRole("heading", { name: "Institute administration" })).toBeVisible();
-
-    await page.goto("/portal/login");
-    await expect(page.getByRole("heading", { name: "Faculty & student portal" })).toBeVisible();
-
-    await page.goto("/admin/login");
-    await expect(page.getByRole("heading", { name: "Platform super admin" })).toBeVisible();
+  test("legacy institute sign-in URLs preserve invitation return links", async ({ page }) => {
+    for (const path of ["/institute/login", "/portal/login"]) {
+      await page.goto(`${path}?return_to=%2Finvite%2Fexample`);
+      await expect(page).toHaveURL((url) =>
+        url.pathname === "/sign-in" && url.searchParams.get("return_to") === "/invite/example",
+      );
+    }
   });
 
   test("unconfigured dependencies fail readiness without failing liveness", async ({ request }) => {

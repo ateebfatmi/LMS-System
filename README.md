@@ -21,12 +21,10 @@ Admissions CRM, institute fee accounting, OMR scanning, parent portals, doubt wo
 
 Authentication uses one Clerk identity service with separate, server-verified entry points:
 
-- `/institute/login` — institute owners and administrators;
-- `/portal/login` — invited faculty and enrolled students;
-- `/admin/login` — allowlisted PrepZii platform super administrators;
-- `/sign-in` — neutral portal chooser only.
+- `/sign-in` — the Clerk sign-in for all institute users. Legacy institute sign-in links redirect here.
+- `/super-admin` — separate access for allowlisted PrepZii platform operators.
 
-Completing authentication does not grant a role. `/auth/resolve` verifies the selected portal against the authenticated platform allowlist or active institute membership before assigning a workspace.
+After Clerk authenticates the user, `/auth/resolve` checks active institute memberships. One membership opens the role-scoped dashboard; multiple memberships open the workspace selector. Users without an active membership get invitation and onboarding guidance.
 
 ## Repository layout
 

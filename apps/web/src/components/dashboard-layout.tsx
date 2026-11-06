@@ -23,7 +23,7 @@ import { PrepziiMark } from "@prepzii/ui";
 import { DashboardSidebar } from "@/components/ui/dashboard-sidebar";
 import { resolveActiveOrganization } from "@/lib/client-org";
 
-export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT";
+export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT";
 
 let rememberedSidebarCollapsed = false;
 let rememberedMembershipRole: AppRole = "DIRECTOR";
@@ -59,6 +59,10 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideI
     { href: "/dashboard/attendance/workspace", label: "My Attendance", icon: CalendarCheck2 },
     { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
   ],
+  PARENT: [
+    { href: "/dashboard/workspace", label: "Home", icon: LayoutDashboard },
+    { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
+  ],
   COORDINATOR: [
     { href: "/dashboard/workspace", label: "Academic Overview", icon: LayoutDashboard },
     { href: "/dashboard/students/workspace", label: "Students", icon: GraduationCap },
@@ -75,7 +79,8 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideI
 export function mapMembershipRole(role: string): AppRole {
   if (role === "TEACHER") return "FACULTY";
   if (role === "ACADEMIC_COORDINATOR") return "COORDINATOR";
-  if (role === "STUDENT" || role === "PARENT" || role === "ACCOUNTANT") return "STUDENT";
+  if (role === "PARENT") return "PARENT";
+  if (role === "STUDENT" || role === "ACCOUNTANT") return "STUDENT";
   return "DIRECTOR";
 }
 

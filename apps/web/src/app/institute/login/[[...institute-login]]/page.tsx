@@ -1,21 +1,11 @@
-import { RoleSignIn } from "@/components/role-sign-in";
+import { redirect } from "next/navigation";
+import { withSignInReturn } from "@/lib/sign-in-navigation";
 
-export default async function InstituteAdminLoginPage({
+export default async function LegacySignInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ return_to?: string }>;
+  searchParams: Promise<{ return_to?: string; redirect_url?: string }>;
 }) {
-  const query = await searchParams;
-  return (
-    <RoleSignIn
-      portal="institute-admin"
-      path="/institute/login"
-      eyebrow="INSTITUTE ADMINISTRATION"
-      title="Institute administration"
-      description="Manage your institute, faculty, students, batches and academic workflows."
-      guidance="Institute owners and authorized administrators"
-      signUpUrl="/sign-up"
-      returnTo={query.return_to}
-    />
-  );
+  const { return_to, redirect_url } = await searchParams;
+  redirect(withSignInReturn("/sign-in", return_to ?? redirect_url));
 }
