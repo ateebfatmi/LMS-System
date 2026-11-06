@@ -3,22 +3,30 @@
 import { Check, ChevronDown, Plus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { rememberActiveOrganization, resolveActiveOrganization } from "@/lib/client-org";
+import { instituteInitials } from "@prepzii/contracts";
+import { clearRememberedActiveOrganization, rememberActiveOrganization, resolveActiveOrganization, type ActiveOrganizationSelection, WORKSPACE_SWITCH_EVENT } from "@/lib/client-org";
 
 type Organization = { id: string; name: string; slug: string; logoUrl: string | null; status: string };
 
-export function OrganizationSwitcher({ returnTo }: { returnTo?: string } = {}) {
+export function OrganizationSwitcher({ returnTo, selection, selectionPending = false }: {
+  returnTo?: string;
+  selection?: ActiveOrganizationSelection | null;
+  selectionPending?: boolean;
+} = {}) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [activeSlug, setActiveSlug] = useState("");
-  const [role, setRole] = useState("");
+  const [standaloneSelection, setStandaloneSelection] = useState<ActiveOrganizationSelection | null>(null);
+  const active = selection === undefined ? standaloneSelection : selection;
+  const standalone = selection === undefined;
   const [busy, setBusy] = useState(true);
+  const [switching, setSwitching] = useState(false);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const switcherRef = useRef<HTMLDivElement>(null);
 
   const select = useCallback(async (slug: string) => {
-    setBusy(true);
+    setSwitching(true);
     setError("");
+    window.dispatchEvent(new CustomEvent(WORKSPACE_SWITCH_EVENT, { detail: true }));
     try {
       const response = await fetch("/api/organizations/active", {
         method: "POST",
@@ -26,49 +34,43 @@ export function OrganizationSwitcher({ returnTo }: { returnTo?: string } = {}) {
         body: JSON.stringify({ slug }),
       });
       if (response.ok) {
-        const result = await response.json();
-        rememberActiveOrganization(result);
-        setActiveSlug(result.organization.slug);
-        setRole(result.role);
-        window.dispatchEvent(new CustomEvent("prepzii:organization-changed", { detail: { role: result.role } }));
+        const result = await response.json().catch(() => null) as ActiveOrganizationSelection | null;
+        if (result?.organization?.id) rememberActiveOrganization(result);
+        else clearRememberedActiveOrganization();
+        // A document navigation discards cached routes and data from the previous institute.
         window.location.assign(returnTo ?? "/dashboard/workspace");
-      } else {
-        setError("Unable to switch workspace");
+        return;
       }
     } catch {
-      setError("Unable to switch workspace");
-    } finally {
-      setBusy(false);
+      // Restore the current workspace if the selection request fails.
     }
+    setError("Unable to switch workspace.");
+    setSwitching(false);
+    window.dispatchEvent(new CustomEvent(WORKSPACE_SWITCH_EVENT, { detail: false }));
   }, [returnTo]);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const [listResponse, active] = await Promise.all([
-        fetch("/api/organizations"),
-        resolveActiveOrganization(),
-      ]);
-      if (cancelled || !listResponse.ok) return setBusy(false);
-      const data = await listResponse.json();
-      const list = (data.organizations ?? []) as Organization[];
-      setOrganizations(list);
-      if (active?.organization?.slug) {
-        setActiveSlug(active.organization.slug);
-        setRole(active.role ?? "");
-        setBusy(false);
-        return;
+      try {
+        const [response, resolved] = await Promise.all([
+          fetch("/api/organizations", { cache: "no-store" }),
+          standalone ? resolveActiveOrganization() : null,
+        ]);
+        if (!response.ok) throw new Error("Workspace list unavailable");
+        const data = await response.json();
+        if (cancelled) return;
+        setOrganizations(data.organizations ?? []);
+        setStandaloneSelection(resolved);
+      } catch {
+        if (!cancelled) setError("Unable to load workspaces.");
+      } finally {
+        if (!cancelled) setBusy(false);
       }
-      setBusy(false);
     }
-    void load().catch(() => {
-      if (!cancelled) {
-        setError("Unable to load workspaces.");
-        setBusy(false);
-      }
-    });
+    void load();
     return () => { cancelled = true; };
-  }, []);
+  }, [standalone]);
 
   useEffect(() => {
     if (!open) return;
@@ -89,19 +91,15 @@ export function OrganizationSwitcher({ returnTo }: { returnTo?: string } = {}) {
     };
   }, [open]);
 
-  const active = organizations.find((organization) => organization.slug === activeSlug);
-  const initialsFor = (name: string) =>
-    name
-      .split(/\s+/)
-      .map((word) => word[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase();
-  const initials = initialsFor(active?.name ?? "PrepZii");
-  const canSwitch = !busy;
+  const activeName = active?.organization.name;
+  const role = active?.role;
+  const loading = busy || selectionPending;
+  const canSwitch = !loading && !switching;
   const accessLabel = role
     ? `${role.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase())} access`
     : organizations.length ? "Select a workspace" : "Create an institute";
+  const triggerName = switching ? "Switching workspace…" : loading ? "Loading workspace…" : activeName ?? "No institute";
+  const triggerStatus = switching ? "Loading institute" : error || accessLabel;
 
   return (
     <div ref={switcherRef} className={`org-switcher real-org-switcher${open ? " is-open" : ""}`}>
@@ -114,10 +112,11 @@ export function OrganizationSwitcher({ returnTo }: { returnTo?: string } = {}) {
         disabled={!canSwitch}
         onClick={() => canSwitch && setOpen((current) => !current)}
       >
-        <span className="org-avatar" aria-hidden="true">{initials}</span>
+        {!standalone && <span className="dashboard-sr-only">Switch institute workspace</span>}
+        <span className="org-avatar" aria-hidden="true">{switching ? "…" : instituteInitials(activeName ?? "")}</span>
         <span className="org-switcher-copy">
-          <strong>{busy ? "Loading workspace…" : active?.name ?? "No institute"}</strong>
-          <small aria-live="polite">{error || accessLabel}</small>
+          <strong>{triggerName}</strong>
+          <small aria-live="polite">{triggerStatus}</small>
         </span>
         {canSwitch && (
           <ChevronDown className="org-switcher-chevron" aria-hidden="true" strokeWidth={2.2} />
@@ -128,7 +127,7 @@ export function OrganizationSwitcher({ returnTo }: { returnTo?: string } = {}) {
         <div id="organization-switcher-menu" className="org-switcher-menu" role="listbox" aria-label="Institute workspaces">
           <span className="org-switcher-menu-label">Switch workspace</span>
           {organizations.map((organization) => {
-            const isActive = organization.slug === activeSlug;
+            const isActive = organization.slug === active?.organization.slug;
             return (
               <button
                 key={organization.id}
@@ -142,9 +141,9 @@ export function OrganizationSwitcher({ returnTo }: { returnTo?: string } = {}) {
                   else if (returnTo) window.location.assign(returnTo);
                 }}
               >
-                <span className="org-option-avatar" aria-hidden="true">{initialsFor(organization.name)}</span>
+                <span className="org-option-avatar" aria-hidden="true">{instituteInitials(isActive ? activeName ?? organization.name : organization.name)}</span>
                 <span className="org-option-copy">
-                  <strong>{organization.name}</strong>
+                  <strong>{isActive ? activeName : organization.name}</strong>
                   <small>{organization.slug}</small>
                 </span>
                 {isActive && <Check className="org-option-check" aria-hidden="true" strokeWidth={2.4} />}

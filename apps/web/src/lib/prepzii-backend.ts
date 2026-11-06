@@ -16,6 +16,7 @@ type Institute = {
   name: string;
   slug: string;
   logo_url: string | null;
+  primary_color: string | null;
   owner_user_id: string | null;
   status: string;
 
@@ -79,7 +80,7 @@ export async function isPlatformAdmin(authenticatedUserId?: string | null): Prom
   return allowedUserIds.has(userId);
 }
 
-const instituteFields = "id,name,slug,logo_url,owner_user_id,status";
+const instituteFields = "id,name,slug,logo_url,primary_color,owner_user_id,status";
 const memberFields = "id,institute_id,user_id,role,status";
 
 export type Workspace = {

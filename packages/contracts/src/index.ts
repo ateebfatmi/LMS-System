@@ -865,3 +865,29 @@ export interface AdmissionsEnquiryRecord {
   createdAt: string;
   updatedAt: string;
 }
+export const INSTITUTE_NAME_MAX_LENGTH = 120;
+export const INSTITUTE_LOGO_MAX_BYTES = 2 * 1024 * 1024;
+export const INSTITUTE_LOGO_FORMATS = ["image/png", "image/jpeg", "image/webp"] as const;
+export const INSTITUTE_ACCENT_PATTERN = /^#[0-9a-f]{6}$/i;
+
+export function instituteInitials(name: string): string {
+  return name.trim().split(/\s+/u).slice(0, 2)
+    .map((word) => Array.from(word)[0] ?? "").join("").toLocaleUpperCase() || "I";
+}
+
+export type FacultyBatch = { id: string; name: string };
+export type FacultyAccountStatus = "PENDING" | "INVITED" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
+export type FacultyTeacher = {
+  id: string;
+  displayName: string;
+  email: string;
+  emailEditable: boolean;
+  phone: string | null;
+  subjectSpecialization: string | null;
+  qualification: string | null;
+  joinedOn: string | null;
+  status: FacultyAccountStatus;
+  batches: FacultyBatch[];
+  schedule: { id: string; subject: string; day: string; time: string; batchName: string | null }[];
+};
+export type FacultyDirectoryResult = { teachers: FacultyTeacher[]; total: number; batches: FacultyBatch[] };

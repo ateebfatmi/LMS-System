@@ -5,9 +5,9 @@ import { useState } from "react";
 import { useClerk } from "@clerk/nextjs";
 import { AnimatePresence, motion } from "motion/react";
 import { LogOut, PanelLeftClose, PanelLeftOpen, X, type LucideIcon } from "lucide-react";
-import { PrepziiMark } from "@prepzii/ui";
+import { InstituteMark } from "@/components/institute-mark";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
-import { clearRememberedActiveOrganization } from "@/lib/client-org";
+import { clearRememberedActiveOrganization, type ActiveOrganizationSelection } from "@/lib/client-org";
 
 export type DashboardSidebarItem = {
   href: string;
@@ -17,6 +17,9 @@ export type DashboardSidebarItem = {
 
 type DashboardSidebarProps = {
   activeRole: string;
+  selection: ActiveOrganizationSelection | null;
+  switching: boolean;
+  selectionPending: boolean;
   collapsed: boolean;
   isOpen: boolean;
   items: DashboardSidebarItem[];
@@ -59,6 +62,9 @@ function ClerkLogoutButton({ collapsed, onClose }: { collapsed: boolean; onClose
 
 export function DashboardSidebar({
   activeRole,
+  selection,
+  switching,
+  selectionPending,
   collapsed,
   isOpen,
   items,
@@ -66,6 +72,8 @@ export function DashboardSidebar({
   onClose,
   onToggleCollapsed,
 }: DashboardSidebarProps) {
+  const institute = switching ? null : selection?.organization;
+  const instituteName = institute?.name ?? "Your institute";
   return (
     <>
       <AnimatePresence>
@@ -87,12 +95,18 @@ export function DashboardSidebar({
         suppressHydrationWarning
       >
         <div className="brand-row" suppressHydrationWarning>
-          <motion.div whileHover={{ rotate: 1.5, scale: 1.02 }} transition={{ duration: 0.2 }}>
-            <Link href="/" aria-label="PrepZii home">
-              <PrepziiMark compact={collapsed} theme="light" />
-            </Link>
-          </motion.div>
-          <span className="inst-pill">INSTITUTIONS</span>
+          <Link href="/dashboard/workspace" className="institute-sidebar-identity" aria-disabled={switching || undefined}
+            onClick={(event) => {
+              if (switching) event.preventDefault();
+              else onClose();
+            }}>
+            <InstituteMark name={institute?.name} logoUrl={institute?.logoUrl} />
+            <span className="institute-sidebar-copy">
+              <small>Institute workspace</small>
+              <strong title={institute?.name}>{instituteName}</strong>
+            </span>
+            <span className="dashboard-sr-only">overview</span>
+          </Link>
           <motion.button
             type="button"
             className="sidebar-collapse"
@@ -115,7 +129,7 @@ export function DashboardSidebar({
         </div>
 
         <div>
-          <OrganizationSwitcher />
+          <OrganizationSwitcher selection={selection} selectionPending={selectionPending} />
         </div>
 
         <div className="side-nav-heading">
@@ -157,6 +171,7 @@ export function DashboardSidebar({
               <span className="side-nav-label">Exit workspace</span>
             </Link>
           )}
+          <span className="sidebar-platform-credit" title="Powered by Prepzii">Powered by Prepzii</span>
         </div>
 
       </aside>

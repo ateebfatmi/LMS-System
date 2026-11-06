@@ -202,6 +202,9 @@ export async function PATCH(request: Request, context: Context) {
     return Response.json({ error: "Unable to update member." }, { status: 503 });
   }
   if (!target) return Response.json({ error: "Member not found." }, { status: 404 });
+  if (target.role === "TEACHER" && (parsed.data.batchId !== undefined || target.status === "PENDING")) {
+    return Response.json({ error: "Manage pending teachers and teaching assignments in the Faculty Directory." }, { status: 409 });
+  }
   if (
     (["OWNER", "PLATFORM_SUPER_ADMIN"].includes(target.role))
     || (resolved.context.role !== "OWNER" && target.role === "COACHING_ADMIN")
@@ -282,6 +285,10 @@ export async function POST(request: Request, context: Context) {
     return Response.json({ error: "You cannot grant that member role." }, { status: 403 });
   }
 
+  if (parsed.data.role === "TEACHER") {
+    return Response.json({ error: "Add teachers from the Faculty Directory." }, { status: 409 });
+  }
+
   const client = getPrepziiAdmin();
   const organizationId = resolved.context.organizationId;
   const value = parsed.data;
@@ -298,6 +305,9 @@ export async function POST(request: Request, context: Context) {
   let userId = existing?.user_id;
 
   if (existing) {
+    if (existing.role === "TEACHER") {
+      return Response.json({ error: "This email already belongs to a teacher in this institute." }, { status: 409 });
+    }
     if (existing.role !== value.role && (existing.role === "OWNER" || existing.role === "COACHING_ADMIN")) {
       return Response.json({ error: "Cannot modify role of existing institute administrator." }, { status: 409 });
     }

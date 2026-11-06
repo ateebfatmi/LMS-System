@@ -72,14 +72,15 @@ export function AssessmentWorkspace() {
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const value = (key: string) => String(form.get(key) ?? "").trim();
     if (await mutate("CREATE_TEST", {
       title: value("title"), exam: value("exam"), subject: value("subject"),
       chapters: value("chapters").split(",").map((item) => item.trim()).filter(Boolean), difficulty: value("difficulty"),
       durationMinutes: Number(value("durationMinutes")), maxAttempts: Number(value("maxAttempts")),
       resultReleasePolicy: value("resultReleasePolicy"), solutionReleasePolicy: value("solutionReleasePolicy"),
-    })) event.currentTarget.reset();
+    })) formElement.reset();
   }
 
   const staff = data.role !== "STUDENT";

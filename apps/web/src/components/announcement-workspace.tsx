@@ -14,7 +14,20 @@ export function AnnouncementWorkspace() {
   const load = useCallback(async (active: Organization) => { const response = await fetch(`/api/organizations/${encodeURIComponent(active.slug)}/announcements`, { cache: "no-store" }); const result = await response.json(); if (response.ok) { setData(result); setError(""); } else setError(result.error ?? "Unable to load announcements."); }, []);
   useEffect(() => { async function initialize() { const response = await fetch("/api/organizations/active", { cache: "no-store" }); const active = response.ok ? (await response.json()).organization as Organization | null : null; setOrganization(active); if (active) await load(active); else setError("Select an institute before opening announcements."); } void initialize(); }, [load]);
   async function mutate(action: string, payload: Row) { if (!organization) return false; setBusy(true); setError(""); const response = await fetch(`/api/organizations/${encodeURIComponent(organization.slug)}/announcements`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, payload }) }); const result = await response.json(); if (!response.ok) setError(result.error ?? "Unable to save announcement."); else { setMessage(action === "MARK_READ" ? "Notification marked read." : "Announcement saved to the institute portal."); await load(organization); } setBusy(false); return response.ok; }
-  async function create(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); if (await mutate("CREATE", { title, content, category: form.get("category"), priority: form.get("priority"), targetAudience: form.get("targetAudience"), batchId: form.get("batchId") || null, status: form.get("status"), channels: ["PORTAL"] })) { setTitle(""); setContent(""); event.currentTarget.reset(); } }
+  async function create(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    if (await mutate("CREATE", {
+      title, content, category: form.get("category"), priority: form.get("priority"),
+      targetAudience: form.get("targetAudience"), batchId: form.get("batchId") || null,
+      status: form.get("status"), channels: ["PORTAL"],
+    })) {
+      setTitle("");
+      setContent("");
+      formElement.reset();
+    }
+  }
   const canManage = ["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR"].includes(data.role); const unread = data.notifications.filter((item) => !item.read_at).length;
   return <DashboardLayout title="Announcements & notifications" subtitle={`${organization?.name ?? "Institute"} · Portal-first, permission-scoped communication`}>
     <div className="metrics-grid"><MetricCard label="Announcements" value={String(data.announcements.length)} detail="Visible to your role" accent="yellow"/><MetricCard label="Unread" value={String(unread)} detail="Your in-app notifications" accent="blue"/><MetricCard label="Drafts" value={String(data.announcements.filter((item) => item.status === "DRAFT").length)} detail="Not visible to recipients" accent="navy"/></div>{error && <div className="form-error directory-error" role="alert">{error}</div>}{message && <div className="success-banner" role="status">{message}</div>}

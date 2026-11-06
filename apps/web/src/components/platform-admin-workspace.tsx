@@ -505,7 +505,8 @@ export function PlatformAdminWorkspace() {
 
   async function saveFlag(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     if (
       await mutate("SET_FEATURE_FLAG", {
         key: form.get("key"),
@@ -513,7 +514,7 @@ export function PlatformAdminWorkspace() {
         enabled: form.get("enabled") === "on",
       })
     ) {
-      event.currentTarget.reset();
+      formElement.reset();
     }
   }
 

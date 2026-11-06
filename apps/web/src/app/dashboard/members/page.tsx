@@ -4,6 +4,8 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { InstituteBrandingSettings } from "@/components/institute-branding-settings";
+import { resolveActiveOrganization } from "@/lib/client-org";
 
 type Organization = { id: string; name: string; slug: string };
 type Invitation = {
@@ -35,20 +37,7 @@ export default function MembersPage() {
 
   useEffect(() => {
     async function load() {
-      const activeResponse = await fetch("/api/organizations/active");
-      let active = activeResponse.ok ? (await activeResponse.json()).organization as Organization | null : null;
-      if (!active) {
-        const listResponse = await fetch("/api/organizations");
-        const first = listResponse.ok ? ((await listResponse.json()).organizations as Organization[])[0] : null;
-        if (first) {
-          const selectResponse = await fetch("/api/organizations/active", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ slug: first.slug }),
-          });
-          if (selectResponse.ok) active = (await selectResponse.json()).organization;
-        }
-      }
+      const active = (await resolveActiveOrganization())?.organization ?? null;
       setOrganization(active);
       if (active) await loadInvitations(active.slug);
     }
@@ -61,7 +50,8 @@ export default function MembersPage() {
     setBusy(true);
     setError("");
     setCreatedLink("");
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const response = await fetch(`/api/organizations/${encodeURIComponent(organization.slug)}/invitations`, {
       method: "POST",
       headers: { "content-type": "application/json", "idempotency-key": crypto.randomUUID() },
@@ -71,7 +61,7 @@ export default function MembersPage() {
     if (!response.ok) setError(result.error ?? "Unable to create invitation.");
     else {
       setCreatedLink(`${window.location.origin}${result.acceptPath}`);
-      event.currentTarget.reset();
+      formElement.reset();
       await loadInvitations(organization.slug);
     }
     setBusy(false);
@@ -90,9 +80,10 @@ export default function MembersPage() {
   return (
     <DashboardLayout
       title="Settings & access"
-      subtitle={organization ? `${organization.name} · Members, roles and subscription` : "Select an institute"}
+      subtitle="Institute profile, members, roles, and subscription"
       action={<Link className="pz-button pz-button-outline" href="/dashboard/billing">Subscription</Link>}
     >
+      <InstituteBrandingSettings />
       <div className="members-grid">
         <section className="panel invitation-panel">
           <h2>Invite a member</h2>

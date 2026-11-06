@@ -7,6 +7,7 @@ export type ActiveOrganization = {
   name: string;
   slug: string;
   logoUrl?: string | null;
+  accentColor?: string | null;
   status?: string;
 };
 
@@ -25,13 +26,17 @@ function readRememberedSelection(): ActiveOrganizationSelection | null {
     : null;
 }
 
+export const WORKSPACE_SWITCH_EVENT = "prepzii:workspace-switching";
+
 export function rememberActiveOrganization(selection: ActiveOrganizationSelection): void {
+  activeOrganizationRequest = null;
   rememberedSelection = selection;
   rememberedSelectionAt = Date.now();
   setActiveOrganizationId(selection.organization.id);
 }
 
 export function clearRememberedActiveOrganization(): void {
+  activeOrganizationRequest = null;
   rememberedSelection = null;
   rememberedSelectionAt = 0;
   if (typeof window === "undefined") return;
@@ -47,27 +52,27 @@ export async function resolveActiveOrganization({
   refresh?: boolean;
 } = {}): Promise<ActiveOrganizationSelection | null> {
   if (!refresh) {
+    if (activeOrganizationRequest) return activeOrganizationRequest;
     const remembered = readRememberedSelection();
     if (remembered) return remembered;
-    if (activeOrganizationRequest) return activeOrganizationRequest;
   }
 
-  activeOrganizationRequest = fetch("/api/organizations/active", { cache: "no-store" })
+  const request: Promise<ActiveOrganizationSelection | null> = fetch("/api/organizations/active", { cache: "no-store" })
     .then(async (response) => {
       if (!response.ok) return null;
       const result = await response.json() as ActiveOrganizationSelection;
-      if (!result.organization?.id) return null;
-      rememberActiveOrganization(result);
-      return result;
+      return result.organization?.id ? result : null;
     })
     .catch(() => null)
-    .finally(() => {
-      activeOrganizationRequest = null;
+    .then((selection) => {
+      if (activeOrganizationRequest !== request) return activeOrganizationRequest ?? readRememberedSelection();
+      if (selection) rememberActiveOrganization(selection);
+      else clearRememberedActiveOrganization();
+      return selection;
     });
 
-  const selection = await activeOrganizationRequest;
-  if (!selection) clearRememberedActiveOrganization();
-  return selection;
+  activeOrganizationRequest = request;
+  return request;
 }
 
 export function getActiveOrganizationId(): string | null {

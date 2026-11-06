@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { type PropsWithChildren, useEffect, useState, Suspense } from "react";
+import { createContext, type CSSProperties, type PropsWithChildren, useContext, useEffect, useState, Suspense } from "react";
 import { motion } from "motion/react";
 import {
   BarChart3,
@@ -19,15 +19,21 @@ import {
   UserCog,
   type LucideIcon,
 } from "lucide-react";
-import { PrepziiMark } from "@prepzii/ui";
+import { InstituteMark } from "@/components/institute-mark";
 import { DashboardSidebar } from "@/components/ui/dashboard-sidebar";
-import { resolveActiveOrganization } from "@/lib/client-org";
+import { resolveActiveOrganization, type ActiveOrganizationSelection, WORKSPACE_SWITCH_EVENT } from "@/lib/client-org";
 
 export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT";
 
 let rememberedSidebarCollapsed = false;
-let rememberedMembershipRole: AppRole = "DIRECTOR";
-let rememberedOrganizationStatus: "checking" | "available" | "missing" = "checking";
+const DashboardInstituteContext = createContext<{
+  selection: ActiveOrganizationSelection;
+  updateSelection: (selection: ActiveOrganizationSelection) => void;
+} | null>(null);
+
+export function useDashboardInstitute() {
+  return useContext(DashboardInstituteContext);
+}
 
 const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideIcon }[]> = {
   DIRECTOR: [
@@ -90,41 +96,36 @@ function LayoutContent({
   subtitle,
   action,
   currentRole: propRole,
+  welcome = false,
 }: PropsWithChildren<{
   title?: string;
   subtitle?: string;
   action?: React.ReactNode;
   currentRole?: AppRole;
+  welcome?: boolean;
 }>) {
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(rememberedSidebarCollapsed);
-  const [membershipRole, setMembershipRole] = useState<AppRole>(rememberedMembershipRole);
-  const [organizationStatus, setOrganizationStatus] = useState<"checking" | "available" | "missing">(rememberedOrganizationStatus);
+  const [selection, setSelection] = useState<ActiveOrganizationSelection | null | undefined>();
+  const [switching, setSwitching] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    const handleOrganizationChange = (event: Event) => {
-      const role = (event as CustomEvent<{ role?: string }>).detail?.role ?? "";
-      rememberedMembershipRole = mapMembershipRole(role);
-      rememberedOrganizationStatus = "available";
-      setMembershipRole(rememberedMembershipRole);
-      setOrganizationStatus("available");
+    const handleSwitch = (event: Event) => setSwitching((event as CustomEvent<boolean>).detail);
+    const reloadRestoredPage = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
     };
-    window.addEventListener("prepzii:organization-changed", handleOrganizationChange);
+    window.addEventListener(WORKSPACE_SWITCH_EVENT, handleSwitch);
+    window.addEventListener("pageshow", reloadRestoredPage);
     void resolveActiveOrganization().then((result) => {
-      if (cancelled) return;
-      if (result?.organization) {
-        rememberedMembershipRole = mapMembershipRole(String(result.role ?? ""));
-        rememberedOrganizationStatus = "available";
-        setMembershipRole(rememberedMembershipRole);
-        setOrganizationStatus("available");
-      } else {
-        rememberedOrganizationStatus = "missing";
-        setOrganizationStatus("missing");
-      }
+      if (!cancelled) setSelection(result);
     });
-    return () => { cancelled = true; window.removeEventListener("prepzii:organization-changed", handleOrganizationChange); };
+    return () => {
+      cancelled = true;
+      window.removeEventListener(WORKSPACE_SWITCH_EVENT, handleSwitch);
+      window.removeEventListener("pageshow", reloadRestoredPage);
+    };
   }, []);
 
   useEffect(() => {
@@ -143,13 +144,23 @@ function LayoutContent({
     };
   }, [isMobileMenuOpen]);
 
-  const activeRole: AppRole = propRole || membershipRole;
+  const active = switching ? null : selection;
+  const organization = active?.organization;
+  const loading = switching || selection === undefined;
+  const activeRole = propRole ?? mapMembershipRole(active?.role ?? "");
+  const accent = organization?.accentColor;
+  const navItems = active ? roleNavItems[activeRole] : [];
 
-  const navItems = organizationStatus === "available" ? (roleNavItems[activeRole] || roleNavItems.DIRECTOR) : [];
   return (
-    <main className={`app-shell ${isSidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+    <main
+      className={`app-shell ${isSidebarCollapsed ? "sidebar-collapsed" : ""}`}
+      style={accent ? { "--institute-accent": accent } as CSSProperties : undefined}
+    >
       <DashboardSidebar
-        activeRole={organizationStatus === "available" ? activeRole : organizationStatus === "missing" ? "GET STARTED" : "CHECKING"}
+        activeRole={active ? activeRole : loading ? "CHECKING" : "GET STARTED"}
+        selection={selection ?? null}
+        switching={switching}
+        selectionPending={selection === undefined}
         collapsed={isSidebarCollapsed}
         isOpen={isMobileMenuOpen}
         items={navItems}
@@ -162,7 +173,7 @@ function LayoutContent({
         }}
       />
 
-      <section className="workspace">
+      <section className="workspace" aria-busy={loading}>
         <header className="workspace-header">
           <div>
             <div className="mobile-nav-row">
@@ -177,17 +188,22 @@ function LayoutContent({
                 <Menu aria-hidden="true" />
               </motion.button>
               <span className="mobile-brand">
-                <PrepziiMark compact theme="light" />
+                <InstituteMark name={organization?.name} logoUrl={organization?.logoUrl} />
+                <strong>{organization?.name ?? "Institute workspace"}</strong>
               </span>
             </div>
-            {organizationStatus !== "missing" && subtitle && <p className="header-subtitle">{subtitle}</p>}
-            <h1>{organizationStatus === "missing" ? "Get started" : title || "Institute Overview"}</h1>
+            {active && subtitle && <p className="header-subtitle">{subtitle}</p>}
+            <h1>{loading ? "Institute workspace" : active ? title || "Institute Overview" : "Get started"}</h1>
           </div>
 
-          {organizationStatus === "available" && action && <div className="header-actions">{action}</div>}
+          {active && action && <div className="header-actions">{action}</div>}
         </header>
 
-        {organizationStatus === "missing" ? (
+        {loading ? (
+          <p className="empty-state dashboard-shell-loading" role="status">
+            {switching ? "Switching institute…" : "Checking institute access…"}
+          </p>
+        ) : !active ? (
           <section className="no-organization-state" aria-labelledby="no-organization-title">
             <span className="no-organization-icon"><School aria-hidden="true" /></span>
             <p className="eyebrow">Institute access required</p>
@@ -198,9 +214,20 @@ function LayoutContent({
               <Link className="pz-button pz-button-secondary" href="/">Return home</Link>
             </div>
           </section>
-        ) : organizationStatus === "checking" ? (
-          <p className="empty-state dashboard-shell-loading">Checking institute access…</p>
-        ) : children}
+        ) : (
+          <DashboardInstituteContext.Provider value={{ selection: active, updateSelection: setSelection }}>
+            {welcome && (
+              <section className="institute-welcome" aria-labelledby="institute-welcome-title">
+                <InstituteMark name={active.organization.name} logoUrl={active.organization.logoUrl} />
+                <div>
+                  <p>Institute workspace</p>
+                  <h2 id="institute-welcome-title">Welcome to {active.organization.name}</h2>
+                </div>
+              </section>
+            )}
+            {children}
+          </DashboardInstituteContext.Provider>
+        )}
       </section>
     </main>
   );
@@ -211,6 +238,7 @@ export function DashboardLayout(props: PropsWithChildren<{
   subtitle?: string;
   action?: React.ReactNode;
   currentRole?: AppRole;
+  welcome?: boolean;
 }>) {
   return (
     <Suspense fallback={<div style={{ padding: "40px", textAlign: "center", color: "var(--muted)" }}>Loading workspace...</div>}>

@@ -6,14 +6,12 @@ import { Badge, Button, MetricCard, Panel, ProgressBar } from "@prepzii/ui";
 import { DashboardLayout, mapMembershipRole } from "@/components/dashboard-layout";
 import { resolveActiveOrganization } from "@/lib/client-org";
 
-type Organization = { name: string; slug: string };
 type Summary = { students: number | null; activeBatches: number; attendanceRate: number | null; assessmentAverage: number | null; assignments: number; submittedAssignments: number };
 type Data = { role: string; summary: Summary; batches: { id: string; name: string; target_exam: string; grade_level: string | null; student_count: number }[]; attendanceTrend: { date: string; rate: number }[]; attempts: { id: string; percentage: number | string | null; submitted_at: string | null }[]; assignments: { id: string; title: string; status: string; due_at: string }[] };
 const empty: Data = { role: "", summary: { students: null, activeBatches: 0, attendanceRate: null, assessmentAverage: null, assignments: 0, submittedAssignments: 0 }, batches: [], attendanceTrend: [], attempts: [], assignments: [] };
 const display = (value: number | null, suffix = "") => value === null ? "No data" : `${value}${suffix}`;
 
 export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolean }) {
-  const [organization, setOrganization] = useState<Organization | null>(null);
   const [data, setData] = useState<Data>(empty);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -30,7 +28,6 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
         const selection = await resolveActiveOrganization();
         if (controller.signal.aborted) return;
         const active = selection?.organization ?? null;
-        setOrganization(active);
         if (!active) {
           setError("Select an institute to view analytics.");
           return;
@@ -67,7 +64,7 @@ export function AnalyticsWorkspace({ reportMode = false }: { reportMode?: boolea
 
   const submissionRate = data.summary.assignments ? Math.min(100, Math.round(data.summary.submittedAssignments / data.summary.assignments * 100)) : 0;
   const title = reportMode ? "Reports & analytics" : data.role === "STUDENT" ? "My learning overview" : data.role === "TEACHER" ? "My teaching overview" : data.role === "PARENT" ? "Parent overview" : "Institute overview";
-  return <DashboardLayout title={title} subtitle={`${organization?.name ?? "Institute"} · Live, role-scoped operational data`} currentRole={data.role ? mapMembershipRole(data.role) : undefined} action={reportMode && data.batches.length ? <Button onClick={exportCsv}>Download batch CSV</Button> : undefined}>
+  return <DashboardLayout title={title} subtitle="Live, role-scoped operational data" welcome={!reportMode} currentRole={data.role ? mapMembershipRole(data.role) : undefined} action={reportMode && data.batches.length ? <Button onClick={exportCsv}>Download batch CSV</Button> : undefined}>
     {error && <div className="form-error directory-error" role="alert">{error}</div>}
     {loading ? <p className="empty-state">Loading tenant analytics…</p> : <>
       <div className="metrics-grid">

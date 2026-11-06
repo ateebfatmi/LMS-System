@@ -65,13 +65,15 @@ export function LearningWorkspace() {
 
   async function submit(event: FormEvent<HTMLFormElement>, action: string, builder: (form: FormData) => Record<string, unknown>) {
     event.preventDefault();
-    if (await mutate(action, builder(new FormData(event.currentTarget)))) event.currentTarget.reset();
+    const form = event.currentTarget;
+    if (await mutate(action, builder(new FormData(form)))) form.reset();
   }
 
   async function createCourse(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!organization) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setBusy(true); setError("");
     const response = await fetch(`/api/organizations/${encodeURIComponent(organization.slug)}/academic`, {
       method: "POST", headers: { "content-type": "application/json" },
@@ -79,19 +81,20 @@ export function LearningWorkspace() {
     });
     const result = await response.json();
     if (!response.ok) setError(result.error ?? "Unable to create course.");
-    else { event.currentTarget.reset(); await load(organization); setNotice("Draft course created."); }
+    else { formElement.reset(); await load(organization); setNotice("Draft course created."); }
     setBusy(false);
   }
 
   async function uploadResource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!organization) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setBusy(true); setError(""); setNotice("");
     const response = await fetch(`/api/organizations/${encodeURIComponent(organization.slug)}/learning/resources`, { method: "POST", body: form });
     const result = await response.json();
     if (!response.ok) setError(result.error ?? "Unable to upload resource.");
-    else { event.currentTarget.reset(); await load(organization); setNotice("Private resource uploaded."); }
+    else { formElement.reset(); await load(organization); setNotice("Private resource uploaded."); }
     setBusy(false);
   }
 

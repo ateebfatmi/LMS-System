@@ -8,7 +8,7 @@ type Organization = { name: string; slug: string };
 type Plan = { id: string; name: string; monthly_price_paise: number; annual_price_paise: number; student_limit: number; branch_limit: number; storage_gb: number; ai_credits_per_month: number; features: string[]; entitlements: Record<string, unknown> };
 type Subscription = { plan_id: string; status: string; current_period_end: string; trial_ends_at: string | null; grace_ends_at: string | null; cancel_at_period_end: boolean; requested_plan_id: string | null; requested_billing_interval: string | null };
 type Usage = { metric: string; quantity: number; period_end: string };
-type Branding = { logo_url: string | null; primary_color: string; support_email: string | null; support_phone: string | null; subdomain: string | null; subdomain_verified_at: string | null };
+type Branding = { logo_url: string | null; primary_color: string | null; support_email: string | null; support_phone: string | null; subdomain: string | null; subdomain_verified_at: string | null };
 type Data = { subscription: Subscription | null; plans: Plan[]; usage: Usage[]; branding: Branding | null; counts: { activeStudents: number; campuses: number } };
 const empty: Data = { subscription: null, plans: [], usage: [], branding: null, counts: { activeStudents: 0, campuses: 0 } };
 const rupees = (paise: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(paise / 100);

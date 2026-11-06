@@ -36,7 +36,9 @@ export function MemberImportDialog({
   const [rows, setRows] = useState<PreviewRow[]>([]);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"validate" | "commit" | null>(null);
+  const [committedRows, setCommittedRows] = useState<number | null>(null);
+  const busy = operation !== null;
 
   const isStudent = role === "STUDENT";
   const sample = isStudent
@@ -56,6 +58,10 @@ export function MemberImportDialog({
     const file = event.target.files?.[0];
     if (!file) return;
     setSummary(null);
+    setCommittedRows(null);
+    setFileName("");
+    setCsvText("");
+    setIdempotencyKey("");
     setRows([]);
     setError("");
     setFileErrors([]);
@@ -63,49 +69,64 @@ export function MemberImportDialog({
       setError("CSV must be smaller than 2 MB.");
       return;
     }
-    setFileName(file.name);
-    setCsvText(await file.text());
-    setIdempotencyKey(crypto.randomUUID());
+    try {
+      setCsvText(await file.text());
+      setFileName(file.name);
+      setIdempotencyKey(crypto.randomUUID());
+    } catch {
+      setError("Unable to read this file. Choose the CSV again.");
+    }
   }
 
   async function validate() {
     if (!csvText || !idempotencyKey) return;
-    setBusy(true);
+    setOperation("validate");
     setError("");
     setFileErrors([]);
-    const response = await fetch(`/api/organizations/${encodeURIComponent(organizationSlug)}/member-imports`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
-      body: JSON.stringify({ fileName, csvText, role }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      setError(result.error ?? "Unable to validate CSV.");
-      setFileErrors(result.fileErrors ?? []);
-    } else {
-      setSummary(result.import);
-      setRows(result.rows);
+    try {
+      const response = await fetch(`/api/organizations/${encodeURIComponent(organizationSlug)}/member-imports`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": idempotencyKey },
+        body: JSON.stringify({ fileName, csvText, role }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? "Unable to validate CSV.");
+        setFileErrors(result.fileErrors ?? []);
+      } else {
+        setSummary(result.import);
+        setRows(result.rows);
+        if (result.import.import_status === "COMMITTED") setCommittedRows(result.import.valid_rows);
+      }
+    } catch {
+      setError("Unable to validate CSV. Check your connection and try again.");
+    } finally {
+      setOperation(null);
     }
-    setBusy(false);
   }
 
   async function commit() {
     if (!summary || summary.import_status !== "VALIDATED") return;
-    setBusy(true);
+    setOperation("commit");
     setError("");
-    const response = await fetch(
-      `/api/organizations/${encodeURIComponent(organizationSlug)}/member-imports/${summary.import_id}/commit`,
-      { method: "POST" },
-    );
-    const result = await response.json();
-    if (!response.ok) {
-      setError(result.error ?? "Unable to commit import.");
-      setBusy(false);
-      return;
+    try {
+      const response = await fetch(
+        `/api/organizations/${encodeURIComponent(organizationSlug)}/member-imports/${summary.import_id}/commit`,
+        { method: "POST" },
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        setError(result.error ?? "Unable to import records.");
+        return;
+      }
+      setSummary({ ...summary, import_status: "COMMITTED" });
+      setCommittedRows(result.result?.committed_rows ?? summary.valid_rows);
+      await onCommitted();
+    } catch {
+      setError("Unable to confirm the import. Try again to check its status.");
+    } finally {
+      setOperation(null);
     }
-    setSummary({ ...summary, import_status: "COMMITTED" });
-    await onCommitted();
-    setBusy(false);
   }
 
   return (
@@ -113,35 +134,40 @@ export function MemberImportDialog({
       <section className="member-import-dialog" role="dialog" aria-modal="true" aria-labelledby="member-import-title">
         <header>
           <div><h2 id="member-import-title">Import {isStudent ? "students" : "faculty"}</h2><p>Validate every row before creating pending member records.</p></div>
-          <button onClick={onClose} aria-label="Close">✕</button>
+          <button onClick={onClose} disabled={busy} aria-label="Close">✕</button>
         </header>
 
         <div className="import-actions">
           <Button variant="outline" onClick={downloadSample}>Download template</Button>
-          <label className="pz-button pz-button-secondary import-file-button">{fileName || "Choose CSV"}<input type="file" accept=".csv,text/csv" onChange={(event) => void chooseFile(event)} /></label>
-          <Button variant="primary" disabled={!csvText || busy} onClick={() => void validate()}>{busy && !summary ? "Validating…" : "Validate CSV"}</Button>
+          <label className="pz-button pz-button-secondary import-file-button">{fileName || "Choose CSV"}<input type="file" disabled={busy} accept=".csv,text/csv" onChange={(event) => void chooseFile(event)} /></label>
+          <Button variant="primary" disabled={!csvText || busy || summary?.import_status === "COMMITTED"} onClick={() => void validate()}>{operation === "validate" ? "Validating…" : "Validate CSV"}</Button>
         </div>
 
         {error && <div className="form-error" role="alert">{error}{fileErrors.length > 0 && <ul>{fileErrors.map((message) => <li key={message}>{message}</li>)}</ul>}</div>}
         {summary && (
           <>
+            {committedRows !== null ? (
+              <p className="success-banner" role="status">{committedRows} {committedRows === 1 ? "profile" : "profiles"} imported. New accounts remain pending until invited and activated.</p>
+            ) : summary.invalid_rows > 0 ? (
+              <p className="form-error" role="alert">Fix the flagged rows and upload the corrected CSV. No records have been saved.</p>
+            ) : <p className="readiness-note">All rows are ready. Confirm to save them to the directory.</p>}
             <div className="import-summary">
-              <Badge variant={summary.invalid_rows ? "warning" : "success"}>{summary.import_status}</Badge>
+              <Badge variant={summary.invalid_rows ? "warning" : "success"}>{summary.import_status === "COMMITTED" ? "Imported" : summary.invalid_rows ? "Needs changes" : "Ready to import"}</Badge>
               <span>{summary.total_rows} total</span><span>{summary.valid_rows} valid</span><span>{summary.invalid_rows} invalid</span>
             </div>
             <div className="import-preview">
               <table><thead><tr><th>Row</th><th>Name</th><th>Email</th><th>Identifier</th><th>Result</th></tr></thead>
-                <tbody>{rows.map((row) => <tr key={row.row_number}><td>{row.row_number}</td><td>{row.normalized_data?.displayName ?? "—"}</td><td>{row.normalized_data?.email ?? "—"}</td><td>{row.normalized_data?.rollNumber ?? row.normalized_data?.employeeCode ?? "—"}</td><td>{row.errors.length ? <span className="row-errors">{row.errors.join(" ")}</span> : <span className="row-valid">Valid</span>}</td></tr>)}</tbody>
+                <tbody>{rows.map((row) => <tr key={row.row_number}><td>{row.row_number}</td><td>{row.normalized_data?.displayName ?? "—"}</td><td>{row.normalized_data?.email ?? "—"}</td><td>{row.normalized_data?.rollNumber ?? row.normalized_data?.employeeCode ?? "—"}</td><td>{row.errors.length ? <ul className="row-errors">{row.errors.map((message, index) => <li key={index}>{message}</li>)}</ul> : <span className="row-valid">{committedRows === null ? "Valid" : "Imported"}</span>}</td></tr>)}</tbody>
               </table>
-              {summary.total_rows > rows.length && <p>Showing the first {rows.length} rows.</p>}
+              {(summary.invalid_rows || summary.total_rows) > rows.length && <p>{summary.invalid_rows ? `Showing ${rows.length} of ${summary.invalid_rows} rows that need attention.` : `Showing the first ${rows.length} rows.`}</p>}
             </div>
           </>
         )}
 
         <footer>
-          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button variant="outline" disabled={busy} onClick={onClose}>{committedRows === null ? "Close" : "Done"}</Button>
           <Button variant="primary" disabled={!summary || summary.import_status !== "VALIDATED" || busy} onClick={() => void commit()}>
-            {summary?.import_status === "COMMITTED" ? "Import committed" : busy ? "Committing…" : "Commit valid import"}
+            {summary?.import_status === "COMMITTED" ? "Import complete" : operation === "commit" ? "Importing…" : "Import records"}
           </Button>
         </footer>
       </section>

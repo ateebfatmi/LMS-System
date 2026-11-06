@@ -55,7 +55,8 @@ export function AcademicWorkspace({ view }: { view: View }) {
   const value = (form: FormData, key: string) => String(form.get(key) ?? "").trim();
   async function submit(event: FormEvent<HTMLFormElement>, action: string, builder: (form: FormData) => Record<string, unknown>) {
     event.preventDefault();
-    if (await mutate(action, builder(new FormData(event.currentTarget)))) event.currentTarget.reset();
+    const form = event.currentTarget;
+    if (await mutate(action, builder(new FormData(form)))) form.reset();
   }
 
   const title = view === "BATCHES" ? "Batches & enrolments" : "Courses & subjects";

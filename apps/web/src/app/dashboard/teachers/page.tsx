@@ -1,5 +1,5 @@
-import { MemberDirectory } from "@/components/member-directory";
+import { FacultyDirectory } from "@/components/faculty-directory";
 
 export default function TeachersPage() {
-  return <MemberDirectory role="TEACHER" />;
+  return <FacultyDirectory />;
 }

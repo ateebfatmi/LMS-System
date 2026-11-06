@@ -54,7 +54,8 @@ export function AssignmentWorkspace() {
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const value = (key: string) => String(form.get(key) ?? "").trim();
     const targetId = value("targetId");
     const rubric = value("rubric").split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
@@ -70,19 +71,20 @@ export function AssignmentWorkspace() {
     if (targetType === "COURSE") payload.courseId = targetId;
     if (targetType === "BATCH") payload.batchId = targetId;
     if (targetType === "STUDENT") payload.studentUserId = targetId;
-    if (await mutate("CREATE_ASSIGNMENT", payload)) event.currentTarget.reset();
+    if (await mutate("CREATE_ASSIGNMENT", payload)) formElement.reset();
   }
 
   async function submitAssignment(event: FormEvent<HTMLFormElement>, assignmentId: string) {
     event.preventDefault();
     if (!organization) return;
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     form.set("assignmentId", assignmentId);
     setBusy(true); setError(""); setNotice("");
     const response = await fetch(`/api/organizations/${encodeURIComponent(organization.slug)}/assignments/submissions`, { method: "POST", body: form });
     const result = await response.json();
     if (!response.ok) setError(result.error ?? "Unable to submit assignment.");
-    else { event.currentTarget.reset(); await load(organization); setNotice("Assignment submitted."); }
+    else { formElement.reset(); await load(organization); setNotice("Assignment submitted."); }
     setBusy(false);
   }
 

@@ -66,13 +66,14 @@ export async function POST(request: Request, context: Context) {
   const summary = (data as ImportSummary[] | null)?.[0];
   if (!summary) return Response.json({ error: "Import was not staged." }, { status: 500 });
 
-  const { data: rows, error: rowsError } = await getPrepziiAdmin()
+  const previewQuery = getPrepziiAdmin()
     .from("organization_member_import_rows")
     .select("row_number,normalized_data,errors,status")
     .eq("organization_id", resolved.context.organizationId)
     .eq("import_id", summary.import_id)
     .order("row_number")
     .limit(100);
+  const { data: rows, error: rowsError } = await (summary.invalid_rows ? previewQuery.eq("status", "INVALID") : previewQuery);
   if (rowsError) {
     console.error("Member import preview failed", rowsError);
     return Response.json({ error: "Import staged but preview is unavailable." }, { status: 503 });
