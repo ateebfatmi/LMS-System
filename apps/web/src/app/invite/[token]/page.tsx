@@ -1,50 +1,26 @@
-"use client";
+import { auth } from "@clerk/nextjs/server";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { SignInCard } from "@/components/sign-in-card";
+import { SignOutOtherAccount } from "@/components/sign-out-other-account";
+import { withSignInReturn } from "@/lib/sign-in-navigation";
+import { AcceptInvitationButton } from "./accept-invitation-button";
 
-import { useParams, useRouter } from "next/navigation";
-import { useState } from "react";
-import { PrepziiMark } from "@prepzii/ui";
-
-export default function AcceptInvitationPage() {
-  const params = useParams<{ token: string }>();
-  const router = useRouter();
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  async function accept() {
-    setBusy(true);
-    setError("");
-    try {
-      const response = await fetch("/api/invitations/accept", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: params.token }),
-      });
-      const result = await response.json();
-      if (!response.ok) {
-        setError(result.error ?? "Unable to accept invitation.");
-        return;
-      }
-      router.replace("/dashboard");
-      router.refresh();
-    } catch {
-      setError("Unable to accept invitation. Check your connection and try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
+export default async function AcceptInvitationPage({ params }: PageProps<"/invite/[token]">) {
+  const { token } = await params;
+  if (!/^[A-Za-z0-9_-]{40,128}$/.test(token)) notFound();
+  const path = `/invite/${token}`;
+  const configured = process.env.CLERK_SECRET_KEY && process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  const signedIn = configured && (await auth()).userId;
   return (
-    <main className="onboarding-page">
-      <section className="onboarding-card invite-card">
-        <PrepziiMark theme="light" />
-        <div className="onboarding-step">SECURE INSTITUTE INVITATION</div>
-        <h1>Join your PrepZii workspace</h1>
-        <p>Your verified sign-in email must match the address that received this invitation.</p>
-        {error && <div className="form-error" role="alert">{error}</div>}
-        <button className="pz-button pz-button-primary" disabled={busy} onClick={() => void accept()}>
-          {busy ? "Verifying invitation…" : "Accept invitation →"}
-        </button>
-      </section>
-    </main>
+    <SignInCard title="Institute invitation" footer={signedIn && <SignOutOtherAccount redirectUrl={path} />}>
+      <p>Use the verified email address that received the invitation.</p>
+      {signedIn ? <AcceptInvitationButton token={token} /> : (
+        <>
+          <Link href={withSignInReturn("/sign-in", path)}>Sign in to accept</Link>
+          <p>New to Prepzii? Open the account activation link in your invitation email.</p>
+        </>
+      )}
+    </SignInCard>
   );
 }

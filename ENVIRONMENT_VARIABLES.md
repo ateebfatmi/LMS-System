@@ -19,7 +19,9 @@ All variables required to configure and run PrepZii for Institutes across develo
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | `eyJ...` | Supabase administrative backend access key. |
 | `DATABASE_URL` | Migration only | `postgresql://...` | Direct PostgreSQL connection for controlled migration tooling. |
 | `INVITATION_TOKEN_SECRET` | Yes | 32+ random characters | Signs institute invitation tokens. |
-| `PLATFORM_ADMIN_USER_IDS` | Optional | `user_...` | Comma-separated Clerk IDs allowed to use platform administration. |
+| `PLATFORM_SUPER_ADMIN_USER_IDS` | Required for founder access | `user_...` | Server-only, comma-separated user IDs from the same Clerk instance as the LMS keys. Set in `apps/web/.env.local` for local development. |
+
+If your local file still uses `PLATFORM_ADMIN_USER_IDS`, rename the setting to `PLATFORM_SUPER_ADMIN_USER_IDS`. Use a single comma-separated value, optionally wrapped in one pair of quotes. Restart the web server, then sign in and open [the local sign-in resolver](http://localhost:3000/auth/resolve?return_to=%2Fdashboard%2Fworkspace). An allowlisted session lands at `/super-admin`, even with an institute return URL.
 | `ALLOW_INSECURE_DEV_AUTH` | Local only | `false` | Enables the isolated demo identity only in local development. Must be false in deployed environments. |
 
 ---

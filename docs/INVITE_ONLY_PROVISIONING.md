@@ -1,0 +1,46 @@
+# Invite-only LMS provisioning
+
+## Account flows
+
+| Account | Issuer and activation |
+| --- | --- |
+| Prepzii founder | Sign in through Clerk at `/sign-in`. A verified session whose Clerk ID is in the server allowlist opens `/super-admin`. |
+| Institute owner | A founder creates the institute in **Institutes** and enters the initial owner's email. The institute, trial or subscription, and creation audit are committed together. The owner invitation is then recorded and emailed. The institute has no owner access until the recipient accepts. The founder can see delivery status, resend with a replacement token, or revoke. |
+| Institute manager | The owner invites the recipient as `COACHING_ADMIN` from **Settings & access**. Permissions are delegated within that institute. |
+| Teacher | An owner or manager invites through **Faculty** or **Settings & access**. The Faculty directory supports preassigning batches, and activation attaches those assignments to the verified identity. |
+| Student | An owner or manager enrolls in **Students**. A teacher can enroll in an assigned batch. Use **Invite student** on the student row. Activation attaches the existing record and batch assignments to the verified identity. |
+| Guardian | From an active student's row, an owner, manager, or assigned teacher can use **Invite guardian**. The recipient's acceptance creates a pending link. The institute owner reviews it in **Settings & access**. The guardian dashboard shows approved students and their released assessment results. |
+
+Previously, public onboarding let a signed-in user create an institute and immediately become its owner. Platform member upserts and demo provisioning could also assign access without recipient acceptance. The public onboarding API now returns `410`, old sign-up and admin-login entry points lead to common sign-in, and platform writes no longer directly assign initial owners or synthetic identities. Public demo requests remain lead collection.
+
+Existing active members sign in with their existing Clerk accounts. Canonical legacy owners still resolve through `owner_user_id` and the repository's existing membership rules. A single active institute opens its role-specific workspace. Multiple active memberships require a workspace choice on sign-in. Suspended institutes, suspended memberships, and accounts without access are denied at dashboard and tenant API entry points.
+
+## APIs and invitation security
+
+- `POST /api/platform` supports `CREATE_INSTITUTE`, `INVITE_INITIAL_OWNER`, `REVOKE_INITIAL_OWNER`, and the existing audited `SET_ORGANIZATION_STATUS`. An owner resend replaces the previous invitation in the same database transaction. Institute details and platform member tools cannot set the active owner.
+- `POST /api/organizations/{slug}/members` stages students. `POST /api/organizations/{slug}/invitations` requires the student record for student and guardian invitations, a relationship for guardians, and an assigned batch for teacher-issued invitations. The database checks tenant and batch scope before issuing either. Faculty keeps its existing invitation route.
+- `POST /api/invitations/accept` requires a real Clerk session and a verified primary email matching the invitation. Activation is transactional, expires server-side, rejects revoked or replayed tokens, and disallows role changes or activation of a suspended membership through the invitation. Legacy teacher and LMS-generated student placeholder IDs are claimed only through matching verified email.
+- `GET /api/organizations/{slug}/guardians` returns reviewable links to owners and approved links to the signed-in parent. `POST` requires owner membership and an existing reviewed-workflow link.
+- Supabase stores LMS token hashes and Clerk invitation IDs. The Clerk email callback carries the invitation record ID and Clerk's ticket. LMS links are reconstructed server-side and checked against the stored hash. Set a strong `INVITATION_TOKEN_SECRET` and keep it stable while invitations are open. Use the copy link from Settings or Faculty for recipients who already have an account.
+- Clerk delivery runs after the LMS transaction. When delivery fails, the pending record can be revoked and reissued. A failed Clerk revocation cannot restore LMS access because LMS activation checks the database. Review failed provider revocations in the Clerk Dashboard. Redact invitation paths and query strings from proxy, analytics, and access logs.
+
+## Bootstrap the founders
+
+1. In the LMS Clerk instance, verify the two founders' identities independently. If they already have accounts, use those records. For new founders, send the Clerk Dashboard invitations with activation through Clerk's hosted Account Portal during bootstrap. Complete this step before switching the instance's sign-up URL to the LMS route that requires an institute invitation. Each founder completes their own account setup and verification.
+2. Copy each founder's immutable Clerk user ID from that instance. Set the two comma-separated IDs in `PLATFORM_SUPER_ADMIN_USER_IDS` in server-only environment configuration. If the old `PLATFORM_ADMIN_USER_IDS` is set, review its entries and move only the two verified founders to the canonical variable before release. Founder access requires Clerk authentication. The development identity header cannot grant platform access.
+3. Have each founder sign in through `/sign-in` and check `/super-admin`. Confirm that a regular authenticated owner receives `404` on the platform page and `403` from its API. Keep Clerk keys, session exports, and the allowlist out of source control.
+
+## Clerk and database release requirements
+
+1. Confirm the Clerk instance belongs to the LMS. If it is shared with the consumer app, review instance isolation and continuity of existing Clerk user IDs before changing access mode. Changing the instance without migrating identities can break existing memberships. Set the LMS instance to **Invite-only** and enable **Strict user enumeration protection** where supported. Enable the email invitation template, verified primary email, and the intended recovery factors. Check invitation delivery, existing-account sign-in, and password recovery in that instance. [Clerk access mode](https://clerk.com/docs/guides/secure/restricting-access) · [Enumeration protection](https://clerk.com/docs/guides/protect/user-enumeration-protection)
+2. Set `NEXT_PUBLIC_APP_URL` to the exact LMS origin, `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, and `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`. Remove any old redirect to `/onboarding`. Confirm invitation redirects stay on the LMS origin.
+3. Inspect hosted schema and migration history independently. In particular, verify 0020 guardian reconciliation, 0021 database-backed rate limiting, and 0026 branding before relying on them. Review 0024–0025 shared grants and RLS against the consumer app, then verify 0027 faculty dependencies and rehearse [0028](../supabase/migrations/0028_invite_only_provisioning.sql) on a disposable hosted-schema copy. Check the owner placeholder against actual institute constraints, the subscription plan catalogue, and tenant foreign keys. 0028 reuses existing LMS tables and scopes the new batch fields and RPCs. It does not modify consumer authentication or existing shared-table grants.
+4. Review any pending legacy parent invitations before rollout. An unscoped parent invitation must be reissued from the intended student. Existing active parent memberships and reviewed links are preserved. Check representative legacy student records with historical data tied to placeholder IDs, since the claim updates the login identity and LMS batch assignments. Historical records keyed by a legacy ID may need separate reviewed reconciliation.
+5. Apply the migration and deploy the app only through the authorized rollout process. The old consolidated SQL bundle does not contain 0028. Retain the additive schema on rollback. Avoid restoring the public provisioning route in a rollback build.
+6. The working tree contained credential-shaped values in `.env.example`. The template now leaves them blank. If those values were real or shared, rotate them through the relevant providers and check where they were published.
+
+## Verification
+
+- Local PostgreSQL rehearsal covers institute creation, owner resend and acceptance, wrong-recipient rejection, owner replay, manager and teacher activation, assigned-batch student enrollment, suspended institute denial, parent activation and owner review, and direct RPC grants. Existing membership, faculty, tenant-isolation, and branding SQL tests also ran.
+- Workspace tests cover multiple memberships, inactive or ambiguous memberships, and preservation of canonical legacy owners. Local Chrome tests cover retired registration and provisioning, common sign-in, and forged identity and direct API denials against the isolated app.
+- Staging still requires an authorized origin and external fixtures. Follow the [role staging runbook](ROLE_STAGING_VERIFICATION.md). Include both founder sessions and disposable recipient inboxes. Exercise the full emailed Clerk path, including a new account and an existing account, and verify expired, revoked, replayed, suspended, and cross-tenant attempts. No hosted migrations or Clerk settings were changed during implementation.

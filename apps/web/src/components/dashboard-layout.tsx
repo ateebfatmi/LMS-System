@@ -11,6 +11,8 @@ import {
   CalendarCheck2,
   ClipboardCheck,
   ClipboardPenLine,
+  ContactRound,
+  Wallet,
   GraduationCap,
   LayoutDashboard,
   Menu,
@@ -23,7 +25,7 @@ import { InstituteMark } from "@/components/institute-mark";
 import { DashboardSidebar } from "@/components/ui/dashboard-sidebar";
 import { resolveActiveOrganization, type ActiveOrganizationSelection, WORKSPACE_SWITCH_EVENT } from "@/lib/client-org";
 
-export type AppRole = "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT";
+export type AppRole = "ACCOUNTANT" | "DIRECTOR" | "COORDINATOR" | "FACULTY" | "STUDENT" | "PARENT";
 
 let rememberedSidebarCollapsed = false;
 const DashboardInstituteContext = createContext<{
@@ -38,6 +40,7 @@ export function useDashboardInstitute() {
 const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideIcon }[]> = {
   DIRECTOR: [
     { href: "/dashboard/workspace", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/admissions", label: "Admissions", icon: ContactRound },
     { href: "/dashboard/students/workspace", label: "Students", icon: GraduationCap },
     { href: "/dashboard/teachers", label: "Faculty", icon: UserCog },
     { href: "/dashboard/batches/workspace", label: "Batches & Courses", icon: School },
@@ -46,11 +49,13 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideI
     { href: "/dashboard/attendance/workspace", label: "Attendance", icon: CalendarCheck2 },
     { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
     { href: "/dashboard/reports/workspace", label: "Reports", icon: BarChart3 },
-    { href: "/dashboard/members", label: "Settings", icon: Settings },
+    { href: "/dashboard/fees/workspace", label: "Fees & Payments", icon: Wallet },
+    { href: "/dashboard/members", label: "Settings & Access", icon: Settings },
   ],
   FACULTY: [
     { href: "/dashboard/workspace", label: "My Overview", icon: LayoutDashboard },
     { href: "/dashboard/batches/workspace", label: "My Batches", icon: School },
+    { href: "/dashboard/students/workspace", label: "Students", icon: GraduationCap },
     { href: "/dashboard/courses", label: "Courses & Materials", icon: BookOpen },
     { href: "/dashboard/assignments", label: "Assignments", icon: ClipboardPenLine },
     { href: "/dashboard/assessments/workspace", label: "Assessments", icon: ClipboardCheck },
@@ -63,7 +68,13 @@ const roleNavItems: Record<AppRole, { href: string; label: string; icon: LucideI
     { href: "/dashboard/assignments", label: "My Assignments", icon: ClipboardPenLine },
     { href: "/dashboard/assessments/workspace", label: "My Assessments", icon: ClipboardCheck },
     { href: "/dashboard/attendance/workspace", label: "My Attendance", icon: CalendarCheck2 },
+    { href: "/dashboard/fees/workspace", label: "My Fees", icon: Wallet },
     { href: "/dashboard/announcements", label: "Announcements", icon: Bell },
+  ],
+  ACCOUNTANT: [
+    { href: "/dashboard/workspace", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/fees/workspace", label: "Fees & Payments", icon: Wallet },
+    { href: "/dashboard/reports/workspace", label: "Reports", icon: BarChart3 },
   ],
   PARENT: [
     { href: "/dashboard/workspace", label: "Home", icon: LayoutDashboard },
@@ -86,7 +97,7 @@ export function mapMembershipRole(role: string): AppRole {
   if (role === "TEACHER") return "FACULTY";
   if (role === "ACADEMIC_COORDINATOR") return "COORDINATOR";
   if (role === "PARENT") return "PARENT";
-  if (role === "STUDENT" || role === "ACCOUNTANT") return "STUDENT";
+  if (role === "STUDENT" || role === "ACCOUNTANT") return role;
   return "DIRECTOR";
 }
 
@@ -147,9 +158,13 @@ function LayoutContent({
   const active = switching ? null : selection;
   const organization = active?.organization;
   const loading = switching || selection === undefined;
-  const activeRole = propRole ?? mapMembershipRole(active?.role ?? "");
+  const activeRole = active?.role ? mapMembershipRole(active.role) : propRole ?? "DIRECTOR";
   const accent = organization?.accentColor;
-  const navItems = active ? roleNavItems[activeRole] : [];
+  const navItems = active ? roleNavItems[activeRole].filter(({ href }) => {
+    if (href === "/dashboard/admissions") return active.permissions?.includes("crm:read");
+    if (href === "/dashboard/fees/workspace") return active.permissions?.includes("fees:read");
+    return true;
+  }) : [];
 
   return (
     <main
@@ -206,11 +221,9 @@ function LayoutContent({
         ) : !active ? (
           <section className="no-organization-state" aria-labelledby="no-organization-title">
             <span className="no-organization-icon"><School aria-hidden="true" /></span>
-            <p className="eyebrow">Institute access required</p>
-            <h2 id="no-organization-title">Create your institute to open the workspace</h2>
-            <p>Set up an institute, or open the invitation link sent by an institute owner to join an existing workspace.</p>
+            <h2 id="no-organization-title">Institute access required</h2>
+            <p>Open the invitation you received or contact your institute to verify your access.</p>
             <div>
-              <Link className="pz-button pz-button-primary" href="/onboarding">Create institute</Link>
               <Link className="pz-button pz-button-secondary" href="/">Return home</Link>
             </div>
           </section>

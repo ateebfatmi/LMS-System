@@ -6,11 +6,15 @@ export function signInReturnPath(candidate: string | undefined | null, base = lo
   try {
     const target = new URL(candidate, base);
     if (target.origin !== new URL(base).origin) return null;
+    if (target.pathname === "/sign-up") {
+      const invitation = target.searchParams.get("invite");
+      return invitation && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(invitation)
+        ? `/sign-up?invite=${invitation}` : null;
+    }
     if (
       target.pathname !== "/dashboard" &&
       !target.pathname.startsWith("/dashboard/") &&
-      target.pathname !== "/onboarding" &&
-      !target.pathname.startsWith("/invite/")
+      !/^\/invite\/[A-Za-z0-9_-]{40,128}$/.test(target.pathname)
     ) return null;
     return `${target.pathname}${target.search}${target.hash}`;
   } catch {

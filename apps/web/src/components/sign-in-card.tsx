@@ -41,6 +41,7 @@ export function ClerkSignIn({ path, resolveUrl }: { path: string; resolveUrl: st
           rootBox: { width: "100%", maxWidth: "100%" },
           cardBox: { width: "100%", maxWidth: "100%", boxShadow: "none" },
           card: { boxShadow: "none", paddingInline: 0 },
+          footerAction: { display: "none" },
           formButtonPrimary: {
             backgroundColor: "#facc15",
             color: "#0b1528",

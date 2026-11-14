@@ -2,7 +2,7 @@ import { canGrantRole } from "@prepzii/authorization";
 import type { OrganizationMemberDirectoryRecord } from "@prepzii/contracts";
 import { invitationRoles } from "@prepzii/membership";
 import { z } from "zod";
-import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { getAuthorizedOrganizationContext, getOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
 const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 const querySchema = z.object({
@@ -15,7 +15,7 @@ const querySchema = z.object({
 const profileSchema = z.object({
   memberId: z.uuid(),
   role: z.enum(invitationRoles),
-  status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]),
+  status: z.enum(["PENDING", "ACTIVE", "INACTIVE", "SUSPENDED"]),
   displayName: z.string().trim().min(2).max(160),
   phone: z.string().trim().max(30).nullable().default(null),
   alternatePhone: z.string().trim().max(30).nullable().default(null),
@@ -96,16 +96,18 @@ export async function GET(request: Request, context: Context) {
     return Response.json({ error: "Invalid directory query." }, { status: 400 });
   }
 
-  const resolved = await getAuthorizedOrganizationContext(parsedSlug.data, "members:read");
+  const resolved = await getOrganizationContext(parsedSlug.data, ["OWNER", "COACHING_ADMIN", "ACADEMIC_COORDINATOR", "ACCOUNTANT", "TEACHER"]);
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const { page, perPage, search, role, status } = parsedQuery.data;
   let rows: MemberRow[] = [];
   let total = 0;
 
-  const rpcResult = await getPrepziiAdmin().rpc("lms_list_members", {
+  const teacher = resolved.context.role === "TEACHER";
+  if (teacher && role !== "STUDENT") return Response.json({ error: "Forbidden" }, { status: 403 });
+  const rpcResult = await getPrepziiAdmin().rpc(teacher ? "lms_list_assigned_students" : "lms_list_members", {
     p_organization_id: resolved.context.organizationId,
-    p_role: role ?? null,
+    ...(teacher ? { p_actor: resolved.context.userId } : { p_role: role ?? null }),
     p_status: status ?? null,
     p_search: search || null,
     p_limit: perPage,
@@ -113,6 +115,7 @@ export async function GET(request: Request, context: Context) {
   });
 
   if (rpcResult.error) {
+    if (teacher) return Response.json({ error: "Unable to load assigned students." }, { status: 503 });
     // Graceful fallback to direct institute_members and institute_batches query
     try {
       const client = getPrepziiAdmin();
@@ -193,15 +196,18 @@ export async function PATCH(request: Request, context: Context) {
 
   const { data: target, error: targetError } = await getPrepziiAdmin()
     .from("institute_members")
-    .select("id,user_id,role,status")
+    .select("id,user_id,role,status,email")
     .eq("id", parsed.data.memberId)
     .eq("institute_id", resolved.context.organizationId)
-    .maybeSingle<{ id: string; user_id: string | null; role: string; status: string }>();
+    .maybeSingle<{ id: string; user_id: string | null; role: string; status: string; email: string }>();
   if (targetError) {
     console.error("Member lookup failed", targetError);
     return Response.json({ error: "Unable to update member." }, { status: 503 });
   }
   if (!target) return Response.json({ error: "Member not found." }, { status: 404 });
+  if (target.status === "PENDING" && (parsed.data.status !== "PENDING" || parsed.data.role !== target.role)) {
+    return Response.json({ error: "Pending accounts must accept their invitation." }, { status: 403 });
+  }
   if (target.role === "TEACHER" && (parsed.data.batchId !== undefined || target.status === "PENDING")) {
     return Response.json({ error: "Manage pending teachers and teaching assignments in the Faculty Directory." }, { status: 409 });
   }
@@ -214,6 +220,11 @@ export async function PATCH(request: Request, context: Context) {
   }
 
   const value = parsed.data;
+  if (value.batchId) {
+    const { data: batch, error: batchError } = await getPrepziiAdmin().from("organization_batches").select("id")
+      .eq("organization_id", resolved.context.organizationId).eq("id", value.batchId).eq("is_active", true).maybeSingle();
+    if (batchError || !batch || value.role !== "STUDENT") return Response.json({ error: "Batch unavailable." }, { status: 403 });
+  }
   const { error } = await getPrepziiAdmin().rpc("lms_update_member_profile", {
     p_organization_id: resolved.context.organizationId,
     p_member_id: value.memberId,
@@ -239,33 +250,20 @@ export async function PATCH(request: Request, context: Context) {
     return Response.json({ error: "Unable to update member." }, { status: 503 });
   }
 
-  // Handle batch assignment update if batchId is provided
-  if (value.batchId !== undefined) {
-    const effectiveUserId = target.user_id || `usr_${target.id.replaceAll("-", "")}`;
-    if (!target.user_id) {
-      await getPrepziiAdmin()
-        .from("institute_members")
-        .update({ user_id: effectiveUserId })
-        .eq("id", target.id);
-    }
+  if (value.batchId) {
+    const { error: enrollmentError } = await getPrepziiAdmin().rpc("lms_enroll_student_for_invitation", {
+      p_org: resolved.context.organizationId, p_actor: resolved.context.userId, p_role: resolved.context.role,
+      p_email: target.email, p_profile: value, p_batch: value.batchId,
+    });
+    if (enrollmentError) return Response.json({ error: "Profile saved. Unable to assign the selected batch." }, { status: 409 });
+  }
 
-    if (value.batchId) {
-      await getPrepziiAdmin()
-        .from("organization_batch_members")
-        .upsert({
-          organization_id: resolved.context.organizationId,
-          batch_id: value.batchId,
-          user_id: effectiveUserId,
-          role: value.role,
-          roll_number: value.rollNumber,
-        }, { onConflict: "batch_id,user_id" });
-    } else {
-      await getPrepziiAdmin()
-        .from("organization_batch_members")
-        .delete()
-        .eq("organization_id", resolved.context.organizationId)
-        .eq("user_id", effectiveUserId);
-    }
+  if (value.batchId === null && target.role === "STUDENT") {
+    const client = getPrepziiAdmin();
+    const { error: removalError } = await client.from("organization_batch_members").delete()
+      .eq("organization_id", resolved.context.organizationId).eq("role", "STUDENT")
+      .eq(target.user_id ? "user_id" : "pending_student_id", target.user_id ?? target.id);
+    if (removalError) return Response.json({ error: "Profile saved. Unable to remove batch assignments." }, { status: 503 });
   }
 
   return Response.json({ updated: true });
@@ -278,128 +276,21 @@ export async function POST(request: Request, context: Context) {
     return Response.json({ error: "Invalid member data." }, { status: 400 });
   }
 
-  const resolved = await getAuthorizedOrganizationContext(parsedSlug.data, "members:manage");
-  if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
+  const resolved = await getOrganizationContext(parsedSlug.data, ["OWNER", "COACHING_ADMIN", "TEACHER"]);
+  if (!resolved || parsed.data.role !== "STUDENT") return Response.json({ error: "Forbidden" }, { status: 403 });
 
-  if (!canGrantRole(resolved.context.role, parsed.data.role)) {
-    return Response.json({ error: "You cannot grant that member role." }, { status: 403 });
-  }
-
-  if (parsed.data.role === "TEACHER") {
-    return Response.json({ error: "Add teachers from the Faculty Directory." }, { status: 409 });
-  }
-
-  const client = getPrepziiAdmin();
-  const organizationId = resolved.context.organizationId;
+  const { organizationId, userId, role } = resolved.context;
   const value = parsed.data;
-
-  // Check if member already exists in this institute
-  const { data: existing } = await client
-    .from("institute_members")
-    .select("id, user_id, role, status")
-    .eq("institute_id", organizationId)
-    .ilike("email", value.email)
-    .maybeSingle<{ id: string; user_id: string | null; role: string; status: string }>();
-
-  let memberId = existing?.id;
-  let userId = existing?.user_id;
-
-  if (existing) {
-    if (existing.role === "TEACHER") {
-      return Response.json({ error: "This email already belongs to a teacher in this institute." }, { status: 409 });
-    }
-    if (existing.role !== value.role && (existing.role === "OWNER" || existing.role === "COACHING_ADMIN")) {
-      return Response.json({ error: "Cannot modify role of existing institute administrator." }, { status: 409 });
-    }
-    userId = userId || `usr_${existing.id.replaceAll("-", "")}`;
-    await client
-      .from("institute_members")
-      .update({ role: value.role, status: "ACTIVE", user_id: userId })
-      .eq("id", existing.id);
-  } else {
-    userId = `usr_${crypto.randomUUID().replaceAll("-", "")}`;
-    const { data: created, error: createError } = await client
-      .from("institute_members")
-      .insert({
-        institute_id: organizationId,
-        user_id: userId,
-        email: value.email,
-        role: value.role,
-        status: "ACTIVE",
-      })
-      .select("id, user_id")
-      .single<{ id: string; user_id: string }>();
-
-    if (createError) {
-      if (createError.code === "23505") return Response.json({ error: "A member with this email already exists." }, { status: 409 });
-      console.error("Member creation failed", createError);
-      return Response.json({ error: "Unable to create member." }, { status: 503 });
-    }
-    memberId = created.id;
-    userId = created.user_id;
-  }
-
-  // Create or update member profile
-  const { error: profileError } = await client
-    .from("organization_member_profiles")
-    .upsert({
-      organization_id: organizationId,
-      membership_id: memberId,
-      display_name: value.displayName,
-      phone: value.phone,
-      alternate_phone: value.alternatePhone,
-      roll_number: value.rollNumber,
-      employee_code: value.employeeCode,
-      guardian_name: value.guardianName,
-      guardian_phone: value.guardianPhone,
-      qualification: value.qualification,
-      subject_specialization: value.subjectSpecialization,
-      joined_on: value.joinedOn || new Date().toISOString().split("T")[0],
-    }, { onConflict: "membership_id" });
-
-  if (profileError) {
-    if (profileError.code === "23505") return Response.json({ error: "Roll number or employee code is already in use." }, { status: 409 });
-    console.error("Member profile creation failed", profileError);
-    return Response.json({ error: "Unable to save member profile." }, { status: 503 });
-  }
-
-  // If batchId is provided, enroll in batch
-  if (value.batchId && userId) {
-    await client.from("organization_batch_members").upsert({
-      organization_id: organizationId,
-      batch_id: value.batchId,
-      user_id: userId,
-      role: value.role,
-      roll_number: value.rollNumber,
-    }, { onConflict: "batch_id,user_id" });
-  }
-
-  // Audit log
-  await client.from("organization_audit_logs").insert({
-    organization_id: organizationId,
-    actor_user_id: resolved.context.userId,
-    actor_role: resolved.context.role,
-    action: "member.enrolled",
-    entity_type: "institute_member",
-    entity_id: memberId,
-    after_state: {
-      role: value.role,
-      displayName: value.displayName,
-      email: value.email,
-      batchId: value.batchId,
-      rollNumber: value.rollNumber,
-    },
+  const { data, error } = await getPrepziiAdmin().rpc("lms_enroll_student_for_invitation", {
+    p_org: organizationId, p_actor: userId, p_role: role, p_email: value.email,
+    p_profile: value, p_batch: value.batchId ?? null,
   });
+  if (error) {
+    const status = error.code === "42501" ? 403 : error.code === "23505" ? 409 : 503;
+    return Response.json({ error: "Unable to enroll this student." }, { status });
+  }
 
-  return Response.json({
-    success: true,
-    member: {
-      id: memberId,
-      userId,
-      email: value.email,
-      displayName: value.displayName,
-      role: value.role,
-      batchId: value.batchId,
-    },
+  return Response.json({ success: true,
+    member: { id: data, email: value.email, displayName: value.displayName, role: value.role, batchId: value.batchId },
   }, { status: 201 });
 }

@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const developmentScriptSources = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+const clerkChallengeSources = "https://challenges.cloudflare.com https://*.protect.clerk.com";
 
 const securityHeaders = [
   {
@@ -39,12 +40,12 @@ const securityHeaders = [
       "object-src 'none'",
       "frame-ancestors 'self'",
       "form-action 'self'",
-      `script-src 'self' 'unsafe-inline'${developmentScriptSources} https://*.clerk.accounts.dev https://*.clerk.com`,
+      `script-src 'self' 'unsafe-inline'${developmentScriptSources} https://*.clerk.accounts.dev https://*.clerk.com ${clerkChallengeSources}`,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.supabase.co wss://*.supabase.co",
-      "frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com",
+      "connect-src 'self' https://*.clerk.accounts.dev https://*.clerk.com https://*.protect.clerk.com:* https://*.supabase.co wss://*.supabase.co",
+      `frame-src 'self' https://*.clerk.accounts.dev https://*.clerk.com ${clerkChallengeSources}`,
       "worker-src 'self' blob:",
       "upgrade-insecure-requests",
     ].join("; "),
@@ -67,14 +68,12 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: "/dashboard", destination: "/dashboard/workspace", permanent: false },
-      { source: "/dashboard/admissions", destination: "/dashboard/workspace", permanent: false },
-      { source: "/dashboard/crm", destination: "/dashboard/workspace", permanent: false },
+      { source: "/dashboard/crm", destination: "/dashboard/admissions", permanent: false },
       { source: "/dashboard/batches", destination: "/dashboard/batches/workspace", permanent: false },
       { source: "/dashboard/students", destination: "/dashboard/students/workspace", permanent: false },
       { source: "/dashboard/assessments", destination: "/dashboard/assessments/workspace", permanent: false },
       { source: "/dashboard/attendance", destination: "/dashboard/attendance/workspace", permanent: false },
-      { source: "/dashboard/fees", destination: "/dashboard/workspace", permanent: false },
-      { source: "/dashboard/fees/workspace", destination: "/dashboard/workspace", permanent: false },
+      { source: "/dashboard/fees", destination: "/dashboard/fees/workspace", permanent: false },
       { source: "/dashboard/reports", destination: "/dashboard/reports/workspace", permanent: false },
       { source: "/dashboard/onboarding", destination: "/dashboard/members", permanent: false },
       { source: "/dashboard/question-bank", destination: "/dashboard/assessments/workspace", permanent: false },
@@ -92,6 +91,13 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: securityHeaders,
+      },
+      {
+        source: "/:path(sign-up|invite)/:rest*",
+        headers: [
+          { key: "Referrer-Policy", value: "no-referrer" },
+          { key: "Cache-Control", value: "private, no-store" },
+        ],
       },
     ];
   },

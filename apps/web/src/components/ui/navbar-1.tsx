@@ -50,9 +50,9 @@ export function Navbar1() {
           </div>
           <div className={styles.navActions}>
             <Link href="/sign-in" onClick={() => setIsOpen(false)}>Sign In</Link>
-            <Link href="/onboarding" className={styles.navCta} onClick={() => setIsOpen(false)}>
-              Get Started <ArrowUpRight size={15} aria-hidden="true" />
-            </Link>
+            <a href="#demo-request" className={styles.navCta} onClick={() => setIsOpen(false)}>
+              Request Demo <ArrowUpRight size={15} aria-hidden="true" />
+            </a>
           </div>
         </nav>
       </div>

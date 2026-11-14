@@ -4,6 +4,7 @@ import { z } from "zod";
 import { organizationSlugPattern } from "@/lib/institute-branding";
 import { deriveInvitationToken, hashInvitationToken } from "@/lib/invitation-token";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { deliverInvitation } from "@/lib/invitation-delivery";
 import { guardRateLimit } from "@/lib/rate-limit";
 
 const slugSchema = z.string().min(2).max(64).regex(organizationSlugPattern);
@@ -12,39 +13,6 @@ const requestSchema = z.object({ memberId: z.uuid(), sendEmail: z.boolean().defa
 
 function reject(error: string, status: number) {
   return Response.json({ error }, { status, headers });
-}
-
-async function sendInvitationEmail(input: { invitationId: string; email: string; institute: string; acceptPath: string; expiresAt: string }) {
-  const key = process.env.RESEND_API_KEY?.trim();
-  const sender = process.env.FACULTY_INVITATION_FROM_EMAIL?.trim();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!key || !sender || !appUrl) return false;
-
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `faculty-invitation/${input.invitationId}`,
-      },
-      signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({
-        from: sender,
-        to: [input.email],
-        subject: "Activate your Prepzii faculty account",
-        text: [
-          `You have been invited to join ${input.institute} as a teacher.`,
-          "Sign in with this verified email address and accept the invitation:",
-          new URL(input.acceptPath, appUrl).href,
-          `This invitation expires on ${new Date(input.expiresAt).toISOString().slice(0, 10)} (UTC).`,
-        ].join("\n\n"),
-      }),
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ slug: string }> }) {
@@ -99,8 +67,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
   }
 
   const acceptPath = `/invite/${encodeURIComponent(token)}`;
-  const emailSent = sendEmail && await sendInvitationEmail({
-    invitationId: data.invitation_id, email, institute: workspace.institute.name, acceptPath, expiresAt: data.invitation_expires_at,
+  const emailSent = sendEmail && await deliverInvitation({
+    id: data.invitation_id, email, expiresAt: data.invitation_expires_at,
   });
   return Response.json({ acceptPath, emailSent, expiresAt: data.invitation_expires_at }, { status: current ? 200 : 201, headers });
 }

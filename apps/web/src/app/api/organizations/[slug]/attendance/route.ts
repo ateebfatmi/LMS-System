@@ -55,19 +55,16 @@ export async function GET(request: Request, context: Context) {
     let students: Row[] = [];
     if (selectedBatchId && role !== "STUDENT") {
       const enrolments = await requireDatabaseQuery(client.from("organization_batch_members").select("user_id,roll_number").eq("organization_id", organizationId).eq("batch_id", selectedBatchId).eq("role", "STUDENT").order("roll_number"), [], "Load batch enrolments");
-      let directory = await requireDatabaseQuery(client.rpc("lms_list_members", { p_organization_id: organizationId, p_role: "STUDENT", p_status: "ACTIVE", p_search: null, p_limit: 500, p_offset: 0 }), null, "Load attendance student directory");
-      if (!directory) {
-        const rawMembers = await requireDatabaseQuery(client.from("institute_members").select("id,user_id,email,role,status").eq("institute_id", organizationId).eq("role", "STUDENT"), [], "Load legacy attendance students");
-        directory = rawMembers.map((m: Record<string, unknown>) => ({
-          user_id: m.user_id,
-          email: m.email,
-          display_name: typeof m.email === "string" ? m.email.split("@")[0] : "Student",
-        }));
+      const ids = enrolments.flatMap(({ user_id }) => typeof user_id === "string" ? [user_id] : []);
+      if (ids.length) {
+        const directory = await requireDatabaseQuery(client.from("institute_members").select("id,user_id,email")
+          .eq("institute_id", organizationId).eq("status", "ACTIVE").eq("role", "STUDENT").in("user_id", ids), [], "Load enrolled active students");
+        const profiles = directory.length ? await requireDatabaseQuery(client.from("organization_member_profiles").select("membership_id,display_name")
+          .eq("organization_id", organizationId).in("membership_id", directory.map(({ id }) => id)), [], "Load enrolled student names") : [];
+        const names = new Map(profiles.map(({ membership_id, display_name }) => [membership_id, display_name]));
+        const rollNumbers = new Map(enrolments.map(({ user_id, roll_number }) => [user_id, roll_number]));
+        students = directory.map(({ id, user_id, email }) => ({ user_id, email, display_name: names.get(id) ?? email, roll_number: rollNumbers.get(user_id) }));
       }
-      const byUser = new Map(((directory ?? []) as Row[]).map((member) => [String(member.user_id), member]));
-      students = enrolments.length
-        ? enrolments.map((enrolment: Record<string, unknown>) => ({ ...enrolment, ...(byUser.get(String(enrolment.user_id)) ?? {}), user_id: enrolment.user_id, roll_number: enrolment.roll_number }))
-        : [];
     }
 
     let sessions: Row[] = [];
@@ -84,9 +81,9 @@ export async function GET(request: Request, context: Context) {
       let recordQuery = client.from("organization_attendance_records").select("id,session_id,student_id,status,remarks,created_at").eq("organization_id", organizationId).in("session_id", sessionIds);
       if (role === "STUDENT") recordQuery = recordQuery.eq("student_id", userId);
       records = await requireDatabaseQuery(recordQuery, [], "Load attendance records");
-      const corrQuery = client.from("organization_attendance_corrections").select("id,session_id,attendance_record_id,student_id,previous_status,corrected_status,reason,corrected_by,created_at").eq("organization_id", organizationId).in("session_id", sessionIds).order("created_at", { ascending: false });
+      let corrQuery = client.from("organization_attendance_corrections").select("id,session_id,attendance_record_id,student_id,previous_status,corrected_status,reason,corrected_by,created_at").eq("organization_id", organizationId).in("session_id", sessionIds).order("created_at", { ascending: false });
+      if (role === "STUDENT") corrQuery = corrQuery.eq("student_id", userId);
       corrections = await requireDatabaseQuery(corrQuery, [], "Load attendance corrections");
-      if (role === "STUDENT") corrections = corrections.filter((row) => row.student_id === userId);
     }
 
     return Response.json({ role, batches, selectedBatchId, students, sessions, records, corrections }, { headers: { "cache-control": "private, no-store" } });

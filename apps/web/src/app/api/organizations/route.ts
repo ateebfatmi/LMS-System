@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const [organizations, platformAdmin] = await Promise.all([
       listMyOrganizations(userId),
-      isPlatformAdmin(userId),
+      isPlatformAdmin(),
     ]);
     return Response.json({
       isPlatformAdmin: platformAdmin,

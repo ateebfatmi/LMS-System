@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 
 const expected = {
   OWNER: ["Institute overview", "Overview"],
-  COACHING_ADMIN: ["Institute overview", "Overview"],
+  COACHING_ADMIN: ["Manager overview", "Overview"],
   TEACHER: ["My teaching overview", "My Batches"],
   STUDENT: ["My learning overview", "My Courses"],
   PARENT: ["Parent overview", "Announcements"],
@@ -17,6 +17,7 @@ type Actor = { storageState: string; workspace: string; secondaryWorkspace?: Wor
 type Fixtures = {
   origin: string;
   allowBrandingWrites?: boolean;
+  founders?: [Actor, Actor];
   facultyOnboarding?: {
     email: string;
     storageState: string;
@@ -91,6 +92,12 @@ for (const role of fixtureRoles) {
 
       const api = `/api/organizations/${encodeURIComponent(actor.workspace)}`;
       expect((await request.get(`${api}/subscription`)).status()).toBe(role === "OWNER" ? 200 : 403);
+      const canManage = role === "OWNER" || role === "COACHING_ADMIN";
+      expect((await request.get(`${api}/admissions`)).status()).toBe(canManage ? 200 : 403);
+      expect((await request.get(`${api}/fees`)).status()).toBe(canManage || role === "STUDENT" ? 200 : 403);
+      expect((await request.get(`${api}/fees?options=1`)).status()).toBe(canManage ? 200 : 403);
+      expect((await request.get(`${api}/guardians`)).status()).toBe(role === "OWNER" || role === "PARENT" ? 200 : 403);
+      expect((await request.get(`${api}/question-bank`)).status()).toBe(role === "STUDENT" || role === "PARENT" ? 403 : 200);
       if (role !== "OWNER") {
         expect((await request.post(`${api}/branding`, {
           multipart: { name: "Forbidden branding write", accentColor: "#2563EB", logoAction: "keep" },
@@ -112,7 +119,7 @@ for (const role of fixtureRoles) {
         expect(result.organization.name).not.toBe(active.name);
         await expect(page.getByRole("heading", { name: `Welcome to ${result.organization.name}` })).toBeVisible();
         await expect(page.getByRole("heading", { name: `Welcome to ${active.name}` })).toHaveCount(0);
-        await expect(page.getByRole("heading", { name: "Institute overview" })).toBeVisible();
+        await expect(page.getByRole("heading", { name: "Manager overview" })).toBeVisible();
       }
     });
   });
@@ -135,14 +142,16 @@ test.describe("suspended membership", () => {
 test.describe("sign-in return paths", () => {
   test.use({ storageState: fixture.accounts.OWNER.storageState });
 
-  test("returns to invitations and onboarding, blocks external return URLs and platform access", async ({ context }) => {
-    for (const path of ["/invite/example", "/onboarding"]) {
+  test("preserves valid invitation paths and blocks retired or external destinations", async ({ context }) => {
+    for (const path of [`/invite/${"a".repeat(43)}`]) {
       const response = await context.request.get(`/auth/resolve?return_to=${encodeURIComponent(new URL(path, fixture.origin).href)}`, { maxRedirects: 0 });
       expect(new URL(response.headers().location, fixture.origin).pathname).toBe(path);
     }
     const external = await context.request.get("/auth/resolve?return_to=https%3A%2F%2Fexample.com%2Fdashboard", { maxRedirects: 0 });
     expect(new URL(external.headers().location, fixture.origin).href).toBe(new URL("/dashboard/workspace", fixture.origin).href);
     expect((await context.request.get("/super-admin", { maxRedirects: 0 })).status()).toBe(404);
+    expect((await context.request.post("/api/onboarding/institute", { data: {} })).status()).toBe(410);
+    expect((await context.request.post("/api/platform", { data: { action: "CREATE_INSTITUTE", payload: {} } })).status()).toBe(403);
   });
 });
 
@@ -296,4 +305,32 @@ test.describe("faculty onboarding with real Clerk and Supabase", () => {
       await Promise.all([teacher.close(), otherAccount.close()]);
     }
   });
+});
+
+
+test("founder sessions land in platform administration despite a remembered institute", async ({ browser }) => {
+  test.skip(fixture.founders?.length !== 2, "Requires two authorized Clerk founder storage states.");
+  for (const founder of fixture.founders ?? []) {
+    expect(isAbsolute(founder.storageState)).toBe(true);
+    const context = await browser.newContext({ storageState: founder.storageState, baseURL: fixture.origin });
+    try {
+      await context.addCookies([{
+        name: "prepzii_active_organization",
+        value: founder.workspace || fixture.accounts.OWNER.workspace,
+        url: fixture.origin,
+        httpOnly: true,
+      }]);
+      for (const path of ["/auth/resolve", "/auth/resolve?return_to=%2Fdashboard%2Fworkspace"]) {
+        const landing = await context.request.get(path, { maxRedirects: 0 });
+        expect(new URL(landing.headers().location, fixture.origin).pathname).toBe("/super-admin");
+      }
+      const page = await context.newPage();
+      await page.goto("/sign-in?workspace=choose");
+      await expect(page).toHaveURL(/\/super-admin$/);
+      expect((await context.request.get("/super-admin")).status()).toBe(200);
+      expect((await context.request.get("/api/platform")).status()).toBe(200);
+    } finally {
+      await context.close();
+    }
+  }
 });

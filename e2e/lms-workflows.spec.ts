@@ -24,28 +24,21 @@ test.describe("PrepZii LMS release smoke tests", () => {
     await expect(page.getByText(/For a harmonic potential/)).toBeVisible();
   });
 
-  test("institute onboarding renders its required identity fields", async ({ page }) => {
-    await page.goto("/onboarding");
-    await expect(page.getByRole("heading", { name: "Create your institute workspace" })).toBeVisible();
-    await expect(page.getByLabel("Institute name")).toBeVisible();
-    await expect(page.getByLabel("Workspace URL")).toBeVisible();
-    await expect(page.getByRole("button", { name: /Create institute workspace/ })).toBeVisible();
-  });
-
   test("one mobile-friendly sign-in is shared by institute users", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto("/sign-in");
     await expect(page.getByRole("heading", { level: 1, name: "Your institute workspace" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Own a coaching institute? Create your workspace." })).toHaveAttribute("href", "/sign-up");
+    await expect(page.locator('a[href^="/sign-up"]')).toHaveCount(0);
     await expect(page.getByRole("link", { name: /platform|faculty|institute admin/i })).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
   });
 
   test("legacy institute sign-in URLs preserve invitation return links", async ({ page }) => {
+    const invitation = `/invite/${"a".repeat(43)}`;
     for (const path of ["/institute/login", "/portal/login"]) {
-      await page.goto(`${path}?return_to=%2Finvite%2Fexample`);
+      await page.goto(`${path}?return_to=${encodeURIComponent(invitation)}`);
       await expect(page).toHaveURL((url) =>
-        url.pathname === "/sign-in" && url.searchParams.get("return_to") === "/invite/example",
+        url.pathname === "/sign-in" && url.searchParams.get("return_to") === invitation,
       );
     }
   });
@@ -65,8 +58,8 @@ test.describe("PrepZii LMS release smoke tests", () => {
 
   test("legacy dashboard URLs resolve to canonical workspaces", async ({ page }) => {
     await page.goto("/dashboard/admissions");
-    await expect(page).toHaveURL(/\/dashboard\/workspace$/);
-    await expect(page.getByRole("heading", { name: "Get started" })).toBeVisible();
+    await expect(page).toHaveURL(/\/dashboard\/admissions$/);
+    await expect(page.getByRole("heading", { name: "Institute access required" })).toBeVisible();
 
     await page.goto("/dashboard/assessments");
     await expect(page).toHaveURL(/\/dashboard\/assessments\/workspace$/);
@@ -74,8 +67,8 @@ test.describe("PrepZii LMS release smoke tests", () => {
 
   test("accounts without an institute see setup guidance instead of tenant tools", async ({ page }) => {
     await page.goto("/dashboard/workspace");
-    await expect(page.getByRole("heading", { name: "Create your institute to open the workspace" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Create institute" })).toHaveAttribute("href", "/onboarding");
+    await expect(page.getByRole("heading", { name: "Institute access required" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create institute" })).toHaveCount(0);
     await expect(page.locator('a[href="/dashboard/crm"]')).toHaveCount(0);
     await expect(page.locator('a[href="/dashboard/fees/workspace"]')).toHaveCount(0);
     await expect(page.locator('a[href="/dashboard/omr"]')).toHaveCount(0);

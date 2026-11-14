@@ -28,7 +28,7 @@ Required for the core application:
 
 Optional:
 
-- `PLATFORM_ADMIN_USER_IDS`
+- `PLATFORM_SUPER_ADMIN_USER_IDS`
 
 Do not use production provider credentials during the staging rehearsal.
 

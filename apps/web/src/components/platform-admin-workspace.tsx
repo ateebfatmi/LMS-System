@@ -22,22 +22,13 @@ import {
   ScrollText,
   ShieldCheck,
   SlidersHorizontal,
-  UsersRound,
+  Mail,
   X,
   type LucideIcon,
 } from "lucide-react";
 import { Badge, Button, MetricCard, PrepziiMark, Select } from "@prepzii/ui";
-import { rememberActiveOrganization } from "@/lib/client-org";
 
 type Row = Record<string, unknown>;
-
-type SystemHealth = {
-  databaseStatus: string;
-  databaseLatencyMs: number;
-  storageStatus: string;
-  environment: string;
-  questionBankCount?: number;
-};
 
 type Data = {
   institutes: Row[];
@@ -46,18 +37,17 @@ type Data = {
   flags: Row[];
   overrides: Row[];
   audits: Row[];
+  ownerInvitations: Row[];
   counts: Row[];
-  members: Row[];
   brandings: Row[];
   demoRequests: Row[];
   supportRequests: Row[];
-  systemHealth?: SystemHealth;
 };
 
 type AdminSection =
   | "overview"
   | "institutes"
-  | "users"
+  | "invitations"
   | "plans"
   | "demos"
   | "flags"
@@ -72,19 +62,12 @@ const empty: Data = {
   flags: [],
   overrides: [],
   audits: [],
+  ownerInvitations: [],
   counts: [],
-  members: [],
   brandings: [],
   demoRequests: [],
   supportRequests: [],
 };
-
-const ROLES = [
-  "OWNER",
-  "COACHING_ADMIN",
-  "TEACHER",
-  "STUDENT",
-] as const;
 
 const INSTITUTE_TYPES = [
   { value: "COACHING", label: "Coaching Institute" },
@@ -103,32 +86,32 @@ const ENTITLEMENT_KEYS = [
 
 const SECTION_META: Record<AdminSection, { title: string; subtitle: string; icon: LucideIcon }> = {
   overview: {
-    title: "Command Center",
-    subtitle: "Executive fleet metrics, infrastructure telemetry & priority governance queue",
+    title: "Overview",
+    subtitle: "Institute access and subscription activity",
     icon: LayoutDashboard,
   },
   institutes: {
-    title: "Institutes Fleet",
-    subtitle: "Tenant lifecycle, student quotas, custom domains & deep workspace governance",
+    title: "Institutes",
+    subtitle: "Institute details, invitations, and access",
     icon: School,
   },
-  users: {
-    title: "Global Users & Access",
-    subtitle: "Cross-tenant member directory, role assignments & direct user provisioning",
-    icon: UsersRound,
+  invitations: {
+    title: "Owner invitations",
+    subtitle: "Track and manage institute owner access.",
+    icon: Mail,
   },
   plans: {
-    title: "Commercial Plans & Upgrades",
+    title: "Subscriptions",
     subtitle: "SaaS subscription tiers, pricing, limits & module entitlements",
     icon: Gem,
   },
   demos: {
     title: "Demo Leads & B2B Sales",
-    subtitle: "Inbound institute inquiries & 1-click live workspace provisioning",
+    subtitle: "Inbound institute inquiries",
     icon: ContactRound,
   },
   flags: {
-    title: "Feature Switches",
+    title: "Platform Settings",
     subtitle: "Platform-wide rollout switches, beta capabilities & emergency killswitches",
     icon: SlidersHorizontal,
   },
@@ -143,8 +126,8 @@ const SECTION_META: Record<AdminSection, { title: string; subtitle: string; icon
     icon: ShieldCheck,
   },
   audits: {
-    title: "Security Audit Trail",
-    subtitle: "Immutable compliance ledger of all administrative mutations & logins",
+    title: "Audit Logs",
+    subtitle: "Recent administrative and provisioning activity",
     icon: ScrollText,
   },
 };
@@ -160,6 +143,8 @@ export function PlatformAdminWorkspace() {
   const router = useRouter();
   const { signOut } = useClerk();
   const [data, setData] = useState<Data>(empty);
+  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminSection>("overview");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -170,10 +155,7 @@ export function PlatformAdminWorkspace() {
   const [planFilter, setPlanFilter] = useState("ALL");
   const [typeFilter, setTypeFilter] = useState("ALL");
 
-  // Global Users filters
-  const [userSearch, setUserSearch] = useState("");
-  const [userRoleFilter, setUserRoleFilter] = useState("ALL");
-  const [userStatusFilter, setUserStatusFilter] = useState("ALL");
+
 
   // Demo Leads filter
   const [demoStatusFilter, setDemoStatusFilter] = useState("ALL");
@@ -194,7 +176,7 @@ export function PlatformAdminWorkspace() {
   const [newInstType, setNewInstType] = useState("COACHING");
   const [newInstEmail, setNewInstEmail] = useState("");
   const [newInstPhone, setNewInstPhone] = useState("");
-  const [newInstOwnerId, setNewInstOwnerId] = useState("");
+  const [newInstOwnerEmail, setNewInstOwnerEmail] = useState("");
   const [newInstSubStatus, setNewInstSubStatus] = useState<"ACTIVE" | "TRIAL">("ACTIVE");
 
   // Create Commercial Plan Modal
@@ -208,12 +190,6 @@ export function PlatformAdminWorkspace() {
   const [newPlanStorage, setNewPlanStorage] = useState("100");
 
   // Provision User Modal
-  const [showProvisionUserModal, setShowProvisionUserModal] = useState(false);
-  const [provOrgId, setShowProvOrgId] = useState("");
-  const [provEmail, setProvEmail] = useState("");
-  const [provUserId, setProvUserId] = useState("");
-  const [provDisplayName, setProvDisplayName] = useState("");
-  const [provRole, setProvRole] = useState<string>("COACHING_ADMIN");
 
   // Create Demo Lead Modal
   const [showCreateDemoModal, setShowCreateDemoModal] = useState(false);
@@ -243,9 +219,9 @@ export function PlatformAdminWorkspace() {
   // Support Access Form state
   const [supportOrgId, setSupportOrgId] = useState("");
   const [supportReason, setSupportReason] = useState("");
-  const [supportHours, setSupportHours] = useState("24");
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await fetch("/api/platform", { cache: "no-store" });
       const result = await response.json();
@@ -254,12 +230,15 @@ export function PlatformAdminWorkspace() {
           ...empty,
           ...result,
         });
+        setLoaded(true);
         setError("");
       } else {
         setError(result.error ?? "Unable to load platform administration.");
       }
     } catch {
-      setError("Network error while connecting to platform control room.");
+      setError("Unable to load platform administration.");
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -282,7 +261,11 @@ export function PlatformAdminWorkspace() {
       if (!response.ok) {
         setError(result.error ?? "Unable to save platform operation.");
       } else {
-        setMessage(customSuccessMessage ?? "Platform operation saved and permanently audited.");
+        setMessage(result.result?.emailSent === false && action !== "REVOKE_INITIAL_OWNER"
+          ? "The workspace or invitation was saved. Email delivery failed. Retry from the institute directory."
+          : result.result?.previousRevoked === false
+            ? "LMS access was revoked. Review the old Clerk invitation in the Clerk Dashboard."
+            : customSuccessMessage ?? "Platform operation saved and audited.");
         await load();
       }
       setBusy(false);
@@ -296,20 +279,20 @@ export function PlatformAdminWorkspace() {
 
   async function handleLockSession() {
     await signOut();
-    router.push("/admin/login");
+    router.push("/sign-in");
     router.refresh();
   }
 
-  function handleEnterInstituteWorkspace(inst: Row) {
-    rememberActiveOrganization({
-      organization: {
-        id: String(inst.id),
-        name: String(inst.name),
-        slug: String(inst.slug),
-      },
-      role: "OWNER",
-    });
-    router.push(`/dashboard/workspace?org=${encodeURIComponent(String(inst.slug))}`);
+  async function handleEnterInstituteWorkspace(inst: Row) {
+    try {
+      const response = await fetch("/api/organizations/active", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: inst.slug }),
+      });
+      if (response.ok) router.push("/dashboard/workspace");
+      else setError("This account has no active membership in that institute.");
+    } catch {
+      setError("Unable to open this institute.");
+    }
   }
 
   async function handleCreateInstitute(e: FormEvent) {
@@ -325,10 +308,10 @@ export function PlatformAdminWorkspace() {
         instituteType: newInstType,
         contactEmail: newInstEmail.trim() || undefined,
         contactPhone: newInstPhone.trim() || undefined,
-        ownerUserId: newInstOwnerId.trim() || undefined,
+        ownerEmail: newInstOwnerEmail.trim(),
         subscriptionStatus: newInstSubStatus,
       },
-      `Institute "${newInstName.trim()}" registered and provisioned.`
+      "Institute created and owner invitation issued."
     );
 
     if (ok) {
@@ -337,7 +320,7 @@ export function PlatformAdminWorkspace() {
       setNewInstSlug("");
       setNewInstEmail("");
       setNewInstPhone("");
-      setNewInstOwnerId("");
+      setNewInstOwnerEmail("");
     }
   }
 
@@ -369,31 +352,6 @@ export function PlatformAdminWorkspace() {
       setShowCreatePlanModal(false);
       setNewPlanId("");
       setNewPlanName("");
-    }
-  }
-
-  async function handleProvisionUser(e: FormEvent) {
-    e.preventDefault();
-    if (!provOrgId || !provEmail.trim()) return;
-
-    const ok = await mutate(
-      "UPSERT_INSTITUTE_MEMBER",
-      {
-        organizationId: provOrgId,
-        userId: provUserId.trim() || `user_${provEmail.trim().split("@")[0]}`,
-        email: provEmail.trim().toLowerCase(),
-        displayName: provDisplayName.trim() || undefined,
-        role: provRole,
-        status: "ACTIVE",
-      },
-      `User ${provEmail.trim()} provisioned as ${provRole}.`
-    );
-
-    if (ok) {
-      setShowProvisionUserModal(false);
-      setProvEmail("");
-      setProvUserId("");
-      setProvDisplayName("");
     }
   }
 
@@ -448,13 +406,12 @@ export function PlatformAdminWorkspace() {
     e.preventDefault();
     if (!supportOrgId || supportReason.trim().length < 10) return;
     const ok = await mutate(
-      "GRANT_SUPPORT_ACCESS",
+      "REQUEST_SUPPORT_ACCESS",
       {
         organizationId: supportOrgId,
         reason: supportReason.trim(),
-        durationHours: Number(supportHours) || 24,
       },
-      "Time-bounded support access granted and logged."
+      "Support request recorded for owner review."
     );
     if (ok) {
       setSupportReason("");
@@ -541,16 +498,11 @@ export function PlatformAdminWorkspace() {
   // Derived Fleet Stats
   const activeInstitutes = data.institutes.filter((item) => item.status === "ACTIVE").length;
   const suspendedInstitutes = data.institutes.filter((item) => item.status === "SUSPENDED").length;
-  const totalStudents = data.counts.reduce((sum, item) => sum + Number(item.activeStudents ?? 0), 0);
-  const totalStaff = data.counts.reduce((sum, item) => sum + Number(item.activeStaff ?? 0), 0);
-  const totalBatches = data.counts.reduce((sum, item) => sum + Number(item.activeBatches ?? 0), 0);
-
-  const mrr = data.subscriptions
-    .filter((sub) => ["ACTIVE", "TRIAL"].includes(String(sub.status)))
-    .reduce((sum, sub) => {
-      const plan = data.plans.find((p) => p.id === sub.plan_id);
-      return sum + Number(plan?.monthly_price_paise ?? 0);
-    }, 0);
+  const pendingOwners = data.ownerInvitations.filter((invite) => invite.status === "PENDING").length;
+  const activeSubscriptions = data.subscriptions.filter((subscription) => subscription.status === "ACTIVE").length;
+  const trials = data.subscriptions.filter((subscription) => subscription.status === "TRIAL").length;
+  const provisioning = data.audits.filter(({ action }) => action === "create_organization" ||
+    action === "set_organization_status" || String(action).startsWith("owner_invitation_")).slice(0, 5);
 
   const pendingUpgrades = data.subscriptions.filter((sub) => Boolean(sub.requested_plan_id));
   const pendingDemos = data.demoRequests.filter((d) => d.status === "PENDING");
@@ -572,16 +524,6 @@ export function PlatformAdminWorkspace() {
     return matchesSearch && matchesStatus && matchesPlan && matchesType;
   });
 
-  // Filtered Global Members
-  const filteredMembers = data.members.filter((m) => {
-    const matchesSearch = `${m.display_name ?? ""} ${m.email ?? ""} ${m.user_id ?? ""} ${m.institute_name ?? ""}`
-      .toLowerCase()
-      .includes(userSearch.toLowerCase());
-    const matchesRole = userRoleFilter === "ALL" || m.role === userRoleFilter;
-    const matchesStatus = userStatusFilter === "ALL" || m.status === userStatusFilter;
-    return matchesSearch && matchesRole && matchesStatus;
-  });
-
   // Filtered Demo Requests
   const filteredDemos = data.demoRequests.filter(
     (d) => demoStatusFilter === "ALL" || d.status === demoStatusFilter
@@ -600,12 +542,12 @@ export function PlatformAdminWorkspace() {
     : null;
 
   const navItems: { id: AdminSection; label: string; icon: LucideIcon; count?: number }[] = [
-    { id: "overview", label: "Command Center", icon: LayoutDashboard },
-    { id: "institutes", label: "Institutes Fleet", icon: School, count: data.institutes.length },
-    { id: "users", label: "Global Users & Roles", icon: UsersRound, count: data.members.length },
+    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "institutes", label: "Institutes", icon: School, count: data.institutes.length },
+    { id: "invitations", label: "Invitations", icon: Mail, count: pendingOwners },
     {
       id: "plans",
-      label: "Commercial Plans",
+      label: "Subscriptions",
       icon: Gem,
       count: pendingUpgrades.length || undefined,
     },
@@ -615,7 +557,7 @@ export function PlatformAdminWorkspace() {
       icon: ContactRound,
       count: pendingDemos.length || data.demoRequests.length || undefined,
     },
-    { id: "flags", label: "Feature Switches", icon: SlidersHorizontal, count: data.flags.length },
+    { id: "flags", label: "Platform Settings", icon: SlidersHorizontal, count: data.flags.length },
     { id: "broadcasts", label: "System Broadcasts", icon: Megaphone },
     {
       id: "support",
@@ -623,7 +565,7 @@ export function PlatformAdminWorkspace() {
       icon: ShieldCheck,
       count: data.supportRequests.filter((r) => r.status === "APPROVED").length || undefined,
     },
-    { id: "audits", label: "Security Audit Trail", icon: ScrollText, count: data.audits.length },
+    { id: "audits", label: "Audit Logs", icon: ScrollText, count: data.audits.length },
   ];
 
   const activeMeta = SECTION_META[activeTab];
@@ -653,7 +595,7 @@ export function PlatformAdminWorkspace() {
       >
         <div className="brand-row">
           <motion.div whileHover={{ rotate: 1.5, scale: 1.02 }} transition={{ duration: 0.2 }}>
-            <Link href="/admin" aria-label="PrepZii Super Admin">
+            <Link href="/super-admin" aria-label="PrepZii Super Admin">
               <PrepziiMark compact={sidebarCollapsed} theme="light" />
             </Link>
           </motion.div>
@@ -842,11 +784,6 @@ export function PlatformAdminWorkspace() {
               }}
             >
               <span style={{ color: "#16a34a" }}>●</span>
-              <span>DB: {data.systemHealth?.databaseLatencyMs ?? 14}ms</span>
-              <span style={{ color: "#cbd5e1" }}>|</span>
-              <span>
-                Q-Bank: {(data.systemHealth?.questionBankCount ?? 14200).toLocaleString("en-IN")} Qs
-              </span>
             </div>
 
             <button
@@ -875,20 +812,6 @@ export function PlatformAdminWorkspace() {
               <Button onClick={() => setShowCreateModal(true)}>
                 <Plus size={15} style={{ marginRight: "4px" }} />
                 Register Institute
-              </Button>
-            )}
-
-            {activeTab === "users" && (
-              <Button
-                onClick={() => {
-                  if (!provOrgId && data.institutes[0]?.id) {
-                    setShowProvOrgId(String(data.institutes[0].id));
-                  }
-                  setShowProvisionUserModal(true);
-                }}
-              >
-                <Plus size={15} style={{ marginRight: "4px" }} />
-                Provision User
               </Button>
             )}
 
@@ -954,6 +877,8 @@ export function PlatformAdminWorkspace() {
         {/* =========================================================
             SECTION 1: COMMAND CENTER OVERVIEW
            ========================================================= */}
+        {loading && <p role="status">Loading platform records…</p>}
+        {loaded && <>
         {activeTab === "overview" && (
           <div style={{ display: "grid", gap: "24px" }}>
             <div className="metrics-grid">
@@ -963,25 +888,17 @@ export function PlatformAdminWorkspace() {
                 detail={`${activeInstitutes} active · ${suspendedInstitutes} suspended`}
                 accent="yellow"
               />
-              <MetricCard
-                label="Enrolled Students (Fleet)"
-                value={totalStudents.toLocaleString("en-IN")}
-                detail={`${totalStaff} faculty · ${totalBatches} active batches`}
-                accent="blue"
-              />
-              <MetricCard
-                label="Monthly Run Rate (MRR)"
-                value={money(mrr)}
-                detail={`ARR: ${money(mrr * 12)} · ${data.plans.length} commercial tiers`}
-                accent="green"
-              />
-              <MetricCard
-                label="Question Bank"
-                value={(data.systemHealth?.questionBankCount ?? 14200).toLocaleString("en-IN")}
-                detail="Canonical assessment questions"
-                accent="navy"
-              />
+              <MetricCard label="Pending owner invitations" value={String(pendingOwners)}
+                detail="Awaiting activation" accent="blue" />
+              <MetricCard label="Active subscriptions" value={String(activeSubscriptions)}
+                detail={`${trials} trials`} accent="green" />
             </div>
+            <section className="panel">
+              <h2>Recent provisioning activity</h2>
+              {provisioning.length ? <ul>{provisioning.map((event) => <li key={String(event.id)}>
+                {String(event.action).replaceAll("_", " ")} · {data.institutes.find(({ id }) => id === event.target_organization_id)?.name as string ?? "Institute"} · {new Date(String(event.created_at)).toLocaleString()}
+              </li>)}</ul> : <p>No provisioning activity yet.</p>}
+            </section>
 
             {/* Actionable Priority Queue */}
             {(pendingUpgrades.length > 0 || pendingDemos.length > 0) && (
@@ -1084,107 +1001,6 @@ export function PlatformAdminWorkspace() {
                 )}
               </div>
             )}
-
-            {/* Platform Microservice & Infrastructure Status */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "18px",
-                padding: "24px",
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-              }}
-            >
-              <h2 style={{ fontSize: "17px", fontWeight: 800, margin: "0 0 16px 0", color: "#0f172a" }}>
-                Platform Infrastructure & Cloud Providers
-              </h2>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: "16px",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "14px",
-                    border: "1px solid #f1f5f9",
-                    backgroundColor: "#f8fafc",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#334155" }}>
-                      PostgreSQL Cluster
-                    </span>
-                    <Badge variant="success">HEALTHY</Badge>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#64748b" }}>
-                    Connection pool active · Latency {data.systemHealth?.databaseLatencyMs ?? 14}ms
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "14px",
-                    border: "1px solid #f1f5f9",
-                    backgroundColor: "#f8fafc",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#334155" }}>
-                      Supabase Object Storage
-                    </span>
-                    <Badge variant="success">ONLINE</Badge>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#64748b" }}>
-                    Secure RLS bucket for assignments and learning documents
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    padding: "16px",
-                    borderRadius: "14px",
-                    border: "1px solid #f1f5f9",
-                    backgroundColor: "#f8fafc",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    <span style={{ fontSize: "13px", fontWeight: 700, color: "#334155" }}>
-                      Razorpay B2B Billing
-                    </span>
-                    <Badge variant="info">SANDBOX</Badge>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "#64748b" }}>
-                    Automated subscription invoicing & webhook handler ready
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Active Institute Fleet Overview */}
             <div
@@ -1529,12 +1345,15 @@ export function PlatformAdminWorkspace() {
                       <Button
                         variant="secondary"
                         disabled={busy}
-                        onClick={() =>
-                          void mutate("SET_ORGANIZATION_STATUS", {
-                            organizationId: inst.id,
-                            status: inst.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
-                          })
-                        }
+                        onClick={() => {
+                          const suspending = inst.status === "ACTIVE";
+                          if (window.confirm(`${suspending ? "Suspend access to" : "Reactivate"} ${String(inst.name)}?`)) {
+                            void mutate("SET_ORGANIZATION_STATUS", {
+                              organizationId: inst.id,
+                              status: suspending ? "SUSPENDED" : "ACTIVE",
+                            });
+                          }
+                        }}
                         style={{
                           color: inst.status === "ACTIVE" ? "#ef4444" : "#166534",
                           borderColor: inst.status === "ACTIVE" ? "#fecaca" : "#bbf7d0",
@@ -1545,6 +1364,7 @@ export function PlatformAdminWorkspace() {
                         {inst.status === "ACTIVE" ? "Suspend" : "Reactivate"}
                       </Button>
                     </div>
+                    <OwnerInvitationControls institute={inst} invitations={data.ownerInvitations ?? []} busy={busy} mutate={mutate} />
                   </div>
                 );
               })}
@@ -1569,170 +1389,17 @@ export function PlatformAdminWorkspace() {
         {/* =========================================================
             SECTION 3: GLOBAL USERS & ACCESS DIRECTORY
            ========================================================= */}
-        {activeTab === "users" && (
-          <div style={{ display: "grid", gap: "18px" }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 220px 180px",
-                gap: "12px",
-                backgroundColor: "#ffffff",
-                padding: "16px",
-                borderRadius: "14px",
-                border: "1px solid #e2e8f0",
-              }}
-            >
-              <input
-                type="text"
-                placeholder="Search across all institutes by name, email, user ID, or academy…"
-                value={userSearch}
-                onChange={(e) => setUserSearch(e.target.value)}
-                style={{
-                  height: "44px",
-                  padding: "0 14px",
-                  borderRadius: "10px",
-                  border: "1px solid #dce2de",
-                  outline: "none",
-                  fontSize: "13.5px",
-                }}
-              />
-
-              <Select value={userRoleFilter} onChange={(val) => setUserRoleFilter(val)}>
-                <option value="ALL">All Roles</option>
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </Select>
-
-              <Select value={userStatusFilter} onChange={(val) => setUserStatusFilter(val)}>
-                <option value="ALL">All Statuses</option>
-                <option value="ACTIVE">Active</option>
-                <option value="SUSPENDED">Suspended</option>
-                <option value="INACTIVE">Inactive</option>
-              </Select>
-            </div>
-
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "14px",
-                border: "1px solid #e2e8f0",
-                overflow: "hidden",
-              }}
-            >
-              <div style={{ display: "flex", flexDirection: "column" }}>
-                {filteredMembers.map((member) => (
-                  <div
-                    key={String(member.id)}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "14px 20px",
-                      borderBottom: "1px solid #f1f5f9",
-                      gap: "16px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div style={{ minWidth: "260px", flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <strong style={{ fontSize: "14px", color: "#0f172a" }}>
-                          {String(member.display_name || member.email)}
-                        </strong>
-                        <Badge variant={member.status === "ACTIVE" ? "success" : "danger"}>
-                          {String(member.status)}
-                        </Badge>
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#64748b", marginTop: "2px" }}>
-                        {String(member.email)} · ID: <code>{String(member.user_id)}</code>
-                      </div>
-                      <div style={{ fontSize: "12px", color: "#ca8a04", fontWeight: 600, marginTop: "2px" }}>
-                        🏫 {String(member.institute_name)} ({String(member.institute_slug)})
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                      <div style={{ width: "210px" }}>
-                        <Select
-                          value={String(member.role)}
-                          onChange={(newRole) =>
-                            void mutate(
-                              "UPDATE_MEMBER_ROLE_STATUS",
-                              {
-                                memberId: member.id,
-                                organizationId: member.institute_id,
-                                role: newRole,
-                                status: member.status,
-                              },
-                              `Updated role for ${String(member.email)} to ${newRole}.`
-                            )
-                          }
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-
-                      <Button
-                        variant="secondary"
-                        disabled={busy}
-                        onClick={() =>
-                          void mutate("UPDATE_MEMBER_ROLE_STATUS", {
-                            memberId: member.id,
-                            organizationId: member.institute_id,
-                            role: member.role,
-                            status: member.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE",
-                          })
-                        }
-                        style={{ fontSize: "12px" }}
-                      >
-                        {member.status === "ACTIVE" ? "Suspend User" : "Activate"}
-                      </Button>
-
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          void mutate("REMOVE_MEMBER", {
-                            memberId: member.id,
-                            organizationId: member.institute_id,
-                          })
-                        }
-                        style={{
-                          padding: "7px 10px",
-                          borderRadius: "8px",
-                          border: "1px solid #fecaca",
-                          backgroundColor: "#fef2f2",
-                          color: "#dc2626",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {filteredMembers.length === 0 && (
-                  <div style={{ padding: "40px", textAlign: "center", color: "#94a3b8" }}>
-                    No members match the selected filter criteria.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+        {activeTab === "invitations" && (
+          <section className="panel">
+            {data.ownerInvitations.length === 0 ? <p>No owner invitations yet.</p> : data.institutes
+              .filter((institute) => data.ownerInvitations.some((invite) => invite.organization_id === institute.id))
+              .map((institute) => <article className="invitation-row" key={String(institute.id)}>
+                <strong>{String(institute.name)}</strong>
+                <OwnerInvitationControls institute={institute} invitations={data.ownerInvitations} busy={busy} mutate={mutate} />
+              </article>)}
+          </section>
         )}
 
-        {/* =========================================================
-            SECTION 4: COMMERCIAL PLANS & UPGRADES
-           ========================================================= */}
         {activeTab === "plans" && (
           <div style={{ display: "grid", gap: "20px" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -1997,24 +1664,6 @@ export function PlatformAdminWorkspace() {
                       </Select>
                     </div>
 
-                    {demo.status !== "ONBOARDED" && (
-                      <Button
-                        disabled={busy}
-                        onClick={() =>
-                          void mutate(
-                            "UPDATE_DEMO_REQUEST",
-                            {
-                              requestId: demo.id,
-                              status: "ONBOARDED",
-                              provisionInstitute: true,
-                            },
-                            `Provisioned live institute workspace for ${String(demo.institute_name)}!`
-                          )
-                        }
-                      >
-                        ⚡ 1-Click Provision Institute
-                      </Button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -2306,7 +1955,7 @@ export function PlatformAdminWorkspace() {
                   🛡️ Authorize Support Access Window
                 </h2>
                 <small style={{ color: "#64748b" }}>
-                  Create an audited, auto-expiring support access grant for tenant troubleshooting
+                  Request institute owner approval for troubleshooting. Tenant permissions stay tied to active membership.
                 </small>
               </div>
 
@@ -2324,17 +1973,7 @@ export function PlatformAdminWorkspace() {
                 </Select>
               </div>
 
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                  Access Duration
-                </label>
-                <Select value={supportHours} onChange={(val) => setSupportHours(val)}>
-                  <option value="4">4 Hours</option>
-                  <option value="12">12 Hours</option>
-                  <option value="24">24 Hours</option>
-                  <option value="72">72 Hours</option>
-                </Select>
-              </div>
+
 
               <div>
                 <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
@@ -2556,6 +2195,7 @@ export function PlatformAdminWorkspace() {
             </div>
           </div>
         )}
+        </>}
       </section>
 
       {/* =========================================================
@@ -2570,7 +2210,7 @@ export function PlatformAdminWorkspace() {
           plans={data.plans}
           flags={data.flags}
           overrides={data.overrides.filter((o) => o.organization_id === inspectedInstitute.id)}
-          members={data.members.filter((m) => m.institute_id === inspectedInstitute.id)}
+          ownerInvitations={data.ownerInvitations}
           activeSubTab={inspectorTab}
           setActiveSubTab={setInspectorTab}
           busy={busy}
@@ -2766,13 +2406,14 @@ export function PlatformAdminWorkspace() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: "12px" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Owner User ID (Optional Clerk ID)
+                    Initial owner email
                   </label>
                   <input
-                    type="text"
-                    placeholder="Defaults to current Super Admin"
-                    value={newInstOwnerId}
-                    onChange={(e) => setNewInstOwnerId(e.target.value)}
+                    type="email"
+                    required
+                    aria-label="Initial owner email"
+                    value={newInstOwnerEmail}
+                    onChange={(e) => setNewInstOwnerEmail(e.target.value)}
                     style={{
                       width: "100%",
                       height: "42px",
@@ -2984,132 +2625,6 @@ export function PlatformAdminWorkspace() {
                 </button>
                 <Button disabled={busy || !newPlanId.trim() || !newPlanName.trim()}>
                   Create Plan Tier
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* =========================================================
-          MODAL: PROVISION USER TO INSTITUTE
-         ========================================================= */}
-      {showProvisionUserModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 2000,
-            backdropFilter: "blur(6px)",
-            padding: "16px",
-          }}
-        >
-          <div
-            style={{
-              backgroundColor: "#ffffff",
-              borderRadius: "18px",
-              padding: "28px",
-              width: "100%",
-              maxWidth: "460px",
-              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.3)",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                Provision User to Institute
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowProvisionUserModal(false)}
-                style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer" }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleProvisionUser} style={{ display: "grid", gap: "12px" }}>
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                  Target Institute *
-                </label>
-                <Select value={provOrgId} onChange={(val) => setShowProvOrgId(val)}>
-                  {data.institutes.map((i) => (
-                    <option key={String(i.id)} value={String(i.id)}>
-                      {String(i.name)} ({String(i.slug)})
-                    </option>
-                  ))}
-                </Select>
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="faculty@institute.in"
-                  value={provEmail}
-                  onChange={(e) => setProvEmail(e.target.value)}
-                  style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #dce2de", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                  Full Display Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Dr. Rajesh Verma"
-                  value={provDisplayName}
-                  onChange={(e) => setProvDisplayName(e.target.value)}
-                  style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #dce2de", boxSizing: "border-box" }}
-                />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Role *
-                  </label>
-                  <Select value={provRole} onChange={(val) => setProvRole(val)}>
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Clerk User ID (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="user_..."
-                    value={provUserId}
-                    onChange={(e) => setProvUserId(e.target.value)}
-                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #dce2de", boxSizing: "border-box" }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "8px" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowProvisionUserModal(false)}
-                  style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "none", cursor: "pointer" }}
-                >
-                  Cancel
-                </button>
-                <Button disabled={busy || !provOrgId || !provEmail.trim()}>
-                  Provision Member
                 </Button>
               </div>
             </form>
@@ -3342,7 +2857,7 @@ function InstituteGovernanceModal({
   plans,
   flags,
   overrides,
-  members,
+  ownerInvitations,
   activeSubTab,
   setActiveSubTab,
   busy,
@@ -3357,7 +2872,7 @@ function InstituteGovernanceModal({
   plans: Row[];
   flags: Row[];
   overrides: Row[];
-  members: Row[];
+  ownerInvitations: Row[];
   activeSubTab: "profile" | "billing" | "overrides" | "members";
   setActiveSubTab: (t: "profile" | "billing" | "overrides" | "members") => void;
   busy: boolean;
@@ -3370,7 +2885,6 @@ function InstituteGovernanceModal({
   const [instType, setInstType] = useState(String(institute.institute_type ?? "COACHING"));
   const [email, setEmail] = useState(String(institute.contact_email ?? ""));
   const [phone, setPhone] = useState(String(institute.contact_phone ?? ""));
-  const [ownerId, setOwnerId] = useState(String(institute.owner_user_id ?? ""));
   const [color, setColor] = useState(String(branding?.primary_color ?? institute.primary_color ?? "#0B132B"));
   const [subdomain, setSubdomain] = useState(String(branding?.subdomain ?? ""));
   const [verifySubdomain, setVerifySubdomain] = useState(Boolean(branding?.subdomain_verified_at));
@@ -3381,9 +2895,6 @@ function InstituteGovernanceModal({
   const [extendDays, setExtendDays] = useState("30");
 
   // Add Member inside Inspector
-  const [newMemEmail, setNewMemEmail] = useState("");
-  const [newMemName, setNewMemName] = useState("");
-  const [newMemRole, setNewMemRole] = useState("COACHING_ADMIN");
 
   async function saveProfile(e: FormEvent) {
     e.preventDefault();
@@ -3396,7 +2907,6 @@ function InstituteGovernanceModal({
         instituteType: instType,
         contactEmail: email.trim() || null,
         contactPhone: phone.trim() || null,
-        ownerUserId: ownerId.trim(),
         primaryColor: color,
         subdomain: subdomain.trim() || null,
         verifySubdomain,
@@ -3419,26 +2929,7 @@ function InstituteGovernanceModal({
     );
   }
 
-  async function handleAddMember(e: FormEvent) {
-    e.preventDefault();
-    if (!newMemEmail.trim()) return;
-    const ok = await onMutate(
-      "UPSERT_INSTITUTE_MEMBER",
-      {
-        organizationId: institute.id,
-        userId: `user_${newMemEmail.trim().split("@")[0]}_${Date.now().toString(36)}`,
-        email: newMemEmail.trim().toLowerCase(),
-        displayName: newMemName.trim() || undefined,
-        role: newMemRole,
-        status: "ACTIVE",
-      },
-      `Added ${newMemEmail.trim()} to ${String(institute.name)}.`
-    );
-    if (ok) {
-      setNewMemEmail("");
-      setNewMemName("");
-    }
-  }
+
 
   return (
     <div
@@ -3541,7 +3032,7 @@ function InstituteGovernanceModal({
             { id: "profile", label: "Profile & Branding" },
             { id: "billing", label: "Subscription & Quotas" },
             { id: "overrides", label: `Feature Overrides (${overrides.length})` },
-            { id: "members", label: `Members & Roles (${members.length})` },
+            { id: "members", label: "Access summary" },
           ].map((t) => (
             <button
               key={t.id}
@@ -3606,18 +3097,6 @@ function InstituteGovernanceModal({
                       </option>
                     ))}
                   </Select>
-                </div>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Owner User ID
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={ownerId}
-                    onChange={(e) => setOwnerId(e.target.value)}
-                    style={{ width: "100%", height: "44px", padding: "0 12px", borderRadius: "10px", border: "1px solid #dce2de", boxSizing: "border-box" }}
-                  />
                 </div>
               </div>
 
@@ -3891,109 +3370,62 @@ function InstituteGovernanceModal({
           )}
 
           {activeSubTab === "members" && (
-            <div style={{ display: "grid", gap: "16px" }}>
-              <form
-                onSubmit={handleAddMember}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 180px auto",
-                  gap: "10px",
-                  padding: "14px",
-                  borderRadius: "12px",
-                  backgroundColor: "#f8fafc",
-                  border: "1px solid #e2e8f0",
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  type="email"
-                  required
-                  placeholder="Member email *"
-                  value={newMemEmail}
-                  onChange={(e) => setNewMemEmail(e.target.value)}
-                  style={{ height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #dce2de", fontSize: "13px" }}
-                />
-                <input
-                  type="text"
-                  placeholder="Display name"
-                  value={newMemName}
-                  onChange={(e) => setNewMemName(e.target.value)}
-                  style={{ height: "42px", padding: "0 12px", borderRadius: "8px", border: "1px solid #dce2de", fontSize: "13px" }}
-                />
-                <Select value={newMemRole} onChange={(val) => setNewMemRole(val)}>
-                  {ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </Select>
-                <Button disabled={busy} type="submit">
-                  + Add Member
-                </Button>
-              </form>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {members.map((m) => (
-                  <div
-                    key={String(m.id)}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "10px 14px",
-                      borderRadius: "10px",
-                      border: "1px solid #f1f5f9",
-                      backgroundColor: "#ffffff",
-                      gap: "12px",
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <div>
-                      <strong style={{ fontSize: "13.5px", color: "#0f172a" }}>
-                        {String(m.display_name || m.email)}
-                      </strong>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>
-                        {String(m.email)} · <code>{String(m.user_id)}</code>
-                      </div>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <div style={{ width: "190px" }}>
-                        <Select
-                          value={String(m.role)}
-                          onChange={(newRole) =>
-                            void onMutate("UPDATE_MEMBER_ROLE_STATUS", {
-                              memberId: m.id,
-                              organizationId: institute.id,
-                              role: newRole,
-                              status: m.status,
-                            })
-                          }
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </Select>
-                      </div>
-                      <Badge variant={m.status === "ACTIVE" ? "success" : "danger"}>
-                        {String(m.status)}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-
-                {members.length === 0 && (
-                  <div style={{ padding: "24px", textAlign: "center", color: "#94a3b8" }}>
-                    No members registered in this institute yet.
-                  </div>
-                )}
-              </div>
-            </div>
+            <section>
+              <p>Owner: {String(institute.owner_user_id).startsWith("pending_owner:") ? "Awaiting activation" : String(institute.owner_user_id)}</p>
+              <p>Created {new Date(String(institute.created_at)).toLocaleDateString()}</p>
+              <OwnerInvitationControls institute={institute} invitations={ownerInvitations} busy={busy} mutate={onMutate} />
+              <h4>Active memberships by role</h4>
+              <ul>{Object.entries((counts?.byRole ?? {}) as Record<string, number>).map(([role, count]) => (
+                <li key={role}>{role.replaceAll("_", " ")} · {count}</li>
+              ))}</ul>
+              {!Object.keys((counts?.byRole ?? {}) as object).length && <p>No active memberships.</p>}
+            </section>
           )}
+
         </div>
       </div>
     </div>
+  );
+}
+
+
+function OwnerInvitationControls({ institute, invitations, busy, mutate }: {
+  institute: Row;
+  invitations: Row[];
+  busy: boolean;
+  mutate: (action: string, payload: Row, message?: string) => Promise<boolean>;
+}) {
+  const recent = invitations.find((invite) => invite.organization_id === institute.id);
+  const awaitingOwner = String(institute.owner_user_id).startsWith("pending_owner:");
+  if (!awaitingOwner && !recent) return null;
+  const canReplace = recent?.status === "PENDING" || recent?.status === "EXPIRED";
+  return (
+    <section aria-label="Initial owner invitation">
+      {recent && <p>Owner invitation · {String(recent.email)} · {String(recent.status)}
+        {recent.status === "PENDING" && !recent.delivered ? " · Email delivery pending" : ""}</p>}
+      {awaitingOwner && canReplace && (
+        <>
+          <Button disabled={busy || institute.status !== "ACTIVE"} onClick={() => void mutate("INVITE_INITIAL_OWNER", {
+            organizationId: institute.id, email: recent.email, replaceId: recent.id,
+          }, "Replacement owner invitation issued.")}>Resend owner invitation</Button>
+          {recent.status === "PENDING" && <Button disabled={busy} onClick={() => {
+            if (window.confirm("Revoke this owner invitation?")) void mutate("REVOKE_INITIAL_OWNER", {
+              organizationId: institute.id, invitationId: recent.id,
+            });
+          }}>Revoke owner invitation</Button>}
+        </>
+      )}
+      {awaitingOwner && !canReplace && institute.status === "ACTIVE" && (
+        <form onSubmit={(event) => {
+          event.preventDefault();
+          void mutate("INVITE_INITIAL_OWNER", {
+            organizationId: institute.id, email: new FormData(event.currentTarget).get("email"),
+          });
+        }}>
+          <label>Owner email <input type="email" name="email" required /></label>
+          <Button disabled={busy} type="submit">Invite initial owner</Button>
+        </form>
+      )}
+    </section>
   );
 }

@@ -3,6 +3,8 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Select } from "@prepzii/ui";
+import { SupportRequests } from "@/components/support-requests";
+import { GuardianAccess } from "@/components/guardian-access";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { InstituteBrandingSettings } from "@/components/institute-branding-settings";
 import { resolveActiveOrganization } from "@/lib/client-org";
@@ -20,12 +22,13 @@ type Invitation = {
 const roles = [
   ["COACHING_ADMIN", "Institute administrator"],
   ["TEACHER", "Teacher"],
-  ["STUDENT", "Student"],
 ] as const;
 
 export default function MembersPage() {
+  const [canInviteManager, setCanInviteManager] = useState(false);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
+  const [emailSent, setEmailSent] = useState(false);
   const [createdLink, setCreatedLink] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,7 +40,9 @@ export default function MembersPage() {
 
   useEffect(() => {
     async function load() {
-      const active = (await resolveActiveOrganization())?.organization ?? null;
+      const selection = await resolveActiveOrganization();
+      const active = selection?.organization ?? null;
+      setCanInviteManager(selection?.role === "OWNER");
       setOrganization(active);
       if (active) await loadInvitations(active.slug);
     }
@@ -60,6 +65,7 @@ export default function MembersPage() {
     const result = await response.json();
     if (!response.ok) setError(result.error ?? "Unable to create invitation.");
     else {
+      setEmailSent(result.emailSent);
       setCreatedLink(`${window.location.origin}${result.acceptPath}`);
       formElement.reset();
       await loadInvitations(organization.slug);
@@ -81,22 +87,23 @@ export default function MembersPage() {
     <DashboardLayout
       title="Settings & access"
       subtitle="Institute profile, members, roles, and subscription"
-      action={<Link className="pz-button pz-button-outline" href="/dashboard/billing">Subscription</Link>}
+      action={canInviteManager ? <Link className="pz-button pz-button-outline" href="/dashboard/billing">Subscription</Link> : undefined}
     >
-      <InstituteBrandingSettings />
+      {canInviteManager && <InstituteBrandingSettings />}
       <div className="members-grid">
         <section className="panel invitation-panel">
           <h2>Invite a member</h2>
           <p>Invitations expire after seven days and only work for the verified email below.</p>
           <form className="onboarding-form" onSubmit={createInvitation}>
             <label>Email address<input name="email" type="email" required placeholder="teacher@example.com" /></label>
-            <label>Organization role<Select name="role" defaultValue="TEACHER">{roles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>
+            <label>Organization role<Select name="role" defaultValue="TEACHER">{roles.filter(([value]) => value !== "COACHING_ADMIN" || canInviteManager).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</Select></label>
             {error && <div className="form-error" role="alert">{error}</div>}
             <button className="pz-button pz-button-primary" disabled={busy || !organization}>{busy ? "Creating…" : "Create secure invite"}</button>
           </form>
           {createdLink && (
             <div className="invite-link-result">
-              <strong>Invitation created</strong>
+              <strong>{emailSent ? "Invitation emailed" : "Invitation saved. Email delivery failed."}</strong>
+              <p>This link can be used by someone with an existing Clerk account.</p>
               <input readOnly value={createdLink} aria-label="Invitation link" />
               <button className="pz-button pz-button-outline" onClick={() => void navigator.clipboard.writeText(createdLink)}>Copy link</button>
             </div>
@@ -117,6 +124,8 @@ export default function MembersPage() {
           </div>
         </section>
       </div>
+      <GuardianAccess />
+      <SupportRequests />
     </DashboardLayout>
   );
 }

@@ -14,6 +14,7 @@ export type ActiveOrganization = {
 export type ActiveOrganizationSelection = {
   organization: ActiveOrganization;
   role?: string;
+  permissions?: string[];
 };
 
 let rememberedSelection: ActiveOrganizationSelection | null | undefined;

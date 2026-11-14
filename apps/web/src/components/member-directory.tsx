@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import type { OrganizationMemberDirectoryRecord } from "@prepzii/contracts";
 import { Badge, Button, DatePicker, MetricCard, Select } from "@prepzii/ui";
 import { DashboardLayout } from "@/components/dashboard-layout";
+import { resolveActiveOrganization } from "@/lib/client-org";
 import { MemberImportDialog } from "@/components/member-import-dialog";
 
 type Organization = { id: string; name: string; slug: string };
@@ -14,6 +14,8 @@ type BatchOption = { id: string; name: string; target_exam?: string };
 
 export function MemberDirectory({ role }: { role: DirectoryRole }) {
   const isStudent = role === "STUDENT";
+  const [actorRole, setActorRole] = useState("");
+  const [inviting, setInviting] = useState<{ member: OrganizationMemberDirectoryRecord; guardian: boolean } | null>(null);
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [members, setMembers] = useState<OrganizationMemberDirectoryRecord[]>([]);
   const [batches, setBatches] = useState<BatchOption[]>([]);
@@ -45,24 +47,13 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
 
   useEffect(() => {
     async function resolveOrganization() {
-      const activeResponse = await fetch("/api/organizations/active");
-      let active = activeResponse.ok ? (await activeResponse.json()).organization as Organization | null : null;
-      if (!active) {
-        const listResponse = await fetch("/api/organizations");
-        const first = listResponse.ok ? ((await listResponse.json()).organizations as Organization[])[0] : null;
-        if (first) {
-          const selection = await fetch("/api/organizations/active", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ slug: first.slug }),
-          });
-          if (selection.ok) active = (await selection.json()).organization;
-        }
-      }
+      const selection = await resolveActiveOrganization();
+      const active = selection?.organization ?? null;
+      setActorRole(selection?.role ?? "");
       setOrganization(active);
       if (!active) {
         setLoading(false);
-        setError("Create or join an institute before managing members.");
+        setError("Select an institute to open its student directory.");
       } else {
         // Fetch institute batches for assignment and filtering
         try {
@@ -163,6 +154,39 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
     setSaving(false);
   }
 
+  async function sendInvitation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!organization || !inviting) return;
+    const form = new FormData(event.currentTarget);
+    const { member, guardian } = inviting;
+    const key = crypto.randomUUID();
+    setSaving(true);
+    setError("");
+    setSuccessMessage("");
+    try {
+      const response = await fetch(`/api/organizations/${encodeURIComponent(organization.slug)}/invitations`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "idempotency-key": key },
+        body: JSON.stringify({
+          email: guardian ? form.get("email") : member.email, role: guardian ? "PARENT" : "STUDENT",
+          studentId: member.id, batchId: form.get("batchId") || undefined,
+          relationship: guardian ? form.get("relationship") : undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to issue this invitation.");
+      setInviting(null);
+      setSuccessMessage(result.emailSent ? "Invitation emailed." : "Invitation saved. Ask an institute administrator to revoke and reissue it after checking email delivery.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Unable to issue this invitation.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const teacher = actorRole === "TEACHER";
+  const managesStudents = ["OWNER", "COACHING_ADMIN"].includes(actorRole);
+  const canEnroll = isStudent && (teacher || managesStudents);
   const displayedMembers = selectedBatchFilter === "ALL"
     ? members
     : members.filter((m) => m.batches.some((b) => b.id === selectedBatchFilter));
@@ -173,9 +197,8 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
       subtitle={organization ? `${organization.name} · Authoritative member records` : "Select an institute"}
       action={
         <div className="directory-actions">
-          <Button variant="outline" onClick={() => setImporting(true)}>Import CSV</Button>
-          <Button variant="primary" onClick={() => setShowAddModal(true)}>＋ Enroll {isStudent ? "student" : "faculty"}</Button>
-          <Link className="pz-button pz-button-outline" href="/dashboard/members">Invite link</Link>
+          {managesStudents && <Button variant="outline" onClick={() => setImporting(true)}>Import CSV</Button>}
+          {canEnroll && <Button variant="primary" onClick={() => setShowAddModal(true)}>Enroll student</Button>}
         </div>
       }
     >
@@ -216,7 +239,16 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
                 <td><div className="member-batches">{member.batches.length ? member.batches.map((batch) => <Badge key={batch.id} variant="neutral" size="sm">{batch.name}</Badge>) : <span>Unassigned</span>}</div></td>
                 <td>{isStudent ? <><strong>{member.guardianName || "Not recorded"}</strong><small>{member.guardianPhone}</small></> : <><strong>{member.subjectSpecialization || "Not recorded"}</strong><small>{member.qualification}</small></>}</td>
                 <td><Badge variant={member.status === "ACTIVE" ? "success" : "neutral"} size="sm">{member.status}</Badge></td>
-                <td><Button variant="secondary" className="btn-xs" onClick={() => setEditing(member)}>Edit profile</Button></td>
+                <td>
+                  {managesStudents && <Button variant="secondary" className="btn-xs" onClick={() => setEditing(member)}>Edit profile</Button>}
+                  {canEnroll && (member.status === "PENDING" ||
+                    (member.status === "ACTIVE" && member.userId?.startsWith("usr_"))) && (
+                    <Button variant="outline" onClick={() => { setError(""); setInviting({ member, guardian: false }); }}>Invite student</Button>
+                  )}
+                  {canEnroll && member.status === "ACTIVE" && member.userId?.startsWith("user_") && (
+                    <Button variant="outline" onClick={() => { setError(""); setInviting({ member, guardian: true }); }}>Invite guardian</Button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -236,7 +268,7 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
             <header>
               <div>
                 <h2>Enroll new {isStudent ? "student" : "faculty"}</h2>
-                <p>Add member directly to the institute with immediate active access.</p>
+                <p>The student can activate access after accepting an invitation.</p>
               </div>
               <button type="button" onClick={() => setShowAddModal(false)} aria-label="Close">✕</button>
             </header>
@@ -248,7 +280,7 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
               {isStudent ? (
                 <>
                   <label>Roll Number<input name="rollNumber" placeholder="e.g. JEE-26-001" /></label>
-                  <label>Assign to Batch<Select name="batchId" defaultValue=""><option value="">Select Batch (Optional)</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></label>
+                  <label>Assign to Batch<Select name="batchId" required={teacher} defaultValue=""><option value="">{teacher ? "Select assigned batch" : "Select batch (optional)"}</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></label>
                   <label>Guardian Name<input name="guardianName" placeholder="Parent / Guardian" /></label>
                   <label>Guardian Phone<input name="guardianPhone" placeholder="Parent Phone" /></label>
                 </>
@@ -277,7 +309,9 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
             <header><div><h2>Edit {isStudent ? "student" : "faculty"} profile</h2><p>{editing.email}</p></div><button type="button" onClick={() => setEditing(null)} aria-label="Close">✕</button></header>
             <div className="member-editor-grid">
               <label>Display name<input name="displayName" required defaultValue={editing.displayName} /></label>
-              <label>Status<Select name="status" defaultValue={editing.status === "PENDING" ? "ACTIVE" : editing.status}><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option><option value="SUSPENDED">SUSPENDED</option></Select></label>
+              <label>Status<Select name="status" defaultValue={editing.status}>{editing.status === "PENDING" ? (
+                <option value="PENDING">PENDING</option>
+              ) : <><option value="ACTIVE">ACTIVE</option><option value="INACTIVE">INACTIVE</option><option value="SUSPENDED">SUSPENDED</option></>}</Select></label>
               <label>Phone<input name="phone" defaultValue={editing.phone ?? ""} /></label>
               <label>Alternate phone<input name="alternatePhone" defaultValue={editing.alternatePhone ?? ""} /></label>
               {isStudent ? (
@@ -298,6 +332,34 @@ export function MemberDirectory({ role }: { role: DirectoryRole }) {
               <label>Joined on<DatePicker name="joinedOn" defaultValue={editing.joinedOn ?? ""} /></label>
             </div>
             <footer><Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" variant="primary" disabled={saving}>{saving ? "Saving…" : "Save profile"}</Button></footer>
+          </form>
+        </div>
+      )}
+      {inviting && (
+        <div className="modal-backdrop" role="presentation">
+          <form className="member-editor" onSubmit={sendInvitation}>
+            <header>
+              <div><h2>{inviting.guardian ? "Invite guardian" : "Invite student"}</h2><p>{inviting.member.displayName}</p></div>
+              <button type="button" onClick={() => setInviting(null)} aria-label="Close">✕</button>
+            </header>
+            <div className="member-editor-grid">
+              {inviting.guardian ? <>
+                <label>Guardian email<input type="email" name="email" required /></label>
+                <label>Relationship<Select name="relationship" defaultValue="LEGAL_GUARDIAN">
+                  <option value="LEGAL_GUARDIAN">Legal guardian</option>
+                  <option value="FATHER">Father</option>
+                  <option value="MOTHER">Mother</option>
+                  <option value="OTHER">Other</option>
+                </Select></label>
+                <p>The institute owner reviews the relationship after the guardian accepts.</p>
+              </> : <p>{inviting.member.email}</p>}
+              {teacher && <label>Assigned batch<Select name="batchId" required defaultValue={inviting.member.batches[0]?.id ?? ""}>
+                <option value="">Select assigned batch</option>
+                {inviting.member.batches.map((batch) => <option key={batch.id} value={batch.id}>{batch.name}</option>)}
+              </Select></label>}
+            </div>
+            {error && <p role="alert">{error}</p>}
+            <footer><Button type="submit" disabled={saving}>Send invitation</Button></footer>
           </form>
         </div>
       )}

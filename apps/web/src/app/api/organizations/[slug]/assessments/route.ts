@@ -1,4 +1,5 @@
 import { getAssignedBatchIds } from "@/lib/dal/resource-scope";
+import { requireDatabaseQuery } from "@/lib/database-query";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
@@ -16,14 +17,8 @@ const mutationSchema = z.discriminatedUnion("action", [
 type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 
-async function safeRows(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
-  try {
-    const result = await query;
-    if (result.error) return [];
-    return result.data ?? [];
-  } catch {
-    return [];
-  }
+function assessmentRows(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>): Promise<Row[]> {
+  return requireDatabaseQuery(query, [], "Load assessment workspace");
 }
 
 export async function GET(request: Request, context: Context) {
@@ -34,11 +29,12 @@ export async function GET(request: Request, context: Context) {
   const client = getPrepziiAdmin();
   const { organizationId, userId, role } = resolved.context;
   try {
-    let tests = await safeRows(client.from("institute_tests").select("id,title,exam,subject,chapters,difficulty,duration_minutes,total_questions,status,created_by,published_at,max_attempts,result_release_policy,solution_release_policy,created_at").eq("institute_id", organizationId).order("created_at", { ascending: false }));
-    const allSchedules = await safeRows(client.from("organization_test_schedules").select("id,test_id,batch_id,starts_at,ends_at,is_strict_timing").eq("organization_id", organizationId).order("starts_at"));
+    let tests = await assessmentRows(client.from("institute_tests").select("id,title,exam,subject,chapters,difficulty,duration_minutes,total_questions,status,created_by,published_at,max_attempts,result_release_policy,solution_release_policy,created_at").eq("institute_id", organizationId).order("created_at", { ascending: false }));
+    const allSchedules = await assessmentRows(client.from("organization_test_schedules").select("id,test_id,batch_id,starts_at,ends_at,is_strict_timing").eq("organization_id", organizationId).order("starts_at"));
     let schedules = allSchedules;
+    const assigned = role === "TEACHER" ? new Set(await getAssignedBatchIds(resolved.context)) : null;
     if (role === "STUDENT") {
-      const enrolments = await safeRows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "STUDENT"));
+      const enrolments = await assessmentRows(client.from("organization_batch_members").select("batch_id").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "STUDENT"));
       const batchIds = enrolments.map((row) => String(row.batch_id));
       schedules = allSchedules.filter((schedule) => batchIds.includes(String(schedule.batch_id)));
       const testIds = new Set(schedules.map((schedule) => String(schedule.test_id)));
@@ -46,16 +42,16 @@ export async function GET(request: Request, context: Context) {
     } else if (role === "TEACHER") {
       tests = tests.filter((test) => test.created_by === userId);
       const testIds = new Set(tests.map((test) => String(test.id)));
-      schedules = allSchedules.filter((schedule) => testIds.has(String(schedule.test_id)));
+      schedules = allSchedules.filter((schedule) => testIds.has(String(schedule.test_id)) && assigned?.has(String(schedule.batch_id)));
     }
     const testIds = tests.map((test) => String(test.id));
-    let questionLinks = role !== "STUDENT" && testIds.length ? await safeRows(client.from("institute_test_questions").select("id,institute_test_id,question_id,question_order").eq("institute_id", organizationId).in("institute_test_id", testIds).order("question_order")) : [];
+    let questionLinks = role !== "STUDENT" && testIds.length ? await assessmentRows(client.from("institute_test_questions").select("id,institute_test_id,question_id,question_order").eq("institute_id", organizationId).in("institute_test_id", testIds).order("question_order")) : [];
     if (role !== "STUDENT" && !questionLinks.length && testIds.length) {
-      questionLinks = await safeRows(client.from("test_questions").select("id,test_id,question_id,question_order").in("test_id", testIds).order("question_order"));
+      questionLinks = await assessmentRows(client.from("test_questions").select("id,test_id,question_id,question_order").in("test_id", testIds).order("question_order"));
     }
     const linkedQuestionIds = [...new Set(questionLinks.flatMap((link) => typeof link.question_id === "string" && link.question_id ? [link.question_id] : []))];
     const linkedQuestionRows = linkedQuestionIds.length
-      ? await safeRows(client.from("questions").select("id,exam,subject,chapter,topic,difficulty,question_type,question_text,marks,negative_marks").in("id", linkedQuestionIds))
+      ? await assessmentRows(client.from("questions").select("id,exam,subject,chapter,difficulty,question_text,marks,negative_marks").in("id", linkedQuestionIds))
       : [];
     const linkedQuestionById = new Map(linkedQuestionRows.map((question) => [String(question.id), question]));
     const testQuestions = questionLinks.flatMap((link) => {
@@ -68,20 +64,34 @@ export async function GET(request: Request, context: Context) {
         question_order: link.question_order,
       }];
     });
+    const scheduleIds = schedules.map(({ id }) => String(id));
+    const scheduleById = new Map(schedules.map((schedule) => [String(schedule.id), schedule]));
+    const testById = new Map(tests.map((test) => [String(test.id), test]));
     let attempts: Row[] = [];
     let descriptiveSubmissions: Row[] = [];
-    if (testIds.length) {
+    if (testIds.length && (role !== "TEACHER" || scheduleIds.length)) {
       let query = client.from("organization_assessment_attempts").select("id,test_id,schedule_id,user_id,attempt_number,status,started_at,expires_at,submitted_at,score,max_score,percentage,correct_count,incorrect_count,unanswered_count,results_released,solutions_released").eq("organization_id", organizationId).in("test_id", testIds).order("started_at", { ascending: false });
       if (role === "STUDENT") query = query.eq("user_id", userId);
-      attempts = await safeRows(query);
+      if (role === "TEACHER") query = query.in("schedule_id", scheduleIds);
+      attempts = await assessmentRows(query);
       if (role === "STUDENT") {
-        attempts = attempts.map((attempt) => attempt.status === "SUBMITTED" && attempt.results_released
-          ? attempt
-          : { ...attempt, score: null, max_score: null, percentage: null, correct_count: null, incorrect_count: null, unanswered_count: null });
+        const now = Date.now();
+        attempts = attempts.map((attempt) => {
+          const test = testById.get(String(attempt.test_id));
+          const schedule = scheduleById.get(String(attempt.schedule_id));
+          const ended = schedule && Date.parse(String(schedule.ends_at)) <= now;
+          const submitted = attempt.status === "SUBMITTED";
+          const resultsReleased = submitted && Boolean(attempt.results_released || test?.result_release_policy === "IMMEDIATE" ||
+            (ended && test?.result_release_policy === "AFTER_WINDOW"));
+          const solutionsReleased = submitted && Boolean(attempt.solutions_released || test?.solution_release_policy === "IMMEDIATE" ||
+            (ended && test?.solution_release_policy === "AFTER_WINDOW"));
+          return { ...attempt, results_released: resultsReleased, solutions_released: solutionsReleased,
+            ...(!resultsReleased && { score: null, max_score: null, percentage: null, correct_count: null, incorrect_count: null, unanswered_count: null }) };
+        });
       }
-      if (!attempts.length && role !== "STUDENT") {
+      if (!attempts.length && role !== "STUDENT" && role !== "TEACHER") {
         const legacyQuery = client.from("test_attempts").select("id,test_id,user_id,score,total_marks,started_at,submitted_at,status,correct,wrong,skipped,accuracy").in("test_id", testIds);
-        const rawLegacy = await safeRows(legacyQuery);
+        const rawLegacy = await assessmentRows(legacyQuery);
         attempts = rawLegacy.map((a) => ({
           id: a.id,
           test_id: a.test_id,
@@ -102,36 +112,34 @@ export async function GET(request: Request, context: Context) {
           solutions_released: true,
         }));
       }
-      let descriptiveQuery = client.from("organization_descriptive_submissions").select("id,attempt_id,test_id,question_id,student_user_id,answer_text,file_url,max_marks,awarded_marks,feedback,evaluator_user_id,status,moderator_user_id,moderator_notes,graded_at,moderated_at,created_at").eq("organization_id", organizationId).in("test_id", testIds).order("created_at");
-      if (role === "STUDENT") descriptiveQuery = descriptiveQuery.eq("student_user_id", userId);
-      descriptiveSubmissions = await safeRows(descriptiveQuery);
+      const descriptiveQuery = client.from("organization_descriptive_submissions").select("id,attempt_id,test_id,question_id,student_user_id,answer_text,file_url,max_marks,awarded_marks,feedback,evaluator_user_id,status,moderator_user_id,moderator_notes,graded_at,moderated_at,created_at").eq("organization_id", organizationId).in("test_id", testIds).order("created_at");
+      if (role === "TEACHER") {
+        const attemptIds = attempts.map(({ id }) => String(id));
+        descriptiveSubmissions = attemptIds.length ? await assessmentRows(descriptiveQuery.in("attempt_id", attemptIds)) : [];
+      } else if (role !== "STUDENT") {
+        descriptiveSubmissions = await assessmentRows(descriptiveQuery);
+      }
     }
     const staff = role !== "STUDENT";
-    let batches = staff ? await safeRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
+    let batches = staff ? await assessmentRows(client.from("organization_batches").select("id,name").eq("organization_id", organizationId).eq("is_active", true).order("name")) : [];
     if (!batches.length && staff) {
-      batches = await safeRows(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
+      batches = await assessmentRows(client.from("institute_batches").select("id,name").eq("institute_id", organizationId).order("name"));
     }
-    if (role === "TEACHER") {
-      const assigned = new Set(await getAssignedBatchIds(resolved.context));
-      batches = batches.filter(({ id }) => assigned.has(String(id)));
-      schedules = schedules.filter(({ batch_id }) => assigned.has(String(batch_id)));
-      const scheduleIds = new Set(schedules.map(({ id }) => id));
-      attempts = attempts.filter(({ schedule_id }) => scheduleIds.has(schedule_id));
-    }
+    if (assigned) batches = batches.filter(({ id }) => assigned.has(String(id)));
     let bankQuestions: Row[] = [];
     if (staff) {
       const searchParams = new URL(request.url).searchParams;
       const search = searchParams.get("q")?.trim().slice(0, 100) ?? "";
       const subject = searchParams.get("subject")?.trim().slice(0, 120) ?? "";
-      let questionQuery = client.from("questions").select("id,exam,subject,chapter,topic,difficulty,question_type,question_text,marks,negative_marks").limit(50);
+      let questionQuery = client.from("questions").select("id,exam,subject,chapter,difficulty,question_text,marks,negative_marks").limit(50);
       if (subject) questionQuery = questionQuery.eq("subject", subject);
       if (search) questionQuery = questionQuery.ilike("question_text", `%${search}%`);
-      bankQuestions = await safeRows(questionQuery);
+      bankQuestions = await assessmentRows(questionQuery);
     }
     return Response.json({ tests, schedules, testQuestions, attempts, descriptiveSubmissions, batches, bankQuestions, role }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Assessment workspace query failed", error);
-    return Response.json({ tests: [], schedules: [], testQuestions: [], attempts: [], descriptiveSubmissions: [], batches: [], bankQuestions: [], role });
+    return Response.json({ error: "Unable to load assessments." }, { status: 503 });
   }
 }
 

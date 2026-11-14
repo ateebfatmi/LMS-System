@@ -41,21 +41,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   const hasClerk = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
   const fontClasses = "font-sans antialiased";
 
-  if (hasClerk) {
-    return (
-      <ClerkProvider>
-        <html lang="en" className={fontClasses} data-scroll-behavior="smooth">
-          <HeadContent />
-          <body suppressHydrationWarning>{children}</body>
-        </html>
-      </ClerkProvider>
-    );
-  }
-
   return (
     <html lang="en" className={fontClasses} data-scroll-behavior="smooth">
       <HeadContent />
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        {hasClerk ? (
+          <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" signInFallbackRedirectUrl="/auth/resolve">
+            {children}
+          </ClerkProvider>
+        ) : children}
+      </body>
     </html>
   );
 }

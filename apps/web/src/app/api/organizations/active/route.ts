@@ -1,3 +1,4 @@
+import { permissionsForRole } from "@prepzii/authorization";
 import { cookies } from "next/headers";
 import { z } from "zod";
 import { ACTIVE_ORGANIZATION_COOKIE, getActiveWorkspace, setActiveWorkspace } from "@/lib/dal/auth-context";
@@ -16,7 +17,7 @@ export async function GET() {
     (await cookies()).delete(ACTIVE_ORGANIZATION_COOKIE);
     return Response.json({ organization: null }, { headers: privateBrandingHeaders });
   }
-  return Response.json({ organization: await brandedWorkspace(workspace), role: workspace.context.role }, { headers: privateBrandingHeaders });
+  return Response.json({ organization: await brandedWorkspace(workspace), role: workspace.context.role, permissions: permissionsForRole(workspace.context.role) }, { headers: privateBrandingHeaders });
 }
 
 export async function POST(request: Request) {
@@ -30,5 +31,5 @@ export async function POST(request: Request) {
 
   const organization = await brandedWorkspace(workspace);
   await setActiveWorkspace(workspace.institute.slug);
-  return Response.json({ organization, role: workspace.context.role }, { headers: privateBrandingHeaders });
+  return Response.json({ organization, role: workspace.context.role, permissions: permissionsForRole(workspace.context.role) }, { headers: privateBrandingHeaders });
 }

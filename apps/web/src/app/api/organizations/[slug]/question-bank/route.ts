@@ -1,90 +1,30 @@
+import { adaptPrepziiQuestionToBankItem, type PrepziiQuestionRow } from "@prepzii/assessment-core";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
-const slugSchema = z.string().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+const filters = z.object({
+  q: z.string().trim().max(100).default(""),
+  subject: z.string().trim().max(120).default("ALL"),
+  difficulty: z.string().trim().max(30).default("ALL"),
+  kind: z.string().trim().max(40).default("ALL"),
+  limit: z.coerce.number().int().min(1).max(100).default(40),
+  page: z.coerce.number().int().min(1).max(10000).default(1),
+});
 
-type Context = { params: Promise<{ slug: string }> };
-type Row = Record<string, unknown>;
-
-async function safeRows(query: PromiseLike<{ data: Row[] | null; error: unknown }>): Promise<Row[]> {
-  try {
-    const result = await query;
-    if (result.error) return [];
-    return result.data ?? [];
-  } catch {
-    return [];
-  }
-}
-
-export async function GET(request: Request, context: Context) {
-  const slug = slugSchema.safeParse((await context.params).slug);
-  if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
-  const resolved = await getAuthorizedOrganizationContext(slug.data, "academics:read");
-  if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
-
-  const url = new URL(request.url);
-  const search = url.searchParams.get("q")?.trim() || "";
-  const subject = url.searchParams.get("subject")?.trim() || "ALL";
-  const difficulty = url.searchParams.get("difficulty")?.trim() || "ALL";
-  const kind = url.searchParams.get("kind")?.trim() || "ALL";
-  const limit = Math.min(100, Math.max(10, parseInt(url.searchParams.get("limit") || "40", 10)));
-
-  const client = getPrepziiAdmin();
-  let query = client
-    .from("questions")
-    .select("id,exam,subject,chapter,topic,difficulty,question_type,question_text,formula,option_a,option_b,option_c,option_d,correct_option,marks,negative_marks,explanation,created_at")
-    .order("created_at", { ascending: false })
-    .limit(limit);
-
-  if (subject !== "ALL") {
-    query = query.ilike("subject", `%${subject}%`);
-  }
-  if (difficulty !== "ALL") {
-    query = query.ilike("difficulty", `%${difficulty}%`);
-  }
-  if (kind !== "ALL") {
-    query = query.eq("question_type", kind);
-  }
-  if (search) {
-    query = query.or(`question_text.ilike.%${search}%,chapter.ilike.%${search}%,topic.ilike.%${search}%`);
-  }
-
-  const rawQuestions = await safeRows(query);
-
-  const questions = rawQuestions.map((q) => {
-    const isMulti = q.question_type === "multiple_choice";
-    const isNumerical = q.question_type === "numerical";
-
-    const options = !isNumerical
-      ? [
-          { id: "A", text: String(q.option_a || "Option A"), isCorrect: q.correct_option === "A" },
-          { id: "B", text: String(q.option_b || "Option B"), isCorrect: q.correct_option === "B" },
-          { id: "C", text: String(q.option_c || "Option C"), isCorrect: q.correct_option === "C" },
-          { id: "D", text: String(q.option_d || "Option D"), isCorrect: q.correct_option === "D" },
-        ]
-      : undefined;
-
-    return {
-      id: q.id,
-      subject: q.subject || "Physics",
-      chapter: q.chapter || "General Physics",
-      topic: q.topic || "Core Concept",
-      examTag: q.exam === "NEET" ? "NEET" : "JEE_ADVANCED",
-      kind: isNumerical ? "numerical" : isMulti ? "multiple_choice" : "single_choice",
-      difficulty: String(q.difficulty || "MEDIUM").toUpperCase(),
-      text: q.question_text || "",
-      options,
-      correctNumber: isNumerical ? 0 : undefined,
-      numericalTolerance: isNumerical ? 0.05 : undefined,
-      marks: Number(q.marks) || 4,
-      negativeMarks: Number(q.negative_marks) || (isNumerical ? 0 : 1),
-      partialMarking: isMulti,
-      explanation: q.explanation || "Official step-by-step solution verified by coaching faculty.",
-      status: "PUBLISHED",
-      contributor: "Faculty Contributor",
-      year: "PYQ Repository",
-    };
-  });
-
-  return Response.json({ questions, total: questions.length }, { headers: { "cache-control": "private, no-store" } });
+export async function GET(request: Request, context: RouteContext<"/api/organizations/[slug]/question-bank">) {
+  const workspace = await getAuthorizedOrganizationContext((await context.params).slug, "assessments:manage");
+  if (!workspace) return Response.json({ error: "Forbidden" }, { status: 403 });
+  const search = filters.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+  if (!search.success) return Response.json({ error: "Invalid question filters." }, { status: 400 });
+  const { q, subject, difficulty, kind, limit, page } = search.data;
+  let query = getPrepziiAdmin().from("questions").select("*", { count: "exact" })
+    .order("created_at", { ascending: false }).order("id");
+  if (subject !== "ALL") query = query.eq("subject", subject);
+  if (difficulty !== "ALL") query = query.ilike("difficulty", difficulty.replace(/[%_]/g, ""));
+  if (kind !== "ALL") query = query.eq("question_type", kind);
+  if (q) query = query.ilike("question_text", `%${q.replace(/[%_]/g, "")}%`);
+  const from = (page - 1) * limit;
+  const { data, count, error } = await query.range(from, from + limit - 1).returns<PrepziiQuestionRow[]>();
+  if (error) return Response.json({ error: "Unable to load the question bank." }, { status: 503 });
+  return Response.json({ questions: data.map(adaptPrepziiQuestionToBankItem), total: count }, { headers: { "cache-control": "private, no-store" } });
 }

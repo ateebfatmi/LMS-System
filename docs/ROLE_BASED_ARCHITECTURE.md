@@ -4,9 +4,9 @@ Clerk authenticates the request. Its verified session user ID is the application
 
 The server resolves institute status and membership from Supabase before it grants permissions. `@prepzii/authorization` owns the canonical institute roles and typed permissions. `prepzii_active_organization` is an HTTP-only preference. Every lookup revalidates the preference against current membership. A user with one valid institute can enter it directly. Users with multiple institutes choose explicitly and may hold different roles across institutes. Ambiguous simultaneous memberships in a single institute fail closed. Adding selectable roles within one institute requires a separate membership data model and migration.
 
-Existing institutes without an owner membership retain the legacy `owner_user_id` path. An explicit inactive owner membership blocks access. Onboarding creates the institute, owner membership, initial subscription, and audit event in a single database transaction. Slug retries for the same owner reuse the institute; a conflicting owner cannot claim it.
+Existing institutes without an owner membership retain the legacy `owner_user_id` path. An explicit inactive owner membership blocks access. A founder provisions each new institute and issues its first owner invitation from the platform workspace. The verified recipient becomes the owner on acceptance.
 
-An authorized institute administrator creates an expiring invitation and shares its link. Supabase stores a token hash. Clerk verifies the recipient’s primary email; acceptance binds the verified account to the existing pending member when applicable. Replay by a different identity and changes to existing roles or suspended memberships are rejected. Students can be staged via CSV and activated later.
+The LMS stores hashes of expiring invitation tokens. Clerk verifies the recipient’s primary email and the LMS activates the matching member in a database transaction. The owner approves guardian links. See [invite-only provisioning](INVITE_ONLY_PROVISIONING.md) for the workflows and migration requirements.
 
 ## Database changes and rollback
 

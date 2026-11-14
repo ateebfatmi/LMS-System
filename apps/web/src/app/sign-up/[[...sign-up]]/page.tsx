@@ -1,102 +1,54 @@
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { SignUp } from "@clerk/nextjs";
 import Link from "next/link";
-import { PrepziiMark } from "@prepzii/ui";
+import { redirect } from "next/navigation";
+import { normalizeInvitationEmail } from "@prepzii/membership";
+import { z } from "zod";
+import { SignInCard } from "@/components/sign-in-card";
+import { deriveInvitationToken, hashInvitationToken } from "@/lib/invitation-token";
+import { getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { withSignInReturn } from "@/lib/sign-in-navigation";
 
-export default function SignUpPage() {
-  const clerkConfigured = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
+export default async function InvitationRegistration({ searchParams }: PageProps<"/sign-up/[[...sign-up]]">) {
+  if (!process.env.CLERK_SECRET_KEY || !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+    !process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) redirect("/sign-in");
+  const query = await searchParams;
+  const invitationId = z.uuid().safeParse(query.invite);
+  const secret = process.env.INVITATION_TOKEN_SECRET;
+  if (!invitationId.success || !secret || secret.length < 32) redirect("/sign-in");
 
+  const continuation = `/sign-up?invite=${invitationId.data}`;
+  const signInUrl = withSignInReturn("/sign-in", continuation);
+  const ticket = query.__clerk_ticket;
+  const hasTicket = typeof ticket === "string" && ticket.length > 0 && ticket.length <= 8192;
+  const { userId } = await auth();
+  if (!userId && !hasTicket) redirect(signInUrl);
+
+  const { data, error } = await getPrepziiAdmin().from("organization_invitations")
+    .select("organization_id,email,role,idempotency_key,token_hash,institutes!inner(status)").eq("id", invitationId.data)
+    .eq("status", "PENDING").eq("institutes.status", "ACTIVE").gt("expires_at", new Date().toISOString()).maybeSingle();
+  if (error || !data) redirect("/sign-in");
+
+  if (userId) {
+    const primaryEmail = (await currentUser())?.primaryEmailAddress;
+    if (primaryEmail?.verification?.status !== "verified" ||
+      normalizeInvitationEmail(primaryEmail.emailAddress) !== normalizeInvitationEmail(data.email)) {
+      redirect("/sign-in?workspace=missing");
+    }
+    const token = deriveInvitationToken({
+      secret, organizationId: data.organization_id, email: data.email, role: data.role,
+      idempotencyKey: data.idempotency_key,
+    });
+    if (hashInvitationToken(token) !== data.token_hash) redirect("/sign-in");
+    redirect(`/invite/${token}`);
+  }
+
+  // Normalize the return URL server-side. The Clerk ticket authenticates the
+  // recipient, and only the matching verified session receives the LMS token.
+  if (query.__clerk_status === "sign_in") redirect(signInUrl);
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "linear-gradient(135deg, #090e1a 0%, #0e172a 50%, #1e293b 100%)",
-        padding: "24px",
-      }}
-    >
-      <div style={{ marginBottom: "28px", textAlign: "center" }}>
-        <Link href="/" style={{ textDecoration: "none", display: "inline-block" }}>
-          <PrepziiMark />
-        </Link>
-        <h1
-          style={{
-            color: "white",
-            fontSize: "22px",
-            fontWeight: 800,
-            marginTop: "16px",
-            marginBottom: "6px",
-            fontFamily: "var(--font-display, inherit)",
-            letterSpacing: "-0.02em",
-          }}
-        >
-          Create an Institute Owner Account
-        </h1>
-        <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
-          Register as the owner of a new institutional workspace.
-        </p>
-      </div>
-
-      <div
-        style={{
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
-          borderRadius: "24px",
-          overflow: "hidden",
-        }}
-      >
-        {clerkConfigured ? (
-          <SignUp
-            appearance={{
-              elements: {
-                card: {
-                  borderRadius: "24px",
-                  background: "#ffffff",
-                  boxShadow: "none",
-                },
-                formButtonPrimary: {
-                  backgroundColor: "#0B1528",
-                  "&:hover": {
-                    backgroundColor: "#1e293b",
-                  },
-                },
-              },
-            }}
-            routing="path"
-            path="/sign-up"
-            signInUrl="/sign-in"
-            forceRedirectUrl="/auth/resolve?return_to=%2Fonboarding"
-            fallbackRedirectUrl="/auth/resolve?return_to=%2Fonboarding"
-          />
-        ) : (
-          <section
-            role="status"
-            style={{
-              maxWidth: "440px",
-              padding: "28px",
-              background: "#ffffff",
-              color: "#0f172a",
-              borderRadius: "24px",
-              textAlign: "center",
-            }}
-          >
-            <h2 style={{ margin: "0 0 10px", fontSize: "18px" }}>Authentication is not configured</h2>
-            <p style={{ margin: 0, color: "#475569", lineHeight: 1.6 }}>
-              Add the Clerk publishable and secret keys to this environment before creating an account.
-            </p>
-          </section>
-        )}
-      </div>
-
-      <div style={{ marginTop: "24px", textAlign: "center" }}>
-        <p style={{ color: "#64748b", fontSize: "13px" }}>
-          Already manage an institute?{" "}
-          <Link href="/sign-in" style={{ color: "#facc15", fontWeight: 700, textDecoration: "none" }}>
-            Sign in here →
-          </Link>
-        </p>
-      </div>
-    </div>
+    <SignInCard title="Activate your invited account" footer={<Link href={signInUrl}>Already have an account? Sign in</Link>}>
+      <SignUp routing="hash" signInUrl={signInUrl} forceRedirectUrl={continuation} fallbackRedirectUrl={continuation} />
+    </SignInCard>
   );
 }

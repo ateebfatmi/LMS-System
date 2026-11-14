@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { getActingUserId, getPrepziiAdmin, isPlatformAdmin } from "@/lib/prepzii-backend";
+import { getPlatformAdminUserId, getPrepziiAdmin, isPlatformAdmin } from "@/lib/prepzii-backend";
+import { manageOwnerInvitation } from "@/lib/platform-owner-invitations";
+import { guardRateLimit } from "@/lib/rate-limit";
 
 const mutationSchema = z.discriminatedUnion("action", [
   z.object({
@@ -23,13 +25,12 @@ const mutationSchema = z.discriminatedUnion("action", [
     payload: z.object({
       organizationId: z.string().uuid(),
       name: z.string().trim().min(2).max(160),
-      slug: z.string().trim().min(2).max(64),
+      slug: z.string().trim().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
       instituteType: z
         .enum(["COACHING", "TUITION", "SCHOOL", "ONLINE_ACADEMY", "INDIVIDUAL_TUTOR", "OTHER"])
         .default("COACHING"),
       contactEmail: z.string().trim().max(160).optional().nullable(),
       contactPhone: z.string().trim().max(40).optional().nullable(),
-      ownerUserId: z.string().trim().min(2).max(160),
       primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
       subdomain: z.string().trim().max(80).optional().nullable(),
       verifySubdomain: z.boolean().optional(),
@@ -92,53 +93,24 @@ const mutationSchema = z.discriminatedUnion("action", [
     action: z.literal("CREATE_INSTITUTE"),
     payload: z.object({
       name: z.string().trim().min(2).max(160),
-      slug: z.string().trim().min(2).max(64),
+      slug: z.string().trim().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
       planId: z.string().default("basic"),
       instituteType: z
         .enum(["COACHING", "TUITION", "SCHOOL", "ONLINE_ACADEMY", "INDIVIDUAL_TUTOR", "OTHER"])
         .default("COACHING"),
       contactEmail: z.string().trim().max(160).optional(),
       contactPhone: z.string().trim().max(40).optional(),
-      ownerUserId: z.string().trim().max(160).optional(),
+      ownerEmail: z.email().max(320),
       subscriptionStatus: z.enum(["ACTIVE", "TRIAL"]).default("ACTIVE"),
     }),
   }),
   z.object({
-    action: z.literal("UPSERT_INSTITUTE_MEMBER"),
-    payload: z.object({
-      organizationId: z.string().uuid(),
-      userId: z.string().trim().min(2).max(160),
-      email: z.string().trim().email(),
-      displayName: z.string().trim().max(160).optional(),
-      role: z.enum([
-        "OWNER",
-        "COACHING_ADMIN",
-        "TEACHER",
-        "STUDENT",
-      ]),
-      status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).default("ACTIVE"),
-    }),
+    action: z.literal("INVITE_INITIAL_OWNER"),
+    payload: z.object({ organizationId: z.uuid(), email: z.email().max(320), replaceId: z.uuid().optional() }),
   }),
   z.object({
-    action: z.literal("UPDATE_MEMBER_ROLE_STATUS"),
-    payload: z.object({
-      memberId: z.string().uuid(),
-      organizationId: z.string().uuid(),
-      role: z.enum([
-        "OWNER",
-        "COACHING_ADMIN",
-        "TEACHER",
-        "STUDENT",
-      ]),
-      status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]),
-    }),
-  }),
-  z.object({
-    action: z.literal("REMOVE_MEMBER"),
-    payload: z.object({
-      memberId: z.string().uuid(),
-      organizationId: z.string().uuid(),
-    }),
+    action: z.literal("REVOKE_INITIAL_OWNER"),
+    payload: z.object({ organizationId: z.uuid(), invitationId: z.uuid() }),
   }),
   z.object({
     action: z.literal("RESOLVE_PLAN_UPGRADE_REQUEST"),
@@ -152,7 +124,6 @@ const mutationSchema = z.discriminatedUnion("action", [
     payload: z.object({
       requestId: z.string().uuid(),
       status: z.enum(["PENDING", "CONTACTED", "DEMO_GIVEN", "ONBOARDED", "REJECTED"]),
-      provisionInstitute: z.boolean().optional(),
     }),
   }),
   z.object({
@@ -179,11 +150,10 @@ const mutationSchema = z.discriminatedUnion("action", [
     }),
   }),
   z.object({
-    action: z.literal("GRANT_SUPPORT_ACCESS"),
+    action: z.literal("REQUEST_SUPPORT_ACCESS"),
     payload: z.object({
       organizationId: z.string().uuid(),
       reason: z.string().trim().min(10).max(500),
-      durationHours: z.number().int().min(1).max(72).default(24),
     }),
   }),
   z.object({
@@ -196,19 +166,18 @@ const mutationSchema = z.discriminatedUnion("action", [
 
 type Row = Record<string, unknown>;
 
-async function safeMany(
-  query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>
-): Promise<Row[]> {
-  try {
-    const result = await query;
-    if (result.error) {
-      console.warn("Platform partial query warning:", result.error.message);
-      return [];
-    }
-    return result.data ?? [];
-  } catch (err) {
-    console.warn("Platform query fallback:", err);
-    return [];
+async function platformRows(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>): Promise<Row[]> {
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+async function allPlatformRows(loadPage: (from: number) => Promise<Row[]>): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (let offset = 0; ; offset += 500) {
+    const page = await loadPage(offset);
+    rows.push(...page);
+    if (page.length < 500) return rows;
   }
 }
 
@@ -218,7 +187,6 @@ export async function GET() {
   }
 
   const client = getPrepziiAdmin();
-  const startTime = Date.now();
 
   try {
     const [
@@ -229,29 +197,19 @@ export async function GET() {
       overrides,
       audits,
       members,
-      profiles,
       batches,
       brandings,
       demoRequests,
       supportRequests,
+      ownerInvitations,
     ] = await Promise.all([
-      safeMany(
-        client
-          .from("institutes")
-          .select(
-            "id,name,slug,owner_user_id,status,institute_type,contact_email,contact_phone,primary_color,created_at"
-          )
-          .order("created_at", { ascending: false })
-          .limit(500)
-      ),
-      safeMany(
-        client
-          .from("organization_subscriptions")
-          .select(
-            "id,organization_id,plan_id,status,current_period_start,current_period_end,trial_ends_at,grace_ends_at,cancel_at_period_end,requested_plan_id,requested_billing_interval,updated_at"
-          )
-      ),
-      safeMany(
+      allPlatformRows((from) => platformRows(client.from("institutes")
+        .select("id,name,slug,owner_user_id,status,institute_type,contact_email,contact_phone,primary_color,created_at")
+        .order("created_at", { ascending: false }).order("id").range(from, from + 499))),
+      allPlatformRows((from) => platformRows(client.from("organization_subscriptions")
+        .select("id,organization_id,plan_id,status,current_period_start,current_period_end,trial_ends_at,grace_ends_at,cancel_at_period_end,requested_plan_id,requested_billing_interval,updated_at")
+        .order("id").range(from, from + 499))),
+      platformRows(
         client
           .from("subscription_plans")
           .select(
@@ -259,46 +217,36 @@ export async function GET() {
           )
           .order("monthly_price_paise")
       ),
-      safeMany(
+      platformRows(
         client
           .from("platform_feature_flags")
           .select("key,description,enabled_by_default,updated_by,updated_at")
           .order("key")
       ),
-      safeMany(
+      platformRows(
         client
           .from("organization_feature_overrides")
           .select("organization_id,feature_key,enabled,reason,updated_by,updated_at")
       ),
-      safeMany(
+      platformRows(
         client
           .from("platform_audit_logs")
           .select("id,actor_user_id,actor_role,target_organization_id,action,details,created_at")
           .order("created_at", { ascending: false })
           .limit(200)
       ),
-      safeMany(
-        client
-          .from("institute_members")
-          .select("id,institute_id,user_id,email,role,status,created_at")
-          .order("created_at", { ascending: false })
-          .limit(1000)
-      ),
-      safeMany(
-        client
-          .from("organization_member_profiles")
-          .select("membership_id,organization_id,display_name,phone,roll_number,employee_code")
-          .limit(1000)
-      ),
-      safeMany(client.from("organization_batches").select("organization_id,is_active")),
-      safeMany(
+      allPlatformRows((from) => platformRows(client.from("institute_members").select("institute_id,role")
+        .eq("status", "ACTIVE").not("user_id", "is", null).order("id").range(from, from + 499))),
+      allPlatformRows((from) => platformRows(client.from("organization_batches").select("organization_id")
+        .eq("is_active", true).order("id").range(from, from + 499))),
+      platformRows(
         client
           .from("organization_branding")
           .select(
             "organization_id,logo_url,primary_color,support_email,support_phone,subdomain,subdomain_verified_at"
           )
       ),
-      safeMany(
+      platformRows(
         client
           .from("platform_demo_requests")
           .select(
@@ -307,61 +255,33 @@ export async function GET() {
           .order("created_at", { ascending: false })
           .limit(200)
       ),
-      safeMany(
+      platformRows(
         client
           .from("platform_support_access_requests")
           .select("id,organization_id,requested_by,reason,status,approved_by,expires_at,created_at")
           .order("created_at", { ascending: false })
           .limit(100)
       ),
+      allPlatformRows((from) => platformRows(client.from("organization_invitations")
+        .select("id,organization_id,email,status,expires_at,clerk_invitation_id").eq("role", "OWNER")
+        .order("created_at", { ascending: false }).order("id").range(from, from + 499))),
     ]);
 
-    // Count canonical questions safely
-    let questionBankCount = 0;
-    try {
-      const qRes = await client.from("questions").select("id", { count: "exact", head: true });
-      questionBankCount = qRes.count ?? 0;
-    } catch {}
-
-    const dbLatencyMs = Date.now() - startTime;
-
-    const counts = institutes.map((institute) => {
-      return {
-        organizationId: institute.id,
-        activeStudents: members.filter(
-          (m) => m.institute_id === institute.id && m.role === "STUDENT" && m.status === "ACTIVE"
-        ).length,
-        activeStaff: members.filter(
-          (m) => m.institute_id === institute.id && m.role !== "STUDENT" && m.status === "ACTIVE"
-        ).length,
-        activeBatches: batches.filter(
-          (b) => b.organization_id === institute.id && b.is_active
-        ).length,
-      };
+    const membershipCounts = new Map<unknown, Map<string, number>>();
+    for (const member of members) {
+      const roles = membershipCounts.get(member.institute_id) ?? new Map<string, number>();
+      const role = String(member.role);
+      roles.set(role, (roles.get(role) ?? 0) + 1);
+      membershipCounts.set(member.institute_id, roles);
+    }
+    const batchCounts = new Map<unknown, number>();
+    for (const batch of batches) batchCounts.set(batch.organization_id, (batchCounts.get(batch.organization_id) ?? 0) + 1);
+    const counts = institutes.map(({ id }) => {
+      const byRole = membershipCounts.get(id) ?? new Map<string, number>();
+      return { organizationId: id, byRole: Object.fromEntries(byRole), activeStudents: byRole.get("STUDENT") ?? 0,
+        activeStaff: [...byRole].filter(([role]) => !["STUDENT", "PARENT"].includes(role)).reduce((count, [, total]) => count + total, 0),
+        activeBatches: batchCounts.get(id) ?? 0 };
     });
-
-    // Enrich members with profile display name and institute name
-    const enrichedMembers = members.map((m) => {
-      const prof = profiles.find((p) => p.membership_id === m.id);
-      const inst = institutes.find((i) => i.id === m.institute_id);
-      return {
-        ...m,
-        display_name: prof?.display_name ?? m.email ?? m.user_id,
-        phone: prof?.phone ?? null,
-        roll_number: prof?.roll_number ?? null,
-        employee_code: prof?.employee_code ?? null,
-        institute_name: inst?.name ?? "Unknown Institute",
-        institute_slug: inst?.slug ?? "",
-      };
-    });
-
-    const systemHealth = {
-      databaseStatus: "OPERATIONAL",
-      databaseLatencyMs: dbLatencyMs,
-      storageStatus: "OPERATIONAL",
-      environment: process.env.NODE_ENV || "development",
-      questionBankCount,
-    };
 
     return Response.json(
       {
@@ -372,11 +292,13 @@ export async function GET() {
         overrides,
         audits,
         counts,
-        members: enrichedMembers,
         brandings,
         demoRequests,
         supportRequests,
-        systemHealth,
+        ownerInvitations: ownerInvitations.map(({ clerk_invitation_id, ...invite }) => ({
+          ...invite, delivered: Boolean(clerk_invitation_id),
+          status: invite.status === "PENDING" && Date.parse(String(invite.expires_at)) <= Date.now() ? "EXPIRED" : invite.status,
+        })),
       },
       { headers: { "cache-control": "private, no-store" } }
     );
@@ -387,11 +309,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isPlatformAdmin())) {
-    return Response.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  const actorUserId = (await getActingUserId()) || "root-superadmin";
+  const actorUserId = await getPlatformAdminUserId();
+  if (!actorUserId) return Response.json({ error: "Forbidden" }, { status: 403 });
   const parsed = mutationSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsed.success) {
@@ -452,7 +371,6 @@ export async function POST(request: Request) {
         instituteType,
         contactEmail,
         contactPhone,
-        ownerUserId,
         primaryColor,
         subdomain,
         verifySubdomain,
@@ -466,7 +384,6 @@ export async function POST(request: Request) {
           institute_type: instituteType,
           contact_email: contactEmail || null,
           contact_phone: contactPhone || null,
-          owner_user_id: ownerUserId,
           ...(primaryColor ? { primary_color: primaryColor } : {}),
           updated_at: new Date().toISOString(),
         })
@@ -497,77 +414,38 @@ export async function POST(request: Request) {
         actor_role: "PLATFORM_SUPER_ADMIN",
         target_organization_id: organizationId,
         action: "update_institute_details",
-        details: { name, slug, instituteType, ownerUserId, subdomain, verifySubdomain },
+        details: { name, slug, instituteType, subdomain, verifySubdomain },
       });
 
       return Response.json({ result: { organizationId } });
     }
 
-    // 3. CREATE_INSTITUTE
+    if (["CREATE_INSTITUTE", "INVITE_INITIAL_OWNER", "REVOKE_INITIAL_OWNER"].includes(parsed.data.action)) {
+      const limited = await guardRateLimit({ request, scope: "platform-provisioning", subject: actorUserId,
+        limit: 30, windowSeconds: 3600 });
+      if (limited) return limited;
+    }
+
     if (parsed.data.action === "CREATE_INSTITUTE") {
-      const {
-        name,
-        slug,
-        planId,
-        instituteType,
-        contactEmail,
-        contactPhone,
-        ownerUserId,
-        subscriptionStatus,
-      } = parsed.data.payload;
-
-      const resolvedOwner = ownerUserId?.trim() || actorUserId;
-      const resolvedEmail = (contactEmail?.trim() || "owner@prepzii.com").toLowerCase();
-
-      const { data: newOrg, error: orgErr } = await client
-        .from("institutes")
-        .insert({
-          name,
-          slug: slug.toLowerCase(),
-          owner_user_id: resolvedOwner,
-          institute_type: instituteType,
-          contact_email: resolvedEmail,
-          contact_phone: contactPhone?.trim() || null,
-          status: "ACTIVE",
-        })
-        .select("id")
-        .single();
-
-      if (orgErr) {
-        return Response.json({ error: orgErr.message }, { status: 400 });
-      }
-
-      await client.from("institute_members").upsert(
-        {
-          institute_id: newOrg.id,
-          user_id: resolvedOwner,
-          email: resolvedEmail,
-          role: "OWNER",
-          status: "ACTIVE",
-        },
-        { onConflict: "institute_id,email" }
-      );
-
-      await client.from("organization_subscriptions").upsert(
-        {
-          organization_id: newOrg.id,
-          plan_id: planId,
-          status: subscriptionStatus,
-          current_period_start: new Date().toISOString(),
-          current_period_end: new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
-        },
-        { onConflict: "organization_id" }
-      );
-
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
-        target_organization_id: newOrg.id,
-        action: "create_organization",
-        details: { name, slug, planId, instituteType, ownerUserId: resolvedOwner },
+      const { ownerEmail, ...payload } = parsed.data.payload;
+      const { data: organizationId, error } = await client.rpc("lms_create_invited_institute", {
+        p_actor: actorUserId, p_payload: { ...payload, contactEmail: payload.contactEmail || ownerEmail },
       });
+      if (error) {
+        return Response.json({ error: "Unable to create institute." }, { status: error.code === "23505" ? 409 : 503 });
+      }
+      const invite = await manageOwnerInvitation({ organizationId, actorId: actorUserId, email: ownerEmail });
+      return Response.json({ result: { organizationId, emailSent: invite.result?.emailSent ?? false } },
+        { status: 201, headers: { "cache-control": "no-store" } });
+    }
 
-      return Response.json({ result: { organizationId: newOrg.id } });
+    if (parsed.data.action === "INVITE_INITIAL_OWNER" || parsed.data.action === "REVOKE_INITIAL_OWNER") {
+      const operation = parsed.data.action === "INVITE_INITIAL_OWNER"
+        ? await manageOwnerInvitation({ ...parsed.data.payload, actorId: actorUserId })
+        : await manageOwnerInvitation({ organizationId: parsed.data.payload.organizationId, actorId: actorUserId,
+          replaceId: parsed.data.payload.invitationId });
+      if (operation.error) return Response.json({ error: "Unable to change the owner invitation." }, { status: 409 });
+      return Response.json(operation, { headers: { "cache-control": "no-store" } });
     }
 
     // 4. CREATE_PLAN
@@ -650,97 +528,6 @@ export async function POST(request: Request) {
       return Response.json({ result: { organizationId, featureKey } });
     }
 
-    // 6. UPSERT_INSTITUTE_MEMBER
-    if (parsed.data.action === "UPSERT_INSTITUTE_MEMBER") {
-      const { organizationId, userId, email, displayName, role, status } = parsed.data.payload;
-      const { data: memberRow, error: memErr } = await client
-        .from("institute_members")
-        .upsert(
-          {
-            institute_id: organizationId,
-            user_id: userId,
-            email: email.toLowerCase(),
-            role,
-            status,
-          },
-          { onConflict: "institute_id,email" }
-        )
-        .select("id")
-        .single();
-
-      if (memErr) {
-        return Response.json({ error: memErr.message }, { status: 400 });
-      }
-
-      if (displayName && memberRow?.id) {
-        await client.from("organization_member_profiles").upsert(
-          {
-            organization_id: organizationId,
-            membership_id: memberRow.id,
-            display_name: displayName,
-          },
-          { onConflict: "membership_id" }
-        );
-      }
-
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
-        target_organization_id: organizationId,
-        action: "upsert_institute_member",
-        details: { userId, email, role, status },
-      });
-
-      return Response.json({ result: { memberId: memberRow?.id } });
-    }
-
-    // 7. UPDATE_MEMBER_ROLE_STATUS & REMOVE_MEMBER
-    if (parsed.data.action === "UPDATE_MEMBER_ROLE_STATUS") {
-      const { memberId, organizationId, role, status } = parsed.data.payload;
-      const { error: updErr } = await client
-        .from("institute_members")
-        .update({ role, status })
-        .eq("id", memberId)
-        .eq("institute_id", organizationId);
-
-      if (updErr) {
-        return Response.json({ error: updErr.message }, { status: 400 });
-      }
-
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
-        target_organization_id: organizationId,
-        action: "update_member_role_status",
-        details: { memberId, role, status },
-      });
-
-      return Response.json({ result: { memberId, role, status } });
-    }
-
-    if (parsed.data.action === "REMOVE_MEMBER") {
-      const { memberId, organizationId } = parsed.data.payload;
-      const { error: delErr } = await client
-        .from("institute_members")
-        .delete()
-        .eq("id", memberId)
-        .eq("institute_id", organizationId);
-
-      if (delErr) {
-        return Response.json({ error: delErr.message }, { status: 400 });
-      }
-
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
-        target_organization_id: organizationId,
-        action: "remove_institute_member",
-        details: { memberId },
-      });
-
-      return Response.json({ result: { memberId } });
-    }
-
     // 8. RESOLVE_PLAN_UPGRADE_REQUEST
     if (parsed.data.action === "RESOLVE_PLAN_UPGRADE_REQUEST") {
       const { organizationId, decision } = parsed.data.payload;
@@ -805,72 +592,14 @@ export async function POST(request: Request) {
     }
 
     if (parsed.data.action === "UPDATE_DEMO_REQUEST") {
-      const { requestId, status, provisionInstitute } = parsed.data.payload;
-      const { data: demoReq } = await client
-        .from("platform_demo_requests")
-        .select("*")
-        .eq("id", requestId)
-        .single();
-
-      await client.from("platform_demo_requests").update({ status }).eq("id", requestId);
-
-      let provisionedOrgId: string | null = null;
-      if (provisionInstitute && demoReq) {
-        const baseSlug = String(demoReq.institute_name || "academy")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-+|-+$/g, "")
-          .slice(0, 48);
-        const uniqueSlug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
-        const planId = String(demoReq.interested_plan || "growth").toLowerCase();
-
-        const { data: newOrg } = await client
-          .from("institutes")
-          .insert({
-            name: String(demoReq.institute_name),
-            slug: uniqueSlug,
-            owner_user_id: actorUserId,
-            contact_email: String(demoReq.email).toLowerCase(),
-            contact_phone: String(demoReq.phone),
-            status: "ACTIVE",
-          })
-          .select("id")
-          .single();
-
-        if (newOrg?.id) {
-          provisionedOrgId = newOrg.id;
-          await client.from("institute_members").upsert(
-            {
-              institute_id: newOrg.id,
-              user_id: actorUserId,
-              email: String(demoReq.email).toLowerCase(),
-              role: "OWNER",
-              status: "ACTIVE",
-            },
-            { onConflict: "institute_id,email" }
-          );
-
-          await client.from("organization_subscriptions").upsert(
-            {
-              organization_id: newOrg.id,
-              plan_id: ["basic", "growth", "scale"].includes(planId) ? planId : "growth",
-              status: "TRIAL",
-              trial_ends_at: new Date(Date.now() + 14 * 86400 * 1000).toISOString(),
-            },
-            { onConflict: "organization_id" }
-          );
-        }
-      }
-
+      const { requestId, status } = parsed.data.payload;
+      const { error } = await client.from("platform_demo_requests").update({ status }).eq("id", requestId);
+      if (error) return Response.json({ error: "Unable to update demo request." }, { status: 503 });
       await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
-        target_organization_id: provisionedOrgId,
-        action: "update_demo_request",
-        details: { requestId, status, provisionInstitute, provisionedOrgId },
+        actor_user_id: actorUserId, actor_role: "PLATFORM_SUPER_ADMIN",
+        action: "update_demo_request", details: { requestId, status },
       });
-
-      return Response.json({ result: { requestId, status, provisionedOrgId } });
+      return Response.json({ result: { requestId, status } });
     }
 
     // 11. BROADCAST_ANNOUNCEMENT
@@ -916,9 +645,8 @@ export async function POST(request: Request) {
     }
 
     // 12. SUPPORT ACCESS MANAGEMENT
-    if (parsed.data.action === "GRANT_SUPPORT_ACCESS") {
-      const { organizationId, reason, durationHours } = parsed.data.payload;
-      const expiresAt = new Date(Date.now() + durationHours * 3600 * 1000).toISOString();
+    if (parsed.data.action === "REQUEST_SUPPORT_ACCESS") {
+      const { organizationId, reason } = parsed.data.payload;
 
       const { data: reqRow, error: supErr } = await client
         .from("platform_support_access_requests")
@@ -926,9 +654,7 @@ export async function POST(request: Request) {
           organization_id: organizationId,
           requested_by: actorUserId,
           reason,
-          status: "APPROVED",
-          approved_by: actorUserId,
-          expires_at: expiresAt,
+          status: "PENDING",
         })
         .select("id")
         .single();
@@ -941,11 +667,11 @@ export async function POST(request: Request) {
         actor_user_id: actorUserId,
         actor_role: "PLATFORM_SUPER_ADMIN",
         target_organization_id: organizationId,
-        action: "grant_support_access",
-        details: { requestId: reqRow?.id, reason, durationHours, expiresAt },
+        action: "request_support_access",
+        details: { requestId: reqRow?.id, reason },
       });
 
-      return Response.json({ result: { requestId: reqRow?.id, expiresAt } });
+      return Response.json({ result: { requestId: reqRow?.id } });
     }
 
     if (parsed.data.action === "REVOKE_SUPPORT_ACCESS") {

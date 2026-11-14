@@ -9,6 +9,8 @@ test("protected APIs reject a forged identity even when institute and role are s
   for (const path of [
     "/api/me", "/api/organizations", "/api/organizations/active",
     "/api/organizations/example/attendance", "/api/platform",
+    "/api/organizations/example/admissions", "/api/organizations/example/fees",
+    "/api/organizations/example/guardians", "/api/organizations/example/question-bank",
   ]) {
     const response = await request.get(path, { headers: forgedIdentity, maxRedirects: 0 });
     expect([401, 503], path).toContain(response.status());
@@ -16,7 +18,9 @@ test("protected APIs reject a forged identity even when institute and role are s
   }
 
   for (const path of [
-    "/api/onboarding/institute", "/api/invitations/accept", "/api/organizations/active",
+    "/api/invitations/accept", "/api/organizations/active", "/api/platform",
+    "/api/organizations/example/admissions", "/api/organizations/example/fees",
+    "/api/organizations/example/invitations", "/api/organizations/example/members", "/api/organizations/example/guardians",
   ]) {
     const response = await request.post(path, {
       headers: forgedIdentity,
@@ -35,17 +39,17 @@ test("a signed-out mobile visitor cannot open a dashboard by supplying a role", 
   } else if (page.url().includes("/sign-in")) {
     await expect(page.getByRole("heading", { name: /your institute workspace/i })).toBeVisible();
   } else {
-    await expect(page.getByRole("heading", { name: "Create your institute to open the workspace" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Institute access required" })).toBeVisible();
   }
 });
 
-test("platform administration stays protected and separate from institute sign-in", async ({ request }) => {
+test("platform administration stays protected behind the common sign-in", async ({ request }) => {
   const denied = await request.get("/super-admin", {
     headers: { ...forgedIdentity, accept: "text/html" },
     maxRedirects: 0,
   });
   expect([307, 503]).toContain(denied.status());
   if (denied.status() === 307) {
-    expect(new URL(denied.headers().location, denied.url()).pathname).toBe("/admin/login");
+    expect(new URL(denied.headers().location, denied.url()).pathname).toBe("/sign-in");
   }
 });

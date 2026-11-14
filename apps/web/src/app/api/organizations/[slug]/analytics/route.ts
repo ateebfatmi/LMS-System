@@ -29,7 +29,8 @@ function unique(source: Row[], key: string): Row[] {
 export async function GET(_request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug);
   if (!slug.success) return Response.json({ error: "Invalid organization." }, { status: 400 });
-  const resolved = await getAuthorizedOrganizationContext(slug.data, "organization:read");
+  const report = new URL(_request.url).searchParams.get("report") === "1";
+  const resolved = await getAuthorizedOrganizationContext(slug.data, report ? "reports:read" : "organization:read");
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
   const client = getPrepziiAdmin();
   const { organizationId, userId, role } = resolved.context;
@@ -122,16 +123,42 @@ export async function GET(_request: Request, context: Context) {
       return attempts;
     })();
 
+    const upcomingPromise = (async () => {
+      if ((!teacher && !student) || !visibleBatchIds.length) return [];
+      const schedules = await rows(client.from("organization_test_schedules").select("id,test_id,starts_at,ends_at")
+        .eq("organization_id", organizationId).in("batch_id", visibleBatchIds).gte("ends_at", new Date().toISOString())
+        .order("starts_at").limit(50));
+      if (!schedules.length) return [];
+      const tests = await rows(client.from("institute_tests").select("id,title").eq("institute_id", organizationId)
+        .eq("status", "PUBLISHED").in("id", schedules.map(({ test_id }) => String(test_id))));
+      const titles = new Map(tests.map(({ id, title }) => [id, title]));
+      return schedules.filter(({ test_id }) => titles.has(test_id)).slice(0, 8)
+        .map(({ id, starts_at, ends_at, test_id }) => ({ id, title: titles.get(test_id), starts_at, ends_at }));
+    })();
+    const classesPromise = teacher && visibleBatchIds.length ? rows(client.from("organization_room_schedules")
+      .select("id,subject,day_of_week,starts_at,ends_at").eq("organization_id", organizationId)
+      .eq("faculty_id", userId).in("batch_id", visibleBatchIds).order("day_of_week").order("starts_at").limit(12)) : Promise.resolve([]);
+
+    const noticesPromise = (student || role === "PARENT") ? (async () => {
+      const audiences = role === "PARENT" ? ["ALL", "PARENTS"] : ["ALL"];
+      const base = () => client.from("organization_announcements").select("id,title,published_at")
+        .eq("organization_id", organizationId).eq("status", "PUBLISHED").order("published_at", { ascending: false });
+      const [general, targeted] = await Promise.all([
+        rows(base().in("target_audience", audiences).limit(5)),
+        student && visibleBatchIds.length ? rows(base().eq("target_audience", "BATCH").in("batch_id", visibleBatchIds).limit(5)) : [],
+      ]);
+      return [...general, ...targeted].sort((a, b) => String(b.published_at).localeCompare(String(a.published_at))).slice(0, 5);
+    })() : Promise.resolve([]);
     const assignmentsPromise = (async () => {
       let assignments: Row[] = [];
       if (leadership) {
         assignments = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).order("due_at").limit(100));
       } else if (teacher) {
-        assignments = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("created_by", userId).order("due_at").limit(100));
+        assignments = visibleBatchIds.length ? await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("created_by", userId).in("batch_id", visibleBatchIds).order("due_at").limit(100)) : [];
       } else if (student) {
         const [direct, batchAssigned] = await Promise.all([
-          rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("student_user_id", userId).eq("status", "PUBLISHED")),
-          visibleBatchIds.length ? rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).eq("status", "PUBLISHED")) : Promise.resolve([] as Row[]),
+          rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("student_user_id", userId).eq("status", "PUBLISHED").or(`available_from.is.null,available_from.lte.${new Date().toISOString()}`).limit(100)),
+          visibleBatchIds.length ? rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).eq("status", "PUBLISHED").or(`available_from.is.null,available_from.lte.${new Date().toISOString()}`).limit(100)) : Promise.resolve([] as Row[]),
         ]);
         assignments = unique([...direct, ...batchAssigned], "id");
       }
@@ -141,26 +168,30 @@ export async function GET(_request: Request, context: Context) {
       return { assignments, submissions: await rows(query) };
     })();
 
-    const [attendanceData, attempts, assignmentData] = await Promise.all([
+    const [attendanceData, attempts, assignmentData, upcoming, classes, notices] = await Promise.all([
       attendancePromise,
       attemptsPromise,
-      assignmentsPromise,
+      assignmentsPromise, upcomingPromise, classesPromise, noticesPromise,
     ]);
     const { sessions, attendance } = attendanceData;
     const { assignments, submissions } = assignmentData;
 
     const present = attendance.filter((record) => record.status === "PRESENT").length;
     const submittedAttempts = attempts.filter((attempt) => attempt.status === "SUBMITTED");
-    const scores = submittedAttempts.map((attempt) => Number(attempt.percentage)).filter(Number.isFinite);
+    const scores = submittedAttempts.flatMap(({ percentage }) => percentage === null || percentage === undefined ? [] : [Number(percentage)]).filter(Number.isFinite);
+    const submittedIds = new Set(submissions.filter(({ status }) => ["SUBMITTED", "LATE", "GRADED", "RETURNED"].includes(String(status)))
+      .map(({ assignment_id }) => assignment_id));
     const trend = sessions.slice(0, 14).reverse().map((session) => {
       const records = attendance.filter((record) => record.session_id === session.id);
-      return { date: session.session_date, rate: records.length ? Math.round(records.filter((record) => record.status === "PRESENT").length / records.length * 1000) / 10 : 0 };
-    });
+      return { date: session.session_date, rate: records.length ? Math.round(records.filter((record) => record.status === "PRESENT").length / records.length * 1000) / 10 : null };
+    }).filter(({ rate }) => rate !== null);
 
     return Response.json({
-      role,
+      role, upcoming, classes, notices,
+      pendingAssignments: student ? assignments.filter(({ id }) => !submittedIds.has(id)).slice(0, 8) : [],
+      pendingGrading: teacher ? submissions.filter(({ status }) => status === "SUBMITTED" || status === "LATE").length : null,
       summary: {
-        students: leadership || teacher ? new Set(memberships.filter((item) => item.role === "STUDENT").map((item) => item.user_id)).size : student ? 1 : null,
+        students: leadership || teacher ? new Set(memberships.filter((item) => item.role === "STUDENT" && item.user_id).map((item) => item.user_id)).size : student ? 1 : null,
         activeBatches: batches.length,
         attendanceRate: attendance.length ? Math.round(present / attendance.length * 1000) / 10 : null,
         assessmentAverage: scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length * 10) / 10 : null,

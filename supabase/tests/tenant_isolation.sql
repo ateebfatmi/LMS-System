@@ -657,7 +657,7 @@ insert into public.organization_descriptive_submissions (
 select public.lms_grade_descriptive_submission(
   '10000000-0000-0000-0000-000000000001',
   '10000000-0000-0000-0000-0000000000d1',
-  'teacher-a', 'TEACHER', 8.5, 'Good physical reasoning; minor algebraic flaw'
+  'user-owner-a', 'OWNER', 8.5, 'Good physical reasoning; minor algebraic flaw'
 );
 
 -- AI draft promotion

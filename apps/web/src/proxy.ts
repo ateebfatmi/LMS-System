@@ -1,13 +1,11 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextRequest, NextFetchEvent, NextResponse } from "next/server";
 import { isDevelopmentAuthOverrideEnabled, isTrustedMutationRequest } from "@prepzii/authorization";
+import { signInReturnPath, withSignInReturn } from "@/lib/sign-in-navigation";
 import { validateEnvironment } from "@/lib/env-validator";
 
 const protectedPathPrefixes = [
   "/dashboard",
-  "/onboarding",
-  "/api/onboarding",
-  "/invite",
   "/api/invitations",
   "/api/organizations",
   "/api/me",
@@ -26,7 +24,6 @@ const retiredProductionApiPaths = new Set([
   "/api/batches",
   "/api/cbt",
   "/api/fees",
-  "/api/onboarding",
   "/api/questions",
   "/api/demo/reset",
   "/api/parent/children",
@@ -87,7 +84,7 @@ export default function proxy(req: NextRequest, ev: NextFetchEvent) {
       && ["localhost", "127.0.0.1", "[::1]"].includes(req.nextUrl.hostname)
       && !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && !process.env.CLERK_SECRET_KEY
       && !process.env.NEXT_PUBLIC_SUPABASE_URL && !process.env.SUPABASE_SERVICE_ROLE_KEY
-      && /^\/(dashboard|onboarding)(?:\/|$)/.test(req.nextUrl.pathname);
+      && /^\/(dashboard)(?:\/|$)/.test(req.nextUrl.pathname);
     if (isProtectedRoute(req) && !previewPage) {
       return NextResponse.json({ error: "Authentication is not configured. Please contact the administrator." }, { status: 503 });
     }
@@ -112,13 +109,14 @@ export default function proxy(req: NextRequest, ev: NextFetchEvent) {
     if (pathname === "/auth/resolve") return;
     if (pathname === "/admin" || pathname === "/super-admin"
       || pathname.startsWith("/admin/") || pathname.startsWith("/super-admin/")) {
-      await auth.protect({ unauthenticatedUrl: new URL("/admin/login", request.url).href });
+      await auth.protect({ unauthenticatedUrl: new URL("/sign-in", request.url).href });
       return;
     }
     const session = await auth();
     if (!session.userId && (request.headers.get("accept")?.includes("text/html") ||
       request.headers.get("sec-fetch-dest") === "document" || request.headers.has("next-url"))) {
-      return session.redirectToSignIn({ returnBackUrl: request.url });
+      return NextResponse.redirect(new URL(withSignInReturn("/sign-in",
+        signInReturnPath(pathname + request.nextUrl.search)), request.url));
     }
     await auth.protect();
   }, { signInUrl: "/sign-in" })(req, ev);

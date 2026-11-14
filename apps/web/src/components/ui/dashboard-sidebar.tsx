@@ -42,7 +42,7 @@ function ClerkLogoutButton({ collapsed, onClose }: { collapsed: boolean; onClose
     }
     clearRememberedActiveOrganization();
     onClose();
-    await signOut({ redirectUrl: "/" });
+    await signOut({ redirectUrl: "/sign-in" });
   }
 
   return (

@@ -11,7 +11,7 @@ const saveSchema = z.object({ attemptId: uuid, expectedVersion: z.number().int()
 type Context = { params: Promise<{ slug: string; testId: string }> };
 type AttemptRow = { id: string; test_id: string; schedule_id: string; user_id: string; status: string; answers: Record<string, Omit<AnswerSubmission, "questionId">>; answer_version: number; started_at: string; expires_at: string; submitted_at: string | null; score: number | null; max_score: number | null; percentage: number | null; correct_count: number | null; incorrect_count: number | null; unanswered_count: number | null; results_released: boolean; solutions_released: boolean; question_results: unknown };
 
-async function loadQuestions(organizationId: string, testId: string): Promise<QuestionDefinition[]> {
+async function loadQuestions(organizationId: string, testId: string): Promise<(QuestionDefinition & { explanation?: string })[]> {
   const client = getPrepziiAdmin();
   let ids: string[] = [];
   try {
@@ -29,10 +29,15 @@ async function loadQuestions(organizationId: string, testId: string): Promise<Qu
     }
   }
   if (!ids.length) return [];
-  const { data, error } = await client.from("questions").select("id,exam,subject,topic,question_type,question_text,option_a,option_b,option_c,option_d,correct_option,marks,negative_marks").in("id", ids);
+  const { data, error } = await client.from("questions").select("*").in("id", ids);
   if (error) throw error;
-  const byId = new Map(((data ?? []) as PrepziiQuestionRow[]).map((row) => [row.id, adaptPrepziiQuestion(row)]));
-  return ids.map((id) => byId.get(id)).filter((item): item is QuestionDefinition => Boolean(item));
+  const byId = new Map(((data ?? []) as PrepziiQuestionRow[]).map((row) => [
+    row.id, { ...adaptPrepziiQuestion(row), explanation: row.explanation ?? undefined },
+  ]));
+  return ids.flatMap((id) => {
+    const question = byId.get(id);
+    return question ? [question] : [];
+  });
 }
 
 function publicQuestion(question: QuestionDefinition) {
@@ -75,7 +80,12 @@ export async function PATCH(request: Request, context: Context) {
   const resolved = await resolve(context, "assessments:take");
   const parsed = saveSchema.safeParse(await request.json().catch(() => null));
   if (!resolved || !parsed.success) return Response.json({ error: "Invalid answer save." }, { status: 400 });
-  const { data, error } = await getPrepziiAdmin().rpc("lms_save_assessment_answers", {
+  const client = getPrepziiAdmin();
+  const { data: attempt, error: lookupError } = await client.from("organization_assessment_attempts").select("id")
+    .eq("organization_id", resolved.authorized.context.organizationId).eq("user_id", resolved.authorized.context.userId)
+    .eq("test_id", resolved.testId).eq("id", parsed.data.attemptId).maybeSingle();
+  if (lookupError || !attempt) return Response.json({ error: "Attempt unavailable." }, { status: lookupError ? 503 : 404 });
+  const { data, error } = await client.rpc("lms_save_assessment_answers", {
     p_organization_id: resolved.authorized.context.organizationId, p_actor_user_id: resolved.authorized.context.userId,
     p_attempt_id: parsed.data.attemptId, p_expected_version: parsed.data.expectedVersion, p_answers: parsed.data.answers,
   });
@@ -102,23 +112,25 @@ export async function PUT(request: Request, context: Context) {
   if (existing.data.status === "SUBMITTED") {
     return Response.json({ attemptId: existing.data.id, submitted: true, idempotent: true, resultsReleased: existing.data.results_released, solutionsReleased: existing.data.solutions_released });
   }
-  const saved = await client.rpc("lms_save_assessment_answers", {
-    p_organization_id: authorized.context.organizationId, p_actor_user_id: authorized.context.userId,
-    p_attempt_id: parsed.data.attemptId, p_expected_version: version, p_answers: answers,
-  });
-  if (saved.error && saved.error.code !== "22023") {
-    if (saved.error.code === "40001") return Response.json({ error: "A newer answer version exists. Reload before submitting." }, { status: 409 });
-    return Response.json({ error: "Unable to save final answers." }, { status: 503 });
-  }
-  if (!saved.error) version = Number((saved.data as { answerVersion: number }).answerVersion);
-  else {
-    const current = await client.from("organization_assessment_attempts").select("answers,answer_version").eq("id", parsed.data.attemptId).eq("organization_id", authorized.context.organizationId).single();
-    if (current.error) return Response.json({ error: "Unable to recover saved answers." }, { status: 503 });
-    answers = current.data.answers as typeof answers;
-    version = current.data.answer_version;
+  if (existing.data.status !== "IN_PROGRESS") return Response.json({ error: "Attempt is closed." }, { status: 409 });
+  if (Date.parse(existing.data.expires_at) > Date.now()) {
+    const saved = await client.rpc("lms_save_assessment_answers", {
+      p_organization_id: authorized.context.organizationId, p_actor_user_id: authorized.context.userId,
+      p_attempt_id: parsed.data.attemptId, p_expected_version: version, p_answers: answers,
+    });
+    if (saved.error) {
+      if (saved.error.code === "40001") return Response.json({ error: "A newer answer version exists. Reload before submitting." }, { status: 409 });
+      if (saved.error.code === "22023") return Response.json({ error: saved.error.message }, { status: 400 });
+      return Response.json({ error: "Unable to save final answers." }, { status: 503 });
+    }
+    version = Number((saved.data as { answerVersion: number }).answerVersion);
+  } else {
+    answers = existing.data.answers as typeof answers;
+    version = existing.data.answer_version;
   }
 
   const questions = await loadQuestions(authorized.context.organizationId, testId);
+  if (!questions.length) return Response.json({ error: "Assessment questions are unavailable." }, { status: 503 });
   const answerList: AnswerSubmission[] = Object.entries(answers).map(([questionId, value]) => ({ questionId, ...value }));
   const summary = gradeAssessment(questions, answerList);
   const finalized = await client.rpc("lms_finalize_assessment", {

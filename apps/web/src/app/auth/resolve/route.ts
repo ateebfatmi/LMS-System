@@ -6,7 +6,6 @@ import { isPlatformAdmin, listMyOrganizations, publicWorkspace } from "@/lib/pre
 import { signInReturnPath, withSignInReturn } from "@/lib/sign-in-navigation";
 
 export async function GET(request: NextRequest) {
-  const platform = request.nextUrl.searchParams.get("portal") === "platform";
   const returnTo = signInReturnPath(request.nextUrl.searchParams.get("return_to"), request.url);
   const { userId } = await auth();
 
@@ -15,17 +14,10 @@ export async function GET(request: NextRequest) {
   });
 
   if (!userId) {
-    return redirectTo(platform ? "/admin/login" : withSignInReturn("/sign-in", returnTo));
+    return redirectTo(withSignInReturn("/sign-in", returnTo));
   }
-  if (platform) {
-    return redirectTo(await isPlatformAdmin(userId) ? "/super-admin" : "/admin/login");
-  }
-
-  // Invitations can grant the first membership, and onboarding creates a workspace.
-  if (returnTo === "/onboarding" || returnTo?.startsWith("/onboarding?") ||
-      returnTo?.startsWith("/onboarding#") || returnTo?.startsWith("/invite/")) {
-    return redirectTo(returnTo);
-  }
+  if (returnTo?.startsWith("/invite/") || returnTo?.startsWith("/sign-up?invite=")) return redirectTo(returnTo);
+  if (await isPlatformAdmin()) return redirectTo("/super-admin");
 
   let organizations;
   try {

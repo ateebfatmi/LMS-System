@@ -1,3 +1,6 @@
+import { canGrantRole } from "@prepzii/authorization";
+import type { OrganizationRole } from "@prepzii/contracts";
+import { revokeClerkInvitation } from "@/lib/invitation-delivery";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
@@ -14,7 +17,15 @@ export async function DELETE(_request: Request, context: Context) {
   const resolved = await getAuthorizedOrganizationContext(parsed.data.slug, "members:manage");
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
 
-  const { data, error } = await getPrepziiAdmin().rpc("lms_revoke_invitation", {
+  const client = getPrepziiAdmin();
+  const { data: target, error: lookupError } = await client.from("organization_invitations")
+    .select("role,clerk_invitation_id").eq("organization_id", resolved.context.organizationId)
+    .eq("id", parsed.data.invitationId).maybeSingle();
+  if (lookupError || !target || !canGrantRole(resolved.context.role, target.role as OrganizationRole)) {
+    return Response.json({ error: "Invitation unavailable." }, { status: 404 });
+  }
+
+  const { data, error } = await client.rpc("lms_revoke_invitation", {
     p_organization_id: resolved.context.organizationId,
     p_invitation_id: parsed.data.invitationId,
     p_actor_user_id: resolved.context.userId,
@@ -28,5 +39,6 @@ export async function DELETE(_request: Request, context: Context) {
     return Response.json({ error: "Unable to revoke invitation." }, { status: 503 });
   }
 
-  return Response.json({ status: data });
+  const providerRevoked = await revokeClerkInvitation(target.clerk_invitation_id);
+  return Response.json({ status: data, providerRevoked });
 }

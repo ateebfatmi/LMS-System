@@ -110,7 +110,7 @@ begin
   begin
     perform public.lms_accept_invitation(repeat('b',64),'role-test-teacher','teacher@example.invalid');
     raise exception 'Suspended teacher replayed an invitation';
-  exception when insufficient_privilege then null;
+  exception when no_data_found then null;
   end;
 
   insert into public.institute_members(institute_id,user_id,email,role,status)

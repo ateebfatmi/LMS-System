@@ -65,19 +65,16 @@ export async function getActingUserId(): Promise<string | null> {
   return null;
 }
 
-export async function isPlatformAdmin(authenticatedUserId?: string | null): Promise<boolean> {
-  const userId = authenticatedUserId ?? await getActingUserId();
-  if (!userId) return false;
+export async function getPlatformAdminUserId(): Promise<string | null> {
+  if (!process.env.CLERK_SECRET_KEY || !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return null;
+  const { userId } = await auth();
+  const allowedUserIds = (process.env.PLATFORM_SUPER_ADMIN_USER_IDS ?? "")
+    .split(",").map((id) => id.trim()).filter(Boolean);
+  return userId && allowedUserIds.includes(userId) ? userId : null;
+}
 
-  const allowedUserIds = new Set(
-    [process.env.PLATFORM_ADMIN_USER_IDS, process.env.PLATFORM_SUPER_ADMIN_USER_IDS]
-      .filter(Boolean)
-      .join(",")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
-  return allowedUserIds.has(userId);
+export async function isPlatformAdmin(): Promise<boolean> {
+  return Boolean(await getPlatformAdminUserId());
 }
 
 const instituteFields = "id,name,slug,logo_url,primary_color,owner_user_id,status";

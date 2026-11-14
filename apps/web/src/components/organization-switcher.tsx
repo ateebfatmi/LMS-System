@@ -1,7 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Plus } from "lucide-react";
-import Link from "next/link";
+import { Check, ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { instituteInitials } from "@prepzii/contracts";
 import { clearRememberedActiveOrganization, rememberActiveOrganization, resolveActiveOrganization, type ActiveOrganizationSelection, WORKSPACE_SWITCH_EVENT } from "@/lib/client-org";
@@ -97,7 +96,7 @@ export function OrganizationSwitcher({ returnTo, selection, selectionPending = f
   const canSwitch = !loading && !switching;
   const accessLabel = role
     ? `${role.replaceAll("_", " ").toLowerCase().replace(/^./, (letter) => letter.toUpperCase())} access`
-    : organizations.length ? "Select a workspace" : "Create an institute";
+    : organizations.length ? "Select a workspace" : "No active workspaces";
   const triggerName = switching ? "Switching workspace…" : loading ? "Loading workspace…" : activeName ?? "No institute";
   const triggerStatus = switching ? "Loading institute" : error || accessLabel;
 
@@ -151,35 +150,6 @@ export function OrganizationSwitcher({ returnTo, selection, selectionPending = f
             );
           })}
 
-          <div
-            style={{
-              borderTop: "1px solid rgba(0, 0, 0, 0.08)",
-              marginTop: "8px",
-              paddingTop: "6px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "3px",
-            }}
-          >
-            <Link
-              href="/onboarding"
-              onClick={() => setOpen(false)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                padding: "8px 10px",
-                borderRadius: "8px",
-                fontSize: "13px",
-                fontWeight: 500,
-                color: "#1e293b",
-                textDecoration: "none",
-              }}
-            >
-              <Plus size={15} style={{ opacity: 0.7 }} />
-              <span>Create new institute</span>
-            </Link>
-          </div>
         </div>
       )}
     </div>

@@ -22,7 +22,7 @@ const features = [
 ] as const;
 
 const steps = [
-  ["Create Your Institute", "Set up a workspace with your institute’s name and details."],
+  ["Activate Your Workspace", "Accept the invitation sent by Prepzii to open your institute workspace."],
   ["Add Teachers, Students & Batches", "Invite your team and organize learners into their batches."],
   ["Start Teaching, Testing & Tracking Progress", "Share materials, run tests, and follow attendance and results."],
 ] as const;
@@ -42,7 +42,7 @@ const security = [
 const faqs = [
   ["Can we import our existing student and faculty lists?", "Yes. Institute administrators can upload CSV files and validate the records before importing them."],
   ["Can teachers manage their own batches?", "Teachers can manage learning materials, assignments, assessments, and attendance for the batches they’re assigned to."],
-  ["Can I try a computer-based test before signing up?", "Yes. The public CBT demo lets you answer sample questions, move between them, and review solutions without an account."],
+  ["Can I try a computer-based test without an account?", "Yes. The public CBT demo lets you answer sample questions, move between them, and review solutions without an account."],
   ["Can another institute access our records?", "Access is tied to verified membership in your institute, and permissions control what each role can see and do."],
 ] as const;
 
@@ -60,7 +60,7 @@ export default function Home() {
               <h1>Manage Your Entire <span className={styles.heroSubject}>Coaching Institute</span> in <span className={styles.heroAccent}>One Place.</span></h1>
               <p className={styles.heroDescription}>Manage students, batches, classes, attendance, tests, and performance — all from one simple platform.</p>
               <div className={styles.heroActions}>
-                <Link className={styles.primaryButton} href="/onboarding">Get Started <ArrowRight size={18} aria-hidden="true" /></Link>
+                <Link className={styles.primaryButton} href="/sign-in">Sign In <ArrowRight size={18} aria-hidden="true" /></Link>
                 <a className={styles.secondaryButton} href="#modules">Explore Features <ArrowDown size={17} aria-hidden="true" /></a>
               </div>
               <Link className={styles.cbtLink} href="/cbt-demo"><Play size={14} aria-hidden="true" /> Try the CBT demo <ArrowUpRight size={14} aria-hidden="true" /></Link>
@@ -92,7 +92,7 @@ export default function Home() {
           <div className={styles.container}>
             <header className={styles.sectionHeading}>
               <p className={styles.kicker}>How it works</p>
-              <h2>Get Started in Three Simple Steps</h2>
+              <h2>How Institutes Get Started</h2>
             </header>
             <ol className={styles.steps}>
               {steps.map(([title, description], index) => (
@@ -180,7 +180,6 @@ export default function Home() {
           <nav aria-label="Footer navigation">
             <a href="#modules">Features</a>
             <Link href="/sign-in">Sign In</Link>
-            <Link href="/onboarding">Create Workspace</Link>
             <Link href="/dashboard">Open Workspace</Link>
             <a href="#demo-request">Request Demo</a>
           </nav>
