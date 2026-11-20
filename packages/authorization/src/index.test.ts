@@ -11,6 +11,7 @@ import {
   canGrantRole,
   evaluateQuotaAvailability,
   hasPermission,
+  isAllowlistedPlatformAdmin,
   isAnswerKeyReleased,
   isMembershipActive,
   isPaymentUnique,
@@ -62,6 +63,16 @@ test("platform admins do not implicitly receive tenant content permissions", () 
     () => authorizeTenantAction(platformAdmin, "organization-a", "fees:read"),
     (error) => error instanceof AuthorizationError && error.code === "FORBIDDEN",
   );
+});
+
+test("platform admin matching accepts each configured Clerk ID and requires an exact match", () => {
+  const allowlist = "user_FounderOne, user_FounderTwo\n";
+  assert.equal(isAllowlistedPlatformAdmin("user_FounderOne", allowlist), true);
+  assert.equal(isAllowlistedPlatformAdmin("user_FounderTwo", allowlist), true);
+  assert.equal(isAllowlistedPlatformAdmin("user_foundertwo", allowlist), false);
+  assert.equal(isAllowlistedPlatformAdmin("user_Founder", allowlist), false);
+  assert.equal(isAllowlistedPlatformAdmin(null, allowlist), false);
+  assert.equal(isAllowlistedPlatformAdmin("user_FounderOne", undefined), false);
 });
 
 test("parents cannot read attendance or fees before guardian linking exists", () => {

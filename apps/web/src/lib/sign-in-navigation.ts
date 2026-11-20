@@ -1,5 +1,7 @@
 const localBase = "https://local.invalid";
 
+export const PLATFORM_INSTITUTE_SESSION_COOKIE = "prepzii_platform_institute_session";
+
 export function signInReturnPath(candidate: string | undefined | null, base = localBase): string | null {
   if (!candidate || (base === localBase && !candidate.startsWith("/"))) return null;
 

@@ -1,4 +1,7 @@
--- Only for a disposable database at the 0019 baseline. Synthetic data only.
+-- Only for a disposable database at the 0023 baseline. Synthetic data only.
+insert into auth.users (id,email)
+values ('8a000000-0000-4000-8000-000000000010','synthetic-auth-user@example.invalid');
+
 insert into public.institutes (id, name, slug, owner_user_id) values
   ('8a000000-0000-4000-8000-000000000001', 'Rehearsal A', 'rehearsal-a', 'rehearsal-owner'),
   ('8b000000-0000-4000-8000-000000000001', 'Rehearsal B', 'rehearsal-b', 'rehearsal-owner-b');
@@ -48,14 +51,33 @@ values ('8a000000-0000-4000-8000-000000000007', '8a000000-0000-4000-8000-0000000
 insert into public.organization_fee_installments (organization_id, student_fee_id, title, amount, due_date, status, paid_amount)
 values ('8a000000-0000-4000-8000-000000000001', '8a000000-0000-4000-8000-000000000007', 'Term 1', 1000, current_date, 'PARTIAL', 500);
 
+insert into public.institute_batches (id,institute_id,name,exam)
+values ('8a000000-0000-4000-8000-000000000008','8a000000-0000-4000-8000-000000000001','Consumer batch','JEE_MAIN');
+insert into public.institute_batch_members (institute_id,batch_id,member_id)
+select institute_id,'8a000000-0000-4000-8000-000000000008',id from public.institute_members
+where institute_id='8a000000-0000-4000-8000-000000000001' and user_id='rehearsal-student';
+insert into public.institute_tests (id,institute_id,title,exam,subject,created_by,status)
+values ('8a000000-0000-4000-8000-000000000009','8a000000-0000-4000-8000-000000000001','Consumer test','JEE_MAIN','Physics','rehearsal-owner','PUBLISHED');
+insert into public.institute_test_assignments (institute_id,institute_test_id,batch_id)
+values ('8a000000-0000-4000-8000-000000000001','8a000000-0000-4000-8000-000000000009','8a000000-0000-4000-8000-000000000008');
+insert into public.institute_test_attempts (institute_id,institute_test_id,user_id)
+values ('8a000000-0000-4000-8000-000000000001','8a000000-0000-4000-8000-000000000009','rehearsal-student');
+
 -- Test a grant the table-level revoke alone would leave intact.
 grant select (score, question_results) on public.organization_assessment_attempts to authenticated;
 
 create temp view rehearsal_rows as
   select 'institutes' as source, to_jsonb(row) as value from public.institutes row
+  union all select 'auth users', to_jsonb(row) from auth.users row
   union all select 'memberships', to_jsonb(row) from public.institute_members row
+  union all select 'subscriptions', to_jsonb(row) from public.organization_subscriptions row
   union all select 'batches', to_jsonb(row) from public.organization_batches row
-  union all select 'enrollments', to_jsonb(row) from public.organization_batch_members row
+  union all select 'enrollments', to_jsonb(row) - 'pending_teacher_id' - 'pending_student_id' from public.organization_batch_members row
+  union all select 'consumer batches', to_jsonb(row) from public.institute_batches row
+  union all select 'consumer enrollments', to_jsonb(row) from public.institute_batch_members row
+  union all select 'consumer tests', to_jsonb(row) from public.institute_tests row
+  union all select 'consumer test assignments', to_jsonb(row) from public.institute_test_assignments row
+  union all select 'consumer test attempts', to_jsonb(row) from public.institute_test_attempts row
   union all select 'guardians', to_jsonb(row) from public.organization_guardian_links row
   union all select 'attendance', to_jsonb(row) from public.organization_attendance_records row
   union all select 'fees', to_jsonb(row) from public.organization_student_fees row
@@ -64,6 +86,11 @@ create temp table rehearsal_before as select * from rehearsal_rows;
 
 \ir ../migrations/0024_membership_transition_guards.sql
 \ir ../migrations/0025_workspace_resource_policies.sql
+\ir ../migrations/0026_institute_dashboard_branding.sql
+\ir ../migrations/0027_faculty_onboarding.sql
+\ir ../migrations/0028_invite_only_provisioning.sql
+\ir ../migrations/0029_dashboard_workflow_guards.sql
+\ir ../migrations/0030_platform_workflows.sql
 
 do $$
 begin
@@ -80,6 +107,38 @@ begin
   end if;
 end
 $$;
+
+-- The consumer application writes through the Supabase service role. Model
+-- that role's BYPASSRLS attribute in this synthetic PostgreSQL instance only.
+begin;
+alter role service_role bypassrls;
+set local role service_role;
+do $$
+declare
+  org_id uuid;
+  created_member_id uuid;
+  created_batch_id uuid;
+begin
+  insert into public.institutes (name,slug,owner_user_id,status)
+  values ('Consumer creation check','rehearsal-consumer-created','rehearsal-new-owner','ACTIVE')
+  returning id into org_id;
+  insert into public.institute_members (institute_id,user_id,email,role,status)
+  values (org_id,'rehearsal-new-owner','new-owner@example.invalid','COACHING_ADMIN','ACTIVE');
+  insert into public.institute_members (institute_id,user_id,email,role,status)
+  values (org_id,null,'new-student@example.invalid','STUDENT','PENDING')
+  on conflict (institute_id,email) do nothing returning id into created_member_id;
+  insert into public.institute_batches (institute_id,name,exam)
+  values (org_id,'Consumer batch','JEE_MAIN') returning id into created_batch_id;
+  insert into public.institute_batch_members (institute_id,batch_id,member_id)
+  values (org_id,created_batch_id,created_member_id) on conflict (batch_id,member_id) do nothing;
+  if created_member_id is null or not exists (
+    select from public.institute_test_attempts where user_id='rehearsal-student'
+  ) then
+    raise exception 'Consumer read or pending-student write failed under the service role';
+  end if;
+end
+$$;
+rollback;
 
 begin;
 set local role authenticated;

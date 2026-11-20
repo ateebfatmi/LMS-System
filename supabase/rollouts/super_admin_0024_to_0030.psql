@@ -1,0 +1,55 @@
+-- Production rollout entry point. Execute only after explicit approval.
+-- Use psql -X. The reviewed numbered files each own their transaction.
+\set ON_ERROR_STOP on
+
+begin read only;
+set local search_path = pg_catalog, public;
+do $$
+begin
+  if (select md5(pg_get_functiondef(to_regprocedure('public.lms_create_institute(text,text,text,text,text,text,text,text)'))))
+      is distinct from '35e701318a8437b4bb210f194ac8c474'
+    or (select md5(pg_get_functiondef(to_regprocedure('public.lms_accept_invitation(text,text,text)'))))
+      is distinct from 'a95ef3f84a7e4e211a716904c7b09e7a' then
+    raise exception 'Membership function definitions differ from the audited baseline';
+  end if;
+
+  if to_regprocedure('public.lms_fee_overview(uuid)') is not null
+    or to_regprocedure('public.lms_update_institute_branding(uuid,text,text,text,boolean,text)') is not null
+    or to_regprocedure('public.lms_list_faculty(uuid,text,uuid,integer,integer,uuid)') is not null
+    or to_regprocedure('public.lms_create_invited_institute(text,jsonb)') is not null
+    or to_regprocedure('public.lms_guardian_dashboard(uuid,text)') is not null
+    or to_regprocedure('public.lms_provision_institute(text,uuid,jsonb,text,text,text)') is not null
+    or to_regprocedure('public.lms_platform_broadcast(text,jsonb)') is not null
+    or exists (select from storage.buckets where id='organization-branding')
+    or exists (select from information_schema.columns where table_schema='public'
+      and (table_name,column_name) in (('organization_branding','logo_storage_path'),
+        ('organization_batch_members','pending_teacher_id'),('organization_batch_members','pending_student_id'),
+        ('organization_invitations','clerk_invitation_id'),('organization_invitations','guardian_relationship'),
+        ('organization_invitations','student_member_id'))) then
+    raise exception 'Rollout objects already exist. Reconcile before continuing';
+  end if;
+
+  if exists (select from public.organization_invitations
+      where role not in ('OWNER','COACHING_ADMIN','ACADEMIC_COORDINATOR','TEACHER','STUDENT','PARENT','ACCOUNTANT')
+        or (role='PARENT' and status='PENDING'))
+    or exists (select from public.organization_invitations where role='OWNER' and status='PENDING'
+      group by organization_id having count(*)>1)
+    or exists (select from public.organization_batch_members where user_id is null)
+    or not exists (select from public.subscription_plans where id='basic' and is_active) then
+    raise exception 'Provisioning data differs from the audited compatibility checks';
+  end if;
+end;
+$$;
+rollback;
+
+set lock_timeout = '5s';
+\ir ../migrations/0024_membership_transition_guards.sql
+\ir ../migrations/0025_workspace_resource_policies.sql
+\ir ../migrations/0026_institute_dashboard_branding.sql
+\ir ../migrations/0027_faculty_onboarding.sql
+\ir ../migrations/0028_invite_only_provisioning.sql
+\ir ../migrations/0029_dashboard_workflow_guards.sql
+\ir ../migrations/0030_platform_workflows.sql
+reset lock_timeout;
+
+\ir ../tests/super_admin_rollout_verify.sql

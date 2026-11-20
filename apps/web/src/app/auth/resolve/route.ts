@@ -1,9 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
-import { selectWorkspace } from "@prepzii/authorization";
+import { isAllowlistedPlatformAdmin, selectWorkspace } from "@prepzii/authorization";
 import { ACTIVE_ORGANIZATION_COOKIE, setActiveWorkspace } from "@/lib/dal/auth-context";
-import { isPlatformAdmin, listMyOrganizations, publicWorkspace } from "@/lib/prepzii-backend";
-import { signInReturnPath, withSignInReturn } from "@/lib/sign-in-navigation";
+import { listMyOrganizations, publicWorkspace } from "@/lib/prepzii-backend";
+import { PLATFORM_INSTITUTE_SESSION_COOKIE, signInReturnPath, withSignInReturn } from "@/lib/sign-in-navigation";
 
 export async function GET(request: NextRequest) {
   const returnTo = signInReturnPath(request.nextUrl.searchParams.get("return_to"), request.url);
@@ -16,8 +16,12 @@ export async function GET(request: NextRequest) {
   if (!userId) {
     return redirectTo(withSignInReturn("/sign-in", returnTo));
   }
+  if (isAllowlistedPlatformAdmin(userId, process.env.PLATFORM_SUPER_ADMIN_USER_IDS)) {
+    const response = redirectTo("/super-admin");
+    response.cookies.delete(PLATFORM_INSTITUTE_SESSION_COOKIE);
+    return response;
+  }
   if (returnTo?.startsWith("/invite/") || returnTo?.startsWith("/sign-up?invite=")) return redirectTo(returnTo);
-  if (await isPlatformAdmin()) return redirectTo("/super-admin");
 
   let organizations;
   try {

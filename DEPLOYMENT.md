@@ -32,6 +32,10 @@ Optional:
 
 Do not use production provider credentials during the staging rehearsal.
 
+### Walkthrough request email
+
+The app saves each request before sending an alert to `contact@prepzii.com` through your SMTP server. Set `DEMO_REQUEST_SMTP_HOST`, `DEMO_REQUEST_SMTP_PORT`, and `DEMO_REQUEST_FROM_EMAIL` in the web server environment or in `apps/web/.env.local` for development. Use a sender address your server allows. Port 587 uses STARTTLS and port 465 uses TLS from the first connection. Set both `DEMO_REQUEST_SMTP_USER` and `DEMO_REQUEST_SMTP_PASSWORD` if your server requires authentication. The app host needs outbound access to the configured SMTP port.
+
 ## Build and application checks
 
 ```bash

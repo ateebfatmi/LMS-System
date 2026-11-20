@@ -1,7 +1,7 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextRequest, NextFetchEvent, NextResponse } from "next/server";
-import { isDevelopmentAuthOverrideEnabled, isTrustedMutationRequest } from "@prepzii/authorization";
-import { signInReturnPath, withSignInReturn } from "@/lib/sign-in-navigation";
+import { isAllowlistedPlatformAdmin, isDevelopmentAuthOverrideEnabled, isTrustedMutationRequest } from "@prepzii/authorization";
+import { PLATFORM_INSTITUTE_SESSION_COOKIE, signInReturnPath, withSignInReturn } from "@/lib/sign-in-navigation";
 import { validateEnvironment } from "@/lib/env-validator";
 
 const protectedPathPrefixes = [
@@ -113,6 +113,13 @@ export default function proxy(req: NextRequest, ev: NextFetchEvent) {
       return;
     }
     const session = await auth();
+    if ((pathname === "/dashboard" || pathname.startsWith("/dashboard/"))
+      && isAllowlistedPlatformAdmin(session.userId, process.env.PLATFORM_SUPER_ADMIN_USER_IDS)
+      && request.cookies.get(PLATFORM_INSTITUTE_SESSION_COOKIE)?.value !== session.sessionId) {
+      return NextResponse.redirect(new URL("/super-admin", request.url), {
+        headers: { "cache-control": "private, no-store" },
+      });
+    }
     if (!session.userId && (request.headers.get("accept")?.includes("text/html") ||
       request.headers.get("sec-fetch-dest") === "document" || request.headers.has("next-url"))) {
       return NextResponse.redirect(new URL(withSignInReturn("/sign-in",

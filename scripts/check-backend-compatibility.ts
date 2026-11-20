@@ -120,6 +120,18 @@ async function main() {
     } else {
       console.log("  ✓ 'public.institute_test_attempts': Verified columns (institute_test_id, user_id; no member_id).");
     }
+
+    const { error: invitationErr } = await supabase
+      .from("organization_invitations")
+      .select("id, clerk_invitation_id, student_member_id, guardian_relationship")
+      .limit(0);
+
+    if (invitationErr) {
+      compatibilityFailures++;
+      console.log(`  ⚠️  Invite-only provisioning (migration 0028): ${invitationErr.message}`);
+    } else {
+      console.log("  ✓ 'public.organization_invitations': Verified invite-only provisioning columns.");
+    }
   } catch (err: any) {
     compatibilityFailures++;
     console.log(`  ⚠️  Column verification exception: ${err.message}`);

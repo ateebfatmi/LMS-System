@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import nodemailer from "nodemailer";
 import { z } from "zod";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
 import { guardRateLimit } from "@/lib/rate-limit";
@@ -15,43 +16,48 @@ const demoRequestSchema = z.object({
 });
 
 async function notifyPrepzii(requestId: string, details: z.infer<typeof demoRequestSchema>) {
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const host = process.env.DEMO_REQUEST_SMTP_HOST?.trim();
+  const port = Number(process.env.DEMO_REQUEST_SMTP_PORT?.trim() || "587");
+  const user = process.env.DEMO_REQUEST_SMTP_USER?.trim();
+  const pass = process.env.DEMO_REQUEST_SMTP_PASSWORD;
   const from = process.env.DEMO_REQUEST_FROM_EMAIL?.trim();
-  if (!apiKey || !from) return false;
+  if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535 || Boolean(user) !== Boolean(pass)) {
+    console.warn("Demo request SMTP is not configured", { requestId });
+    return false;
+  }
 
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "Idempotency-Key": `demo-request/${requestId}`,
-      },
-      signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({
-        from,
-        to: ["contact@prepzii.com"],
-        reply_to: details.email,
-        subject: "New Prepzii walkthrough request",
-        text: [
-          `Request ID: ${requestId}`,
-          `Name: ${details.fullName}`,
-          `Institute: ${details.instituteName}`,
-          `Work email: ${details.email}`,
-          `Phone: ${details.phone}`,
-          `City: ${details.city}`,
-          `Enrolled students: ${details.studentCount}`,
-          `Interested plan: ${details.interestedPlan}`,
-          "",
-          "Notes:",
-          details.notes || "None",
-        ].join("\n"),
-      }),
+    const smtp = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      requireTLS: port !== 465,
+      auth: user && pass ? { user, pass } : undefined,
+      dnsTimeout: 5000,
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
     });
-    if (!response.ok) {
-      console.warn("Demo request email rejected", { requestId, status: response.status });
-    }
-    return response.ok;
+    await smtp.sendMail({
+      from,
+      to: "contact@prepzii.com",
+      replyTo: { name: "", address: details.email },
+      subject: "New Prepzii walkthrough request",
+      text: [
+        `Request ID: ${requestId}`,
+        `Name: ${details.fullName}`,
+        `Institute: ${details.instituteName}`,
+        `Work email: ${details.email}`,
+        `Phone: ${details.phone}`,
+        `City: ${details.city}`,
+        `Enrolled students: ${details.studentCount}`,
+        `Interested plan: ${details.interestedPlan}`,
+        "",
+        "Notes:",
+        details.notes || "None",
+      ].join("\n"),
+    });
+    return true;
   } catch {
     console.warn("Demo request email could not be sent", { requestId });
     return false;

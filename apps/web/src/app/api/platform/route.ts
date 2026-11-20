@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getPlatformAdminUserId, getPrepziiAdmin, isPlatformAdmin } from "@/lib/prepzii-backend";
-import { manageOwnerInvitation } from "@/lib/platform-owner-invitations";
+import { isOwnerInvitationConfigured, manageOwnerInvitation, prepareOwnerInvitation } from "@/lib/platform-owner-invitations";
+import { deliverInvitation } from "@/lib/invitation-delivery";
 import { guardRateLimit } from "@/lib/rate-limit";
 
 const mutationSchema = z.discriminatedUnion("action", [
@@ -145,8 +146,8 @@ const mutationSchema = z.discriminatedUnion("action", [
       targetOrganizationId: z.string().uuid().optional().nullable(),
       title: z.string().trim().min(3).max(200),
       content: z.string().trim().min(5).max(4000),
-      priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("HIGH"),
-      targetAudience: z.enum(["ALL", "STUDENTS", "TEACHERS"]).default("ALL"),
+      priority: z.enum(["NORMAL", "HIGH", "URGENT"]).default("HIGH"),
+      targetAudience: z.enum(["ALL", "STUDENTS", "FACULTY"]).default("ALL"),
     }),
   }),
   z.object({
@@ -166,9 +167,9 @@ const mutationSchema = z.discriminatedUnion("action", [
 
 type Row = Record<string, unknown>;
 
-async function platformRows(query: PromiseLike<{ data: Row[] | null; error: { message: string } | null }>): Promise<Row[]> {
+async function platformRows(query: PromiseLike<{ data: Row[] | null; error: { message: string; code: string } | null }>): Promise<Row[]> {
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) throw error;
   return data ?? [];
 }
 
@@ -189,6 +190,13 @@ export async function GET() {
   const client = getPrepziiAdmin();
 
   try {
+    const ownerInvitationsQuery = allPlatformRows((from) => platformRows(client.from("organization_invitations")
+      .select("id,organization_id,email,status,expires_at,clerk_invitation_id").eq("role", "OWNER")
+      .order("created_at", { ascending: false }).order("id").range(from, from + 499)))
+      .catch((error: { code?: string; message?: string }) => {
+        if (error.code === "42703" && error.message?.includes("clerk_invitation_id")) return null;
+        throw error;
+      });
     const [
       institutes,
       subscriptions,
@@ -262,9 +270,7 @@ export async function GET() {
           .order("created_at", { ascending: false })
           .limit(100)
       ),
-      allPlatformRows((from) => platformRows(client.from("organization_invitations")
-        .select("id,organization_id,email,status,expires_at,clerk_invitation_id").eq("role", "OWNER")
-        .order("created_at", { ascending: false }).order("id").range(from, from + 499))),
+      ownerInvitationsQuery,
     ]);
 
     const membershipCounts = new Map<unknown, Map<string, number>>();
@@ -294,8 +300,13 @@ export async function GET() {
         counts,
         brandings,
         demoRequests,
-        supportRequests,
-        ownerInvitations: ownerInvitations.map(({ clerk_invitation_id, ...invite }) => ({
+        supportRequests: supportRequests.map((record) => ({
+          ...record,
+          status: record.status === "APPROVED" && Date.parse(String(record.expires_at)) <= Date.now() ? "EXPIRED" : record.status,
+        })),
+        ownerProvisioningReady: ownerInvitations !== null && isOwnerInvitationConfigured(),
+        ownerInvitationHistoryAvailable: ownerInvitations !== null,
+        ownerInvitations: (ownerInvitations ?? []).map(({ clerk_invitation_id, ...invite }) => ({
           ...invite, delivered: Boolean(clerk_invitation_id),
           status: invite.status === "PENDING" && Date.parse(String(invite.expires_at)) <= Date.now() ? "EXPIRED" : invite.status,
         })),
@@ -321,45 +332,55 @@ export async function POST(request: Request) {
   }
 
   const client = getPrepziiAdmin();
+  async function auditedResult(result: Row, audit: Row) {
+    const { error } = await client.from("platform_audit_logs").insert({
+      ...audit,
+      actor_user_id: actorUserId,
+      actor_role: "PLATFORM_SUPER_ADMIN",
+    });
+    if (error) console.error("Platform audit write failed", { action: audit.action, code: error.code });
+    return Response.json({ result, auditSaved: !error });
+  }
 
   try {
+    if ((parsed.data.action === "CREATE_INSTITUTE" || parsed.data.action === "INVITE_INITIAL_OWNER")
+      && !isOwnerInvitationConfigured()) {
+      return Response.json({ error: "Owner invitation configuration is incomplete." }, { status: 503 });
+    }
     // 1. ASSIGN_ORGANIZATION_PLAN
     if (parsed.data.action === "ASSIGN_ORGANIZATION_PLAN") {
       const { organizationId, planId, status, extendDays } = parsed.data.payload;
       const now = new Date();
-      const periodEnd = extendDays
-        ? new Date(now.getTime() + extendDays * 86400 * 1000).toISOString()
-        : new Date(now.getTime() + 30 * 86400 * 1000).toISOString();
-
-      const updatePayload: Record<string, unknown> = {
-        organization_id: organizationId,
+      const { data: current, error: currentError } = await client.from("organization_subscriptions")
+        .select("status,current_period_end,trial_ends_at,updated_at").eq("organization_id", organizationId).maybeSingle();
+      if (currentError) return Response.json({ error: "Unable to load the current subscription." }, { status: 503 });
+      const nextStatus = status ?? current?.status ?? "ACTIVE";
+      const currentEnd = current?.current_period_end ? Date.parse(current.current_period_end) : now.getTime();
+      const periodEnd = extendDays || !current
+        ? new Date(Math.max(currentEnd, now.getTime()) + (extendDays ?? 30) * 86400 * 1000).toISOString()
+        : current.current_period_end;
+      const values = {
         plan_id: planId,
-        status: status ?? "ACTIVE",
+        status: nextStatus,
         current_period_end: periodEnd,
-        requested_plan_id: null,
+        trial_ends_at: nextStatus === "TRIAL" ? periodEnd : current?.trial_ends_at ?? null,
         updated_at: now.toISOString(),
       };
-      if (status === "TRIAL") {
-        updatePayload.trial_ends_at = periodEnd;
-      }
-
-      const { error: subErr } = await client
-        .from("organization_subscriptions")
-        .upsert(updatePayload, { onConflict: "organization_id" });
-
+      const subscriptions = client.from("organization_subscriptions");
+      const { data: saved, error: subErr } = await (current
+        ? subscriptions.update(values).eq("organization_id", organizationId).eq("updated_at", current.updated_at)
+        : subscriptions.insert({ organization_id: organizationId, ...values })).select("id").maybeSingle();
       if (subErr) {
-        return Response.json({ error: subErr.message }, { status: 500 });
+        if (subErr.code === "23505") return Response.json({ error: "The subscription changed. Refresh and try again." }, { status: 409 });
+        return Response.json({ error: "Unable to save the subscription." }, { status: 503 });
       }
+      if (!saved) return Response.json({ error: "The subscription changed. Refresh and try again." }, { status: 409 });
 
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ action: "ASSIGN_ORGANIZATION_PLAN", organizationId, planId }, {
         target_organization_id: organizationId,
         action: "assign_organization_plan",
-        details: { planId, status: status ?? "ACTIVE", extendDays },
+        details: { planId, status: nextStatus, extendDays },
       });
-
-      return Response.json({ result: { action: "ASSIGN_ORGANIZATION_PLAN", organizationId, planId } });
     }
 
     // 2. UPDATE_INSTITUTE_DETAILS
@@ -376,48 +397,49 @@ export async function POST(request: Request) {
         verifySubdomain,
       } = parsed.data.payload;
 
-      const { error: instErr } = await client
+      const { data: institute, error: instErr } = await client
         .from("institutes")
         .update({
           name,
           slug: slug.toLowerCase(),
           institute_type: instituteType,
-          contact_email: contactEmail || null,
-          contact_phone: contactPhone || null,
+          ...(contactEmail !== undefined ? { contact_email: contactEmail || null } : {}),
+          ...(contactPhone !== undefined ? { contact_phone: contactPhone || null } : {}),
           ...(primaryColor ? { primary_color: primaryColor } : {}),
           updated_at: new Date().toISOString(),
         })
-        .eq("id", organizationId);
+        .eq("id", organizationId).select("id").maybeSingle();
 
       if (instErr) {
         return Response.json({ error: instErr.message }, { status: 400 });
       }
+      if (!institute) return Response.json({ error: "Institute not found." }, { status: 404 });
 
-      if (subdomain !== undefined || primaryColor) {
-        await client.from("organization_branding").upsert(
+      if (subdomain !== undefined || primaryColor || contactEmail !== undefined || contactPhone !== undefined) {
+        const { error: brandingError } = await client.from("organization_branding").upsert(
           {
             organization_id: organizationId,
-            primary_color: primaryColor || "#0B132B",
-            subdomain: subdomain ? subdomain.toLowerCase() : null,
-            subdomain_verified_at: verifySubdomain ? new Date().toISOString() : null,
-            support_email: contactEmail || null,
-            support_phone: contactPhone || null,
+            ...(primaryColor ? { primary_color: primaryColor } : {}),
+            ...(subdomain !== undefined ? { subdomain: subdomain ? subdomain.toLowerCase() : null,
+              subdomain_verified_at: subdomain && verifySubdomain ? new Date().toISOString() : null } : {}),
+            ...(contactEmail !== undefined ? { support_email: contactEmail || null } : {}),
+            ...(contactPhone !== undefined ? { support_phone: contactPhone || null } : {}),
             updated_by: actorUserId,
             updated_at: new Date().toISOString(),
           },
           { onConflict: "organization_id" }
         );
+        if (brandingError) {
+          console.error("Platform institute branding update failed", brandingError.code);
+          return Response.json({ error: "Institute details were saved. Branding could not be updated." }, { status: 503 });
+        }
       }
 
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ organizationId }, {
         target_organization_id: organizationId,
         action: "update_institute_details",
         details: { name, slug, instituteType, subdomain, verifySubdomain },
       });
-
-      return Response.json({ result: { organizationId } });
     }
 
     if (["CREATE_INSTITUTE", "INVITE_INITIAL_OWNER", "REVOKE_INITIAL_OWNER"].includes(parsed.data.action)) {
@@ -428,14 +450,21 @@ export async function POST(request: Request) {
 
     if (parsed.data.action === "CREATE_INSTITUTE") {
       const { ownerEmail, ...payload } = parsed.data.payload;
-      const { data: organizationId, error } = await client.rpc("lms_create_invited_institute", {
-        p_actor: actorUserId, p_payload: { ...payload, contactEmail: payload.contactEmail || ownerEmail },
+      const organizationId = crypto.randomUUID();
+      const invitation = prepareOwnerInvitation(organizationId, ownerEmail);
+      const { data, error } = await client.rpc("lms_provision_institute", {
+        p_actor: actorUserId, p_organization_id: organizationId,
+        p_payload: { ...payload, contactEmail: payload.contactEmail || invitation.email },
+        p_email: invitation.email, p_hash: invitation.hash, p_key: invitation.key,
       });
       if (error) {
-        return Response.json({ error: "Unable to create institute." }, { status: error.code === "23505" ? 409 : 503 });
+        if (error.code === "23505") return Response.json({ error: "An institute with this slug already exists." }, { status: 409 });
+        if (error.code === "23503") return Response.json({ error: "The selected subscription plan is unavailable." }, { status: 400 });
+        console.error("Institute provisioning failed", error.code);
+        return Response.json({ error: "Unable to create institute." }, { status: 503 });
       }
-      const invite = await manageOwnerInvitation({ organizationId, actorId: actorUserId, email: ownerEmail });
-      return Response.json({ result: { organizationId, emailSent: invite.result?.emailSent ?? false } },
+      const emailSent = await deliverInvitation({ id: data.id, email: invitation.email, expiresAt: data.expires_at });
+      return Response.json({ result: { organizationId, emailSent } },
         { status: 201, headers: { "cache-control": "no-store" } });
     }
 
@@ -469,14 +498,10 @@ export async function POST(request: Request) {
         return Response.json({ error: planErr.message }, { status: 400 });
       }
 
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ planId: p.planId }, {
         action: "create_subscription_plan",
         details: p,
       });
-
-      return Response.json({ result: { planId: p.planId } });
     }
 
     // 5. SET_ORG_FEATURE_OVERRIDE & REMOVE_ORG_FEATURE_OVERRIDE
@@ -498,82 +523,59 @@ export async function POST(request: Request) {
         return Response.json({ error: ovrErr.message }, { status: 400 });
       }
 
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ organizationId, featureKey, enabled }, {
         target_organization_id: organizationId,
         action: "set_org_feature_override",
         details: { featureKey, enabled, reason },
       });
-
-      return Response.json({ result: { organizationId, featureKey, enabled } });
     }
 
     if (parsed.data.action === "REMOVE_ORG_FEATURE_OVERRIDE") {
       const { organizationId, featureKey } = parsed.data.payload;
-      await client
+      const { error } = await client
         .from("organization_feature_overrides")
         .delete()
         .eq("organization_id", organizationId)
         .eq("feature_key", featureKey);
+      if (error) return Response.json({ error: "Unable to remove the feature override." }, { status: 503 });
 
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ organizationId, featureKey }, {
         target_organization_id: organizationId,
         action: "remove_org_feature_override",
         details: { featureKey },
       });
-
-      return Response.json({ result: { organizationId, featureKey } });
     }
 
     // 8. RESOLVE_PLAN_UPGRADE_REQUEST
     if (parsed.data.action === "RESOLVE_PLAN_UPGRADE_REQUEST") {
       const { organizationId, decision } = parsed.data.payload;
-      const { data: sub } = await client
+      const { data: sub, error: lookupError } = await client
         .from("organization_subscriptions")
         .select("requested_plan_id")
         .eq("organization_id", organizationId)
-        .single();
+        .maybeSingle();
+      if (lookupError) return Response.json({ error: "Unable to load the subscription request." }, { status: 503 });
+      if (!sub?.requested_plan_id) return Response.json({ error: "This institute has no pending plan request." }, { status: 409 });
+      const { data: updated, error: updateError } = await client.from("organization_subscriptions").update({
+        ...(decision === "APPROVE" ? { plan_id: sub.requested_plan_id, status: "ACTIVE" } : {}),
+        requested_plan_id: null,
+        requested_billing_interval: null,
+        updated_at: new Date().toISOString(),
+      }).eq("organization_id", organizationId).eq("requested_plan_id", sub.requested_plan_id).select("id").maybeSingle();
+      if (updateError) return Response.json({ error: "Unable to resolve the subscription request." }, { status: 503 });
+      if (!updated) return Response.json({ error: "The pending plan request changed. Refresh and try again." }, { status: 409 });
 
-      if (decision === "APPROVE" && sub?.requested_plan_id) {
-        await client
-          .from("organization_subscriptions")
-          .update({
-            plan_id: sub.requested_plan_id,
-            status: "ACTIVE",
-            requested_plan_id: null,
-            requested_billing_interval: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("organization_id", organizationId);
-      } else {
-        await client
-          .from("organization_subscriptions")
-          .update({
-            requested_plan_id: null,
-            requested_billing_interval: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("organization_id", organizationId);
-      }
-
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ organizationId, decision }, {
         target_organization_id: organizationId,
         action: "resolve_plan_upgrade_request",
         details: { decision, approvedPlanId: sub?.requested_plan_id },
       });
-
-      return Response.json({ result: { organizationId, decision } });
     }
 
     // 10. DEMO REQUESTS MANAGEMENT & 1-CLICK PROVISIONING
     if (parsed.data.action === "CREATE_DEMO_REQUEST") {
       const d = parsed.data.payload;
-      const { error: demoErr } = await client.from("platform_demo_requests").insert({
+      const { data: demo, error: demoErr } = await client.from("platform_demo_requests").insert({
         full_name: d.fullName,
         institute_name: d.instituteName,
         email: d.email.toLowerCase(),
@@ -583,65 +585,39 @@ export async function POST(request: Request) {
         interested_plan: d.interestedPlan,
         notes: d.notes || null,
         status: "PENDING",
-      });
+      }).select("id").single();
 
       if (demoErr) {
         return Response.json({ error: demoErr.message }, { status: 400 });
       }
-      return Response.json({ result: { ok: true } });
+      return auditedResult({ requestId: demo.id }, {
+        action: "create_demo_request", details: { requestId: demo.id },
+      });
     }
 
     if (parsed.data.action === "UPDATE_DEMO_REQUEST") {
       const { requestId, status } = parsed.data.payload;
-      const { error } = await client.from("platform_demo_requests").update({ status }).eq("id", requestId);
+      const { data: demo, error } = await client.from("platform_demo_requests").update({ status })
+        .eq("id", requestId).select("id").maybeSingle();
       if (error) return Response.json({ error: "Unable to update demo request." }, { status: 503 });
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId, actor_role: "PLATFORM_SUPER_ADMIN",
+      if (!demo) return Response.json({ error: "Demo request not found." }, { status: 404 });
+      return auditedResult({ requestId, status }, {
         action: "update_demo_request", details: { requestId, status },
       });
-      return Response.json({ result: { requestId, status } });
     }
 
     // 11. BROADCAST_ANNOUNCEMENT
     if (parsed.data.action === "BROADCAST_ANNOUNCEMENT") {
-      const { targetOrganizationId, title, content, priority, targetAudience } = parsed.data.payload;
-      let orgIds: string[] = [];
-
-      if (targetOrganizationId) {
-        orgIds = [targetOrganizationId];
-      } else {
-        const { data: activeOrgs } = await client
-          .from("institutes")
-          .select("id")
-          .eq("status", "ACTIVE");
-        orgIds = (activeOrgs ?? []).map((o) => String(o.id));
-      }
-
-      if (orgIds.length > 0) {
-        const rows = orgIds.map((orgId) => ({
-          organization_id: orgId,
-          title: `[Platform Broadcast] ${title}`,
-          content,
-          priority,
-          target_audience: targetAudience,
-          category: "GENERAL",
-          status: "PUBLISHED",
-          channels: ["PORTAL"],
-          created_by: actorUserId,
-          published_at: new Date().toISOString(),
-        }));
-        await client.from("organization_announcements").insert(rows);
-      }
-
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
-        target_organization_id: targetOrganizationId ?? null,
-        action: "platform_broadcast_announcement",
-        details: { title, priority, targetAudience, recipientInstituteCount: orgIds.length },
+      const { data, error } = await client.rpc("lms_platform_broadcast", {
+        p_actor: actorUserId,
+        p_payload: parsed.data.payload,
       });
-
-      return Response.json({ result: { recipientInstituteCount: orgIds.length } });
+      if (error?.code === "22023") return Response.json({ error: "No active institutes match the broadcast target." }, { status: 409 });
+      if (error) {
+        console.error("Platform broadcast failed", error.code);
+        return Response.json({ error: "Unable to publish the broadcast." }, { status: 503 });
+      }
+      return Response.json({ result: { recipientInstituteCount: data } });
     }
 
     // 12. SUPPORT ACCESS MANAGEMENT
@@ -663,32 +639,27 @@ export async function POST(request: Request) {
         return Response.json({ error: supErr.message }, { status: 400 });
       }
 
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ requestId: reqRow?.id }, {
         target_organization_id: organizationId,
         action: "request_support_access",
         details: { requestId: reqRow?.id, reason },
       });
-
-      return Response.json({ result: { requestId: reqRow?.id } });
     }
 
     if (parsed.data.action === "REVOKE_SUPPORT_ACCESS") {
       const { requestId } = parsed.data.payload;
-      await client
+      const { data: revoked, error } = await client
         .from("platform_support_access_requests")
         .update({ status: "REVOKED", updated_at: new Date().toISOString() })
-        .eq("id", requestId);
+        .eq("id", requestId).eq("status", "APPROVED").select("organization_id").maybeSingle();
+      if (error) return Response.json({ error: "Unable to revoke support access." }, { status: 503 });
+      if (!revoked) return Response.json({ error: "This support request is no longer approved." }, { status: 409 });
 
-      await client.from("platform_audit_logs").insert({
-        actor_user_id: actorUserId,
-        actor_role: "PLATFORM_SUPER_ADMIN",
+      return auditedResult({ requestId }, {
+        target_organization_id: revoked.organization_id,
         action: "revoke_support_access",
         details: { requestId },
       });
-
-      return Response.json({ result: { requestId } });
     }
 
     // 13. Fallback to standard platform mutation RPC for SET_ORGANIZATION_STATUS, UPDATE_PLAN, SET_FEATURE_FLAG

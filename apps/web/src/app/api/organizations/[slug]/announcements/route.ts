@@ -21,7 +21,8 @@ export async function GET(_request: Request, context: Context) {
   try {
     let announcements = await safeMany(client.from("organization_announcements").select("id,batch_id,title,content,target_audience,priority,category,status,channels,created_by,published_at,created_at").eq("organization_id", organizationId).order("created_at", { ascending: false }).limit(200));
     const allowedBatchIds = new Set(await getAssignedBatchIds(resolved.context));
-    if (role === "STUDENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && (item.target_audience === "ALL" || (item.target_audience === "BATCH" && allowedBatchIds.has(String(item.batch_id)))));
+    if (role === "STUDENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" &&
+      (["ALL", "STUDENTS"].includes(String(item.target_audience)) || (item.target_audience === "BATCH" && allowedBatchIds.has(String(item.batch_id)))));
     else if (role === "PARENT") announcements = announcements.filter((item) => item.status === "PUBLISHED" && ["ALL", "PARENTS"].includes(String(item.target_audience)));
     else if (role === "TEACHER") announcements = announcements.filter((item) => item.status === "PUBLISHED" &&
       (["ALL", "FACULTY"].includes(String(item.target_audience)) || (item.target_audience === "BATCH" && allowedBatchIds.has(String(item.batch_id)))));

@@ -68,6 +68,10 @@ export function hasPermission(role: OrganizationRole, permission: Permission): b
   return rolePermissions[role]?.has(permission) ?? false;
 }
 
+export function isAllowlistedPlatformAdmin(clerkUserId: string | null, allowlist: string | undefined): boolean {
+  return Boolean(clerkUserId && allowlist?.split(",").some((id) => id.trim() === clerkUserId));
+}
+
 export function authorizeTenantAction(
   context: TenantContext,
   resourceOrganizationId: string,

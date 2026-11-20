@@ -1,9 +1,9 @@
 import { auth } from "@clerk/nextjs/server";
+import { isAllowlistedPlatformAdmin } from "@prepzii/authorization";
 import { redirect } from "next/navigation";
 import { ClerkSignIn, SignInCard } from "@/components/sign-in-card";
 import { OrganizationSwitcher } from "@/components/organization-switcher";
 import { SignOutOtherAccount } from "@/components/sign-out-other-account";
-import { isPlatformAdmin } from "@/lib/prepzii-backend";
 import { signInReturnPath, withSignInReturn } from "@/lib/sign-in-navigation";
 
 export default async function InstituteSignInPage({ params, searchParams }: PageProps<"/sign-in/[[...sign-in]]">) {
@@ -14,11 +14,9 @@ export default async function InstituteSignInPage({ params, searchParams }: Page
   const clerkConfigured = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY;
 
   // Clerk owns the nested verification and OAuth steps.
-  if (clerkConfigured && !step && (await auth()).userId) {
-    // A bookmarked institute selector must not intercept an authorized founder.
-    if ((query.workspace === "choose" || query.workspace === "missing") && await isPlatformAdmin()) {
-      redirect(resolveUrl);
-    }
+  const userId = clerkConfigured && !step ? (await auth()).userId : null;
+  if (userId) {
+    if (isAllowlistedPlatformAdmin(userId, process.env.PLATFORM_SUPER_ADMIN_USER_IDS)) redirect(resolveUrl);
     if (query.workspace === "choose") {
       return (
         <SignInCard title="Choose your workspace" footer={<SignOutOtherAccount />}>
@@ -29,8 +27,8 @@ export default async function InstituteSignInPage({ params, searchParams }: Page
     }
     if (query.workspace === "missing") {
       return (
-        <SignInCard title="No active workspace" footer={<SignOutOtherAccount />}>
-          <p>Open the invitation your institute sent you, or ask your institute to verify your access.</p>
+        <SignInCard title="Institute access required" footer={<SignOutOtherAccount />}>
+          <p>Open the invitation from your institute, or contact your institute administrator to request access.</p>
         </SignInCard>
       );
     }

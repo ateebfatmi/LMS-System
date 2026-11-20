@@ -37,6 +37,8 @@ type Data = {
   flags: Row[];
   overrides: Row[];
   audits: Row[];
+  ownerProvisioningReady: boolean;
+  ownerInvitationHistoryAvailable: boolean;
   ownerInvitations: Row[];
   counts: Row[];
   brandings: Row[];
@@ -62,6 +64,8 @@ const empty: Data = {
   flags: [],
   overrides: [],
   audits: [],
+  ownerProvisioningReady: false,
+  ownerInvitationHistoryAvailable: false,
   ownerInvitations: [],
   counts: [],
   brandings: [],
@@ -265,6 +269,8 @@ export function PlatformAdminWorkspace() {
           ? "The workspace or invitation was saved. Email delivery failed. Retry from the institute directory."
           : result.result?.previousRevoked === false
             ? "LMS access was revoked. Review the old Clerk invitation in the Clerk Dashboard."
+            : result.auditSaved === false
+              ? "The change was saved. The audit entry could not be recorded."
             : customSuccessMessage ?? "Platform operation saved and audited.");
         await load();
       }
@@ -286,18 +292,35 @@ export function PlatformAdminWorkspace() {
   async function handleEnterInstituteWorkspace(inst: Row) {
     try {
       const response = await fetch("/api/organizations/active", {
-        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug: inst.slug }),
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ slug: inst.slug, fromPlatform: true }),
       });
-      if (response.ok) router.push("/dashboard/workspace");
-      else setError("This account has no active membership in that institute.");
+      if (response.ok) router.push("/dashboard/workspace?from=platform");
+      else setError(response.status === 403 ? "This account has no active membership in that institute." : "Unable to open this institute.");
     } catch {
       setError("Unable to open this institute.");
     }
   }
 
+  async function handleInstitutePortal() {
+    try {
+      const response = await fetch("/api/organizations/active", { cache: "no-store" });
+      if (!response.ok) throw new Error("Unable to load the active workspace");
+      const { organization } = await response.json();
+      if (organization) await handleEnterInstituteWorkspace(organization);
+      else {
+        setActiveTab("institutes");
+        setMobileMenuOpen(false);
+        setError("Select an institute where you have an active membership.");
+      }
+    } catch {
+      setError("Unable to open the institute portal.");
+    }
+  }
+
   async function handleCreateInstitute(e: FormEvent) {
     e.preventDefault();
-    if (!newInstName.trim() || !newInstSlug.trim()) return;
+    if (!data.ownerProvisioningReady || !newInstName.trim() || !newInstSlug.trim() || !newInstOwnerEmail.trim()) return;
 
     const ok = await mutate(
       "CREATE_INSTITUTE",
@@ -419,7 +442,7 @@ export function PlatformAdminWorkspace() {
   }
 
   async function handleAssignPlan(instId: string, planId: string, status?: string, extendDays?: number) {
-    await mutate(
+    const ok = await mutate(
       "ASSIGN_ORGANIZATION_PLAN",
       {
         organizationId: instId,
@@ -429,7 +452,7 @@ export function PlatformAdminWorkspace() {
       },
       `Subscription updated to ${planId.toUpperCase()}.`
     );
-    setSelectedInstForPlan(null);
+    if (ok) setSelectedInstForPlan(null);
   }
 
   async function updatePlan(event: FormEvent<HTMLFormElement>, plan: Row) {
@@ -452,7 +475,7 @@ export function PlatformAdminWorkspace() {
         studentLimit: Number(form.get("students")),
         branchLimit: Number(form.get("branches")),
         storageGb: Number(form.get("storage")),
-        aiCreditsPerMonth: 0,
+        aiCreditsPerMonth: Number(plan.ai_credits_per_month ?? 0),
         entitlements: updatedEntitlements,
         isActive: form.get("active") === "on",
       },
@@ -477,15 +500,18 @@ export function PlatformAdminWorkspace() {
 
   function exportAuditCsv() {
     const headers = ["Timestamp", "Action", "ActorUserId", "ActorRole", "TargetOrganizationId", "Details"];
-    const rows = data.audits.map((a) => [
+    const rows = filteredAudits.map((a) => [
       String(a.created_at ?? ""),
       String(a.action ?? ""),
       String(a.actor_user_id ?? ""),
       String(a.actor_role ?? ""),
       String(a.target_organization_id ?? ""),
-      JSON.stringify(a.details ?? {}).replace(/"/g, '""'),
+      JSON.stringify(a.details ?? {}),
     ]);
-    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
+    const csv = [headers.join(","), ...rows.map((r) => r.map((c) => {
+      const safe = /^[\t\r\n]|^\s*[=+@-]/.test(c) ? `'${c}` : c;
+      return `"${safe.replace(/"/g, '""')}"`;
+    }).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -700,8 +726,9 @@ export function PlatformAdminWorkspace() {
 
         {/* Sidebar Footer: Jump to Institute Portal & Lock Session */}
         <div className="sidebar-footer" style={{ display: "grid", gap: "8px" }}>
-          <Link
-            href="/dashboard/workspace"
+          <button
+            type="button"
+            onClick={() => void handleInstitutePortal()}
             title={sidebarCollapsed ? "Institute Portal" : undefined}
             style={{
               display: "flex",
@@ -727,7 +754,7 @@ export function PlatformAdminWorkspace() {
               <ArrowUpRight aria-hidden="true" strokeWidth={2} />
             </span>
             {!sidebarCollapsed && <span className="side-nav-label">Institute Portal</span>}
-          </Link>
+          </button>
 
           <button
             type="button"
@@ -809,7 +836,7 @@ export function PlatformAdminWorkspace() {
             </button>
 
             {(activeTab === "overview" || activeTab === "institutes") && (
-              <Button onClick={() => setShowCreateModal(true)}>
+              <Button disabled={!data.ownerProvisioningReady} onClick={() => setShowCreateModal(true)}>
                 <Plus size={15} style={{ marginRight: "4px" }} />
                 Register Institute
               </Button>
@@ -878,6 +905,13 @@ export function PlatformAdminWorkspace() {
             SECTION 1: COMMAND CENTER OVERVIEW
            ========================================================= */}
         {loading && <p role="status">Loading platform records…</p>}
+        {loaded && !data.ownerProvisioningReady && (
+          <p role="status">
+            {!data.ownerInvitationHistoryAvailable
+              ? "Institute registration and owner invitations require the provisioning database migration."
+              : "Institute registration and owner email delivery require invitation configuration."}
+          </p>
+        )}
         {loaded && <>
         {activeTab === "overview" && (
           <div style={{ display: "grid", gap: "24px" }}>
@@ -1238,7 +1272,7 @@ export function PlatformAdminWorkspace() {
                         {branding?.subdomain ? (
                           <span style={{ marginLeft: "8px", color: "#0284c7", fontWeight: 600 }}>
                             · Custom: {String(branding.subdomain)}.prepzii.com{" "}
-                            {branding.subdomain_verified_at ? "✓" : "(unverified)"}
+                              {branding.subdomain_verified_at ? "(marked verified)" : "(unverified)"}
                           </span>
                         ) : null}
                       </div>
@@ -1364,7 +1398,7 @@ export function PlatformAdminWorkspace() {
                         {inst.status === "ACTIVE" ? "Suspend" : "Reactivate"}
                       </Button>
                     </div>
-                    <OwnerInvitationControls institute={inst} invitations={data.ownerInvitations ?? []} busy={busy} mutate={mutate} />
+                    <OwnerInvitationControls institute={inst} invitations={data.ownerInvitations} canIssue={data.ownerProvisioningReady} busy={busy} mutate={mutate} />
                   </div>
                 );
               })}
@@ -1391,11 +1425,11 @@ export function PlatformAdminWorkspace() {
            ========================================================= */}
         {activeTab === "invitations" && (
           <section className="panel">
-            {data.ownerInvitations.length === 0 ? <p>No owner invitations yet.</p> : data.institutes
+            {!data.ownerInvitationHistoryAvailable ? <p>Owner invitation history is unavailable.</p> : data.ownerInvitations.length === 0 ? <p>No owner invitations yet.</p> : data.institutes
               .filter((institute) => data.ownerInvitations.some((invite) => invite.organization_id === institute.id))
               .map((institute) => <article className="invitation-row" key={String(institute.id)}>
                 <strong>{String(institute.name)}</strong>
-                <OwnerInvitationControls institute={institute} invitations={data.ownerInvitations} busy={busy} mutate={mutate} />
+                <OwnerInvitationControls institute={institute} invitations={data.ownerInvitations} canIssue={data.ownerProvisioningReady} busy={busy} mutate={mutate} />
               </article>)}
           </section>
         )}
@@ -1877,7 +1911,7 @@ export function PlatformAdminWorkspace() {
                 </label>
                 <Select value={broadcastAudience} onChange={(val) => setBroadcastAudience(val)}>
                   <option value="ALL">Everyone</option>
-                  <option value="TEACHERS">Faculty Only</option>
+                  <option value="FACULTY">Faculty Only</option>
                   <option value="STUDENTS">Students Only</option>
                 </Select>
               </div>
@@ -1952,7 +1986,7 @@ export function PlatformAdminWorkspace() {
             >
               <div>
                 <h2 style={{ fontSize: "16.5px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                  🛡️ Authorize Support Access Window
+                  🛡️ Request Support Access Window
                 </h2>
                 <small style={{ color: "#64748b" }}>
                   Request institute owner approval for troubleshooting. Tenant permissions stay tied to active membership.
@@ -1999,7 +2033,7 @@ export function PlatformAdminWorkspace() {
               </div>
 
               <Button disabled={busy || !supportOrgId || supportReason.trim().length < 10}>
-                Authorize Support Window
+                Request Support Window
               </Button>
             </form>
 
@@ -2211,6 +2245,7 @@ export function PlatformAdminWorkspace() {
           flags={data.flags}
           overrides={data.overrides.filter((o) => o.organization_id === inspectedInstitute.id)}
           ownerInvitations={data.ownerInvitations}
+          canIssueOwnerInvitation={data.ownerProvisioningReady}
           activeSubTab={inspectorTab}
           setActiveSubTab={setInspectorTab}
           busy={busy}
@@ -2454,7 +2489,7 @@ export function PlatformAdminWorkspace() {
                 >
                   Cancel
                 </button>
-                <Button disabled={busy || !newInstName.trim() || !newInstSlug.trim()}>
+                <Button disabled={busy || !data.ownerProvisioningReady || !newInstName.trim() || !newInstSlug.trim() || !newInstOwnerEmail.trim()}>
                   {busy ? "Registering…" : "Create Institute Workspace"}
                 </Button>
               </div>
@@ -2858,6 +2893,7 @@ function InstituteGovernanceModal({
   flags,
   overrides,
   ownerInvitations,
+  canIssueOwnerInvitation,
   activeSubTab,
   setActiveSubTab,
   busy,
@@ -2873,6 +2909,7 @@ function InstituteGovernanceModal({
   flags: Row[];
   overrides: Row[];
   ownerInvitations: Row[];
+  canIssueOwnerInvitation: boolean;
   activeSubTab: "profile" | "billing" | "overrides" | "members";
   setActiveSubTab: (t: "profile" | "billing" | "overrides" | "members") => void;
   busy: boolean;
@@ -3145,7 +3182,10 @@ function InstituteGovernanceModal({
                     type="text"
                     placeholder="e.g. allen"
                     value={subdomain}
-                    onChange={(e) => setSubdomain(e.target.value)}
+                    onChange={(e) => {
+                      setSubdomain(e.target.value);
+                      setVerifySubdomain(false);
+                    }}
                     style={{ width: "100%", height: "42px", padding: "0 12px", borderRadius: "10px", border: "1px solid #dce2de", boxSizing: "border-box" }}
                   />
                 </div>
@@ -3155,7 +3195,7 @@ function InstituteGovernanceModal({
                     checked={verifySubdomain}
                     onChange={(e) => setVerifySubdomain(e.target.checked)}
                   />
-                  <span>Subdomain Verified</span>
+                  <span>Mark Subdomain Verified</span>
                 </label>
               </div>
 
@@ -3373,7 +3413,7 @@ function InstituteGovernanceModal({
             <section>
               <p>Owner: {String(institute.owner_user_id).startsWith("pending_owner:") ? "Awaiting activation" : String(institute.owner_user_id)}</p>
               <p>Created {new Date(String(institute.created_at)).toLocaleDateString()}</p>
-              <OwnerInvitationControls institute={institute} invitations={ownerInvitations} busy={busy} mutate={onMutate} />
+              <OwnerInvitationControls institute={institute} invitations={ownerInvitations} canIssue={canIssueOwnerInvitation} busy={busy} mutate={onMutate} />
               <h4>Active memberships by role</h4>
               <ul>{Object.entries((counts?.byRole ?? {}) as Record<string, number>).map(([role, count]) => (
                 <li key={role}>{role.replaceAll("_", " ")} · {count}</li>
@@ -3389,9 +3429,10 @@ function InstituteGovernanceModal({
 }
 
 
-function OwnerInvitationControls({ institute, invitations, busy, mutate }: {
+function OwnerInvitationControls({ institute, invitations, canIssue, busy, mutate }: {
   institute: Row;
   invitations: Row[];
+  canIssue: boolean;
   busy: boolean;
   mutate: (action: string, payload: Row, message?: string) => Promise<boolean>;
 }) {
@@ -3405,7 +3446,7 @@ function OwnerInvitationControls({ institute, invitations, busy, mutate }: {
         {recent.status === "PENDING" && !recent.delivered ? " · Email delivery pending" : ""}</p>}
       {awaitingOwner && canReplace && (
         <>
-          <Button disabled={busy || institute.status !== "ACTIVE"} onClick={() => void mutate("INVITE_INITIAL_OWNER", {
+          <Button disabled={busy || !canIssue || institute.status !== "ACTIVE"} onClick={() => void mutate("INVITE_INITIAL_OWNER", {
             organizationId: institute.id, email: recent.email, replaceId: recent.id,
           }, "Replacement owner invitation issued.")}>Resend owner invitation</Button>
           {recent.status === "PENDING" && <Button disabled={busy} onClick={() => {
@@ -3423,7 +3464,7 @@ function OwnerInvitationControls({ institute, invitations, busy, mutate }: {
           });
         }}>
           <label>Owner email <input type="email" name="email" required /></label>
-          <Button disabled={busy} type="submit">Invite initial owner</Button>
+          <Button disabled={busy || !canIssue} type="submit">Invite initial owner</Button>
         </form>
       )}
     </section>

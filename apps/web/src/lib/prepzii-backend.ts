@@ -7,7 +7,7 @@ if (typeof runtimeGlobal.WebSocket === "undefined") {
 
 import { auth } from "@clerk/nextjs/server";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { hasPermission, isDevelopmentAuthOverrideEnabled, resolveInstituteMembership, type InstituteRole, type Permission } from "@prepzii/authorization";
+import { hasPermission, isAllowlistedPlatformAdmin, isDevelopmentAuthOverrideEnabled, resolveInstituteMembership, type InstituteRole, type Permission } from "@prepzii/authorization";
 import { type OrganizationRole, type TenantContext } from "@prepzii/contracts";
 
 
@@ -68,9 +68,7 @@ export async function getActingUserId(): Promise<string | null> {
 export async function getPlatformAdminUserId(): Promise<string | null> {
   if (!process.env.CLERK_SECRET_KEY || !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return null;
   const { userId } = await auth();
-  const allowedUserIds = (process.env.PLATFORM_SUPER_ADMIN_USER_IDS ?? "")
-    .split(",").map((id) => id.trim()).filter(Boolean);
-  return userId && allowedUserIds.includes(userId) ? userId : null;
+  return isAllowlistedPlatformAdmin(userId, process.env.PLATFORM_SUPER_ADMIN_USER_IDS) ? userId : null;
 }
 
 export async function isPlatformAdmin(): Promise<boolean> {

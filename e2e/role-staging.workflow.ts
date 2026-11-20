@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { isAbsolute } from "node:path";
 import { expect, test } from "@playwright/test";
 
@@ -18,6 +19,7 @@ type Fixtures = {
   origin: string;
   allowBrandingWrites?: boolean;
   founders?: [Actor, Actor];
+  platformProvisioning?: { approvedTestInbox: string };
   facultyOnboarding?: {
     email: string;
     storageState: string;
@@ -129,7 +131,8 @@ test.describe("suspended membership", () => {
   test.use({ storageState: fixture.suspended.storageState });
   test("Clerk session survives but institute access is revoked", async ({ context, page }) => {
     await page.goto("/sign-in");
-    await expect(page.getByRole("heading", { name: "No active workspace" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Institute access required" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /create (institute|workspace)/i })).toHaveCount(0);
     const me = await context.request.get("/api/me");
     expect(me.status()).toBe(200);
     expect((await me.json()).workspaces).not.toContainEqual(expect.objectContaining({ slug: fixture.suspended.workspace }));
@@ -310,6 +313,7 @@ test.describe("faculty onboarding with real Clerk and Supabase", () => {
 
 test("founder sessions land in platform administration despite a remembered institute", async ({ browser }) => {
   test.skip(fixture.founders?.length !== 2, "Requires two authorized Clerk founder storage states.");
+  const founderUserIds = new Set<string>();
   for (const founder of fixture.founders ?? []) {
     expect(isAbsolute(founder.storageState)).toBe(true);
     const context = await browser.newContext({ storageState: founder.storageState, baseURL: fixture.origin });
@@ -320,17 +324,87 @@ test("founder sessions land in platform administration despite a remembered inst
         url: fixture.origin,
         httpOnly: true,
       }]);
-      for (const path of ["/auth/resolve", "/auth/resolve?return_to=%2Fdashboard%2Fworkspace"]) {
+      const me = await context.request.get("/api/me");
+      expect(me.status()).toBe(200);
+      const { userId } = await me.json() as { userId: string };
+      expect(Boolean(userId)).toBe(true);
+      founderUserIds.add(userId);
+      for (const path of [
+        "/auth/resolve",
+        "/auth/resolve?return_to=%2Fdashboard%2Fworkspace",
+        `/auth/resolve?return_to=${encodeURIComponent(`/invite/${"a".repeat(43)}`)}`,
+        "/dashboard/workspace",
+      ]) {
         const landing = await context.request.get(path, { maxRedirects: 0 });
+        expect(landing.status()).toBe(307);
         expect(new URL(landing.headers().location, fixture.origin).pathname).toBe("/super-admin");
       }
       const page = await context.newPage();
       await page.goto("/sign-in?workspace=choose");
       await expect(page).toHaveURL(/\/super-admin$/);
+      const navigation = page.getByRole("navigation", { name: "Super Admin navigation" });
+      for (const [label, heading] of [
+        ["Overview", "Overview"], ["Institutes", "Institutes"], ["Invitations", "Owner invitations"],
+        ["Subscriptions", "Subscriptions"], ["Demo Leads & Sales", "Demo Leads & B2B Sales"],
+        ["Platform Settings", "Platform Settings"], ["System Broadcasts", "System Broadcasts"],
+        ["Support Access", "Support Access"], ["Audit Logs", "Audit Logs"],
+      ]) {
+        await navigation.getByRole("link", { name: label }).click();
+        await expect(page.getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      }
       expect((await context.request.get("/super-admin")).status()).toBe(200);
-      expect((await context.request.get("/api/platform")).status()).toBe(200);
+      const platform = await context.request.get("/api/platform");
+      expect(platform.status()).toBe(200);
+      const platformData = await platform.json();
+      for (const collection of ["institutes", "subscriptions", "plans", "demoRequests", "flags",
+        "overrides", "supportRequests", "audits", "counts", "brandings", "ownerInvitations"]) {
+        expect(Array.isArray(platformData[collection]), collection).toBe(true);
+      }
+      expect(platformData.ownerProvisioningReady).toBe(true);
+      const workspace = (await me.json()).workspaces.find(({ slug }: Workspace) => slug === founder.workspace);
+      if (workspace) {
+        expect((await context.request.post("/api/organizations/active", {
+          data: { slug: workspace.slug, fromPlatform: true },
+        })).status()).toBe(200);
+        const institute = await context.request.get("/dashboard/workspace", { maxRedirects: 0 });
+        expect(institute.status()).toBe(200);
+        const resolved = await context.request.get("/auth/resolve", { maxRedirects: 0 });
+        expect(new URL(resolved.headers().location, fixture.origin).pathname).toBe("/super-admin");
+      }
     } finally {
       await context.close();
     }
+  }
+  expect(founderUserIds.size).toBe(2);
+});
+
+test("staging registration persists an institute, trial, owner invite and audit", async ({ browser }) => {
+  const inbox = fixture.platformProvisioning?.approvedTestInbox;
+  const founder = fixture.founders?.[0];
+  test.skip(!inbox || !founder, "Requires a founder Clerk session and an approved test inbox for one Clerk invitation.");
+  if (!inbox || !founder) return;
+  const context = await browser.newContext({ storageState: founder.storageState, baseURL: fixture.origin });
+  try {
+    const slug = `platform-qa-${randomUUID()}`;
+    const registration = await context.request.post("/api/platform", { data: {
+      action: "CREATE_INSTITUTE",
+      payload: { name: "Platform QA institute", slug, ownerEmail: inbox, planId: "basic", subscriptionStatus: "TRIAL" },
+    } });
+    expect(registration.status()).toBe(201);
+    const { result } = await registration.json();
+    const platform = await context.request.get("/api/platform");
+    expect(platform.status()).toBe(200);
+    const snapshot = await platform.json();
+    expect(snapshot.institutes.some((row: { id: string; slug: string }) =>
+      row.id === result.organizationId && row.slug === slug)).toBe(true);
+    expect(snapshot.subscriptions.some((row: { organization_id: string; status: string }) =>
+      row.organization_id === result.organizationId && row.status === "TRIAL")).toBe(true);
+    expect(snapshot.ownerInvitations.some((row: { organization_id: string; status: string; delivered: boolean }) =>
+      row.organization_id === result.organizationId && row.status === "PENDING" && row.delivered)).toBe(true);
+    expect(snapshot.audits.some((row: { target_organization_id: string; action: string }) =>
+      row.target_organization_id === result.organizationId && row.action === "create_organization")).toBe(true);
+    expect(result.emailSent).toBe(true);
+  } finally {
+    await context.close();
   }
 });

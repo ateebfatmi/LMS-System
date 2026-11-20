@@ -140,7 +140,7 @@ export async function GET(_request: Request, context: Context) {
       .eq("faculty_id", userId).in("batch_id", visibleBatchIds).order("day_of_week").order("starts_at").limit(12)) : Promise.resolve([]);
 
     const noticesPromise = (student || role === "PARENT") ? (async () => {
-      const audiences = role === "PARENT" ? ["ALL", "PARENTS"] : ["ALL"];
+      const audiences = role === "PARENT" ? ["ALL", "PARENTS"] : ["ALL", "STUDENTS"];
       const base = () => client.from("organization_announcements").select("id,title,published_at")
         .eq("organization_id", organizationId).eq("status", "PUBLISHED").order("published_at", { ascending: false });
       const [general, targeted] = await Promise.all([
