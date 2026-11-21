@@ -151,7 +151,7 @@ export default function Home() {
                 <li><Check size={17} aria-hidden="true" /> Ask questions about getting started</li>
               </ul>
             </div>
-            <DemoForm />
+            <DemoForm contactEmail={process.env.DEMO_REQUEST_TO_EMAIL?.trim()} />
           </div>
         </section>
 

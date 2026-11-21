@@ -101,3 +101,94 @@ test.describe("PrepZii LMS release smoke tests", () => {
     expect([401, 503]).toContain(forgedAdmin.status());
   });
 });
+
+test("assessment authors can filter and page through live question bank subjects", async ({ page }) => {
+  const organization = { id: "academy-id", slug: "academy", name: "Academy" };
+  await page.route("**/api/organizations/active", (route) => route.fulfill({
+    json: { organization, role: "TEACHER" },
+  }));
+  const workspaceRequests: string[] = [];
+  await page.route("**/api/organizations/academy/assessments?*", (route) => {
+    workspaceRequests.push(route.request().url());
+    return route.fulfill({ json: {
+      role: "TEACHER", tests: [], schedules: [], attempts: [], descriptiveSubmissions: [], batches: [], testQuestions: [],
+    } });
+  });
+  await page.route("**/api/organizations/academy/question-bank?*", (route) => {
+    const params = new URL(route.request().url()).searchParams;
+    if (params.get("view") === "subjects") {
+      return route.fulfill({ json: { subjects: ["Geography"] } });
+    }
+    const subject = params.get("subject");
+    const search = params.get("q");
+    const pageNumber = params.get("page");
+    const question = { id: "q", exam: "OTHER", chapter: "Rivers", difficulty: "medium", marks: 2 };
+    return route.fulfill({ json: {
+      questions: [{ ...question, question_text: search ? "Search match" : subject ? `Geography result ${pageNumber}` : "Initial result" }],
+      total: search ? 1 : 41,
+    } });
+  });
+
+  await page.goto("/dashboard/assessments/workspace");
+  await expect(page.getByText("Initial result")).toBeVisible();
+  await page.getByLabel("Question bank subject").click();
+  await page.getByRole("option", { name: "Geography" }).click();
+  await expect(page.getByText("Geography result 1")).toBeVisible();
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByText("Geography result 2")).toBeVisible();
+  await page.getByRole("textbox", { name: "Search questions" }).fill("rivers");
+  await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(page.getByText("Search match")).toBeVisible();
+  expect(workspaceRequests).toHaveLength(1);
+  expect(new URL(workspaceRequests[0]).searchParams.get("includeBank")).toBe("0");
+});
+
+test("new attendance sessions require explicit marks and existing sessions load their own records", async ({ page }) => {
+  const organization = { id: "attendance-org", slug: "attendance-test", name: "Attendance Academy" };
+  await page.route("**/api/organizations/active", (route) => route.fulfill({ json: { organization, role: "TEACHER" } }));
+  let submitted: object | undefined;
+  await page.route("**/api/organizations/attendance-test/attendance**", (route) => {
+    if (route.request().method() === "POST") {
+      submitted = route.request().postDataJSON();
+      return route.fulfill({ json: { result: { sessionId: "new", changeCount: 1 } } });
+    }
+    const date = new URL(route.request().url()).searchParams.get("date");
+    const sessions = [
+      { id: "first", session_label: "Morning", starts_at: "08:00", ends_at: "09:00" },
+      { id: "second", session_label: "Afternoon", starts_at: "15:00", ends_at: "16:00" },
+      ...(submitted ? [{ id: "new", session_label: "Workshop", starts_at: null, ends_at: null }] : []),
+    ].map((session) => ({ ...session, session_date: date, finalized_at: date, batch_id: "batch" }));
+    return route.fulfill({ json: {
+      role: "TEACHER", selectedBatchId: "batch", batches: [{ id: "batch", name: "Batch" }],
+      students: [{ user_id: "student", display_name: "Student One" }], sessions, corrections: [],
+      records: [
+        { id: "r1", session_id: "first", student_id: "student", status: "ABSENT" },
+        { id: "r2", session_id: "second", student_id: "student", status: "LATE" },
+      ],
+    } });
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dashboard/attendance/workspace");
+  const status = page.getByRole("button", { name: "Attendance for Student One" });
+  const session = page.getByRole("button", { name: "Attendance session" });
+  const save = page.getByRole("button", { name: "Save register" });
+  await expect(status).toHaveText("ABSENT");
+  await session.click();
+  await page.getByRole("option", { name: /Afternoon/ }).click();
+  await expect(status).toHaveText("LATE");
+  await expect(session).toHaveAttribute("aria-expanded", "false");
+  await session.click();
+  await page.getByRole("option", { name: "New session" }).click();
+  await expect(status).toHaveText("Unmarked");
+  await page.getByRole("textbox", { name: "Session name" }).fill("Workshop");
+  await expect(save).toBeDisabled();
+  await page.getByRole("button", { name: "Mark all present" }).click();
+  await save.click();
+  await expect(page.getByText("1 attendance entries saved.")).toBeVisible();
+  expect(submitted).toMatchObject({
+    sessionLabel: "Workshop", startsAt: null, endsAt: null,
+    records: [{ studentId: "student", status: "PRESENT" }],
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+});

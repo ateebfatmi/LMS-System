@@ -1,3 +1,4 @@
+import { requireDatabaseQuery } from "@/lib/database-query";
 import { z } from "zod";
 import { getAuthorizedOrganizationContext, getPrepziiAdmin } from "@/lib/prepzii-backend";
 
@@ -6,25 +7,27 @@ type Context = { params: Promise<{ slug: string }> };
 type Row = Record<string, unknown>;
 type Result = { data: Row[] | null; error: { message: string } | null };
 
-async function rows(query: PromiseLike<Result>): Promise<Row[]> {
-  try {
-    const result = await query;
-    if (result.error) {
-      const environment = process.env.DEPLOYMENT_ENV ?? process.env.NODE_ENV ?? "development";
-      if (environment === "production" || environment === "staging") throw new Error(result.error.message);
-      return [];
-    }
-    return result.data ?? [];
-  } catch (error) {
-    const environment = process.env.DEPLOYMENT_ENV ?? process.env.NODE_ENV ?? "development";
-    if (environment === "production" || environment === "staging") throw error;
-    return [];
-  }
+function rows(query: PromiseLike<Result>): Promise<Row[]> {
+  return requireDatabaseQuery(query, [], "Load analytics");
 }
 
-function unique(source: Row[], key: string): Row[] {
-  return [...new Map(source.map((item) => [String(item[key]), item])).values()];
-}
+const assignmentDashboardSchema = z.object({
+  assignmentCount: z.number(),
+  submittedCount: z.number(),
+  assignmentsWithSubmissions: z.number(),
+  pendingGrading: z.number().nullable(),
+  pendingAssignments: z.array(z.record(z.string(), z.unknown())),
+  assignments: z.array(z.record(z.string(), z.unknown())),
+});
+const emptyAssignmentDashboard = {
+  assignmentCount: 0, submittedCount: 0, assignmentsWithSubmissions: 0,
+  pendingGrading: null, pendingAssignments: [], assignments: [],
+};
+const attendanceDashboardSchema = z.object({
+  rate: z.number().nullable(),
+  trend: z.array(z.object({ date: z.iso.date(), rate: z.number() })),
+});
+const emptyAttendanceDashboard = { rate: null, trend: [] };
 
 export async function GET(_request: Request, context: Context) {
   const slug = slugSchema.safeParse((await context.params).slug);
@@ -39,6 +42,14 @@ export async function GET(_request: Request, context: Context) {
   const student = role === "STUDENT";
 
   try {
+    const assignmentDashboardPromise = requireDatabaseQuery<unknown>(
+      client.rpc("lms_assignment_dashboard", {
+        p_organization_id: organizationId, p_user_id: userId, p_role: role,
+      }),
+      emptyAssignmentDashboard,
+      "Load assignment dashboard",
+    ).then((data) => assignmentDashboardSchema.parse(data));
+
     const batchesPromise = (async () => {
       if (!(leadership || teacher || student)) return [];
       const canonical = await rows(client.from("organization_batches").select("id,name,target_exam,grade_level,is_active").eq("organization_id", organizationId).eq("is_active", true).order("name"));
@@ -47,7 +58,7 @@ export async function GET(_request: Request, context: Context) {
       return legacy.map((batch) => ({
         id: batch.id,
         name: batch.name,
-        target_exam: batch.exam || "JEE_MAIN",
+        target_exam: batch.exam || null,
         grade_level: batch.target_year ? `Target ${batch.target_year}` : null,
         is_active: true,
       }));
@@ -62,9 +73,10 @@ export async function GET(_request: Request, context: Context) {
         })()
       : Promise.resolve([] as Row[]);
 
-    const [allBatches, leadershipMemberships] = await Promise.all([
+    const [allBatches, leadershipMemberships, assignmentData] = await Promise.all([
       batchesPromise,
       leadershipMembershipsPromise,
+      assignmentDashboardPromise,
     ]);
 
     let memberships: Row[] = [];
@@ -80,17 +92,25 @@ export async function GET(_request: Request, context: Context) {
       memberships = await rows(client.from("organization_batch_members").select("id,batch_id,user_id,role,roll_number").eq("organization_id", organizationId).eq("user_id", userId).eq("role", "STUDENT"));
       visibleBatchIds = memberships.map((item) => String(item.batch_id));
     }
-    const batches = allBatches.filter((batch) => visibleBatchIds.includes(String(batch.id))).map((batch) => ({ ...batch, student_count: memberships.filter((member) => (member.role === "STUDENT" || !member.role) && member.batch_id === batch.id).length }));
+    const visibleBatches = new Set(visibleBatchIds);
+    const studentsByBatch = new Map<unknown, number>();
+    for (const member of memberships) {
+      if (member.role === "STUDENT" || !member.role) {
+        studentsByBatch.set(member.batch_id, (studentsByBatch.get(member.batch_id) ?? 0) + 1);
+      }
+    }
+    const batches = allBatches.filter((batch) => visibleBatches.has(String(batch.id)))
+      .map((batch) => ({ ...batch, student_count: studentsByBatch.get(batch.id) ?? 0 }));
 
-    const attendancePromise = (async () => {
-      if (!visibleBatchIds.length) return { sessions: [] as Row[], attendance: [] as Row[] };
-      const sessions = await rows(client.from("organization_attendance_sessions").select("id,batch_id,session_date,session_label").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).order("session_date", { ascending: false }).limit(60));
-      const sessionIds = sessions.map((session) => String(session.id));
-      if (!sessionIds.length) return { sessions, attendance: [] as Row[] };
-      let query = client.from("organization_attendance_records").select("id,session_id,student_id,status").eq("organization_id", organizationId).in("session_id", sessionIds);
-      if (student) query = query.eq("student_id", userId);
-      return { sessions, attendance: await rows(query) };
-    })();
+    const attendancePromise = visibleBatchIds.length ? requireDatabaseQuery<unknown>(
+      client.rpc("lms_attendance_dashboard", {
+        p_organization_id: organizationId,
+        p_batch_ids: visibleBatchIds,
+        p_student_id: student ? userId : null,
+      }),
+      emptyAttendanceDashboard,
+      "Load attendance dashboard",
+    ).then((data) => attendanceDashboardSchema.parse(data)) : Promise.resolve(emptyAttendanceDashboard);
 
     const attemptsPromise = (async () => {
       let attempts: Row[] = [];
@@ -105,8 +125,8 @@ export async function GET(_request: Request, context: Context) {
             user_id: a.user_id,
             status: a.status === "completed" || a.submitted_at ? "SUBMITTED" : "IN_PROGRESS",
             score: a.score,
-            max_score: a.total_marks || 100,
-            percentage: a.total_marks ? Math.round(((Number(a.score) || 0) / Number(a.total_marks)) * 100) : 0,
+            max_score: a.total_marks,
+            percentage: Number(a.total_marks) > 0 && a.score != null ? Math.round(Number(a.score) / Number(a.total_marks) * 100) : null,
             submitted_at: a.submitted_at,
           }));
         }
@@ -149,56 +169,27 @@ export async function GET(_request: Request, context: Context) {
       ]);
       return [...general, ...targeted].sort((a, b) => String(b.published_at).localeCompare(String(a.published_at))).slice(0, 5);
     })() : Promise.resolve([]);
-    const assignmentsPromise = (async () => {
-      let assignments: Row[] = [];
-      if (leadership) {
-        assignments = await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).order("due_at").limit(100));
-      } else if (teacher) {
-        assignments = visibleBatchIds.length ? await rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("created_by", userId).in("batch_id", visibleBatchIds).order("due_at").limit(100)) : [];
-      } else if (student) {
-        const [direct, batchAssigned] = await Promise.all([
-          rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).eq("student_user_id", userId).eq("status", "PUBLISHED").or(`available_from.is.null,available_from.lte.${new Date().toISOString()}`).limit(100)),
-          visibleBatchIds.length ? rows(client.from("organization_assignments").select("id,title,batch_id,student_user_id,status,due_at,max_marks,created_by").eq("organization_id", organizationId).in("batch_id", visibleBatchIds).eq("status", "PUBLISHED").or(`available_from.is.null,available_from.lte.${new Date().toISOString()}`).limit(100)) : Promise.resolve([] as Row[]),
-        ]);
-        assignments = unique([...direct, ...batchAssigned], "id");
-      }
-      if (!assignments.length) return { assignments, submissions: [] as Row[] };
-      let query = client.from("organization_assignment_submissions").select("id,assignment_id,student_user_id,status,grade,submitted_at").eq("organization_id", organizationId).in("assignment_id", assignments.map((item) => String(item.id)));
-      if (student) query = query.eq("student_user_id", userId);
-      return { assignments, submissions: await rows(query) };
-    })();
-
-    const [attendanceData, attempts, assignmentData, upcoming, classes, notices] = await Promise.all([
-      attendancePromise,
-      attemptsPromise,
-      assignmentsPromise, upcomingPromise, classesPromise, noticesPromise,
+    const [attendance, attempts, upcoming, classes, notices] = await Promise.all([
+      attendancePromise, attemptsPromise, upcomingPromise, classesPromise, noticesPromise,
     ]);
-    const { sessions, attendance } = attendanceData;
-    const { assignments, submissions } = assignmentData;
 
-    const present = attendance.filter((record) => record.status === "PRESENT").length;
     const submittedAttempts = attempts.filter((attempt) => attempt.status === "SUBMITTED");
     const scores = submittedAttempts.flatMap(({ percentage }) => percentage === null || percentage === undefined ? [] : [Number(percentage)]).filter(Number.isFinite);
-    const submittedIds = new Set(submissions.filter(({ status }) => ["SUBMITTED", "LATE", "GRADED", "RETURNED"].includes(String(status)))
-      .map(({ assignment_id }) => assignment_id));
-    const trend = sessions.slice(0, 14).reverse().map((session) => {
-      const records = attendance.filter((record) => record.session_id === session.id);
-      return { date: session.session_date, rate: records.length ? Math.round(records.filter((record) => record.status === "PRESENT").length / records.length * 1000) / 10 : null };
-    }).filter(({ rate }) => rate !== null);
 
     return Response.json({
       role, upcoming, classes, notices,
-      pendingAssignments: student ? assignments.filter(({ id }) => !submittedIds.has(id)).slice(0, 8) : [],
-      pendingGrading: teacher ? submissions.filter(({ status }) => status === "SUBMITTED" || status === "LATE").length : null,
+      pendingAssignments: assignmentData.pendingAssignments,
+      pendingGrading: assignmentData.pendingGrading,
       summary: {
         students: leadership || teacher ? new Set(memberships.filter((item) => item.role === "STUDENT" && item.user_id).map((item) => item.user_id)).size : student ? 1 : null,
         activeBatches: batches.length,
-        attendanceRate: attendance.length ? Math.round(present / attendance.length * 1000) / 10 : null,
+        attendanceRate: attendance.rate,
         assessmentAverage: scores.length ? Math.round(scores.reduce((sum, value) => sum + value, 0) / scores.length * 10) / 10 : null,
-        assignments: assignments.length,
-        submittedAssignments: submissions.filter((item) => ["SUBMITTED", "LATE", "GRADED"].includes(String(item.status))).length,
+        assignments: assignmentData.assignmentCount,
+        submittedAssignments: assignmentData.submittedCount,
+        assignmentsWithSubmissions: assignmentData.assignmentsWithSubmissions,
       },
-      batches, attendanceTrend: trend, attempts: submittedAttempts.slice(0, 20), assignments: assignments.slice(0, 20),
+      batches, attendanceTrend: attendance.trend, attempts: submittedAttempts.slice(0, 20), assignments: assignmentData.assignments,
     }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) {
     console.error("Analytics query failed", error);

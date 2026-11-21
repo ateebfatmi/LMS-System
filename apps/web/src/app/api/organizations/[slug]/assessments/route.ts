@@ -103,8 +103,8 @@ export async function GET(request: Request, context: Context) {
           expires_at: null,
           submitted_at: a.submitted_at,
           score: a.score ?? 0,
-          max_score: a.total_marks ?? 100,
-          percentage: a.total_marks ? Math.round(((Number(a.score) || 0) / Number(a.total_marks)) * 100) : 0,
+          max_score: a.total_marks,
+          percentage: Number(a.total_marks) > 0 && a.score != null ? Math.round(Number(a.score) / Number(a.total_marks) * 100) : null,
           correct_count: a.correct ?? 0,
           incorrect_count: a.wrong ?? 0,
           unanswered_count: a.skipped ?? 0,
@@ -127,8 +127,8 @@ export async function GET(request: Request, context: Context) {
     }
     if (assigned) batches = batches.filter(({ id }) => assigned.has(String(id)));
     let bankQuestions: Row[] = [];
-    if (staff) {
-      const searchParams = new URL(request.url).searchParams;
+    const searchParams = new URL(request.url).searchParams;
+    if (staff && searchParams.get("includeBank") !== "0") {
       const search = searchParams.get("q")?.trim().slice(0, 100) ?? "";
       const subject = searchParams.get("subject")?.trim().slice(0, 120) ?? "";
       let questionQuery = client.from("questions").select("id,exam,subject,chapter,difficulty,question_text,marks,negative_marks").limit(50);
@@ -149,7 +149,7 @@ export async function POST(request: Request, context: Context) {
   if (!slug.success || !parsed.success) return Response.json({ error: "Invalid assessment operation." }, { status: 400 });
   const resolved = await getAuthorizedOrganizationContext(slug.data, "assessments:manage");
   if (!resolved) return Response.json({ error: "Forbidden" }, { status: 403 });
-  if (parsed.data.action === "SCHEDULE_TEST" && parsed.data.payload.endsAt <= parsed.data.payload.startsAt) {
+  if (parsed.data.action === "SCHEDULE_TEST" && Date.parse(parsed.data.payload.endsAt) <= Date.parse(parsed.data.payload.startsAt)) {
     return Response.json({ error: "Assessment end must be after its start." }, { status: 400 });
   }
   const { data, error } = parsed.data.action === "GRADE_DESCRIPTIVE"

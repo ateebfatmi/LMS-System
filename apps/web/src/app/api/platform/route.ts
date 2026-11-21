@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getPlatformAdminUserId, getPrepziiAdmin, isPlatformAdmin } from "@/lib/prepzii-backend";
 import { isOwnerInvitationConfigured, manageOwnerInvitation, prepareOwnerInvitation } from "@/lib/platform-owner-invitations";
 import { deliverInvitation } from "@/lib/invitation-delivery";
+import { isActiveSubscriptionPlan } from "@/lib/subscription-plans";
 import { guardRateLimit } from "@/lib/rate-limit";
 
 const mutationSchema = z.discriminatedUnion("action", [
@@ -95,7 +96,7 @@ const mutationSchema = z.discriminatedUnion("action", [
     payload: z.object({
       name: z.string().trim().min(2).max(160),
       slug: z.string().trim().min(2).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
-      planId: z.string().default("basic"),
+      planId: z.string().trim().min(1).max(50),
       instituteType: z
         .enum(["COACHING", "TUITION", "SCHOOL", "ONLINE_ACADEMY", "INDIVIDUAL_TUTOR", "OTHER"])
         .default("COACHING"),
@@ -136,7 +137,7 @@ const mutationSchema = z.discriminatedUnion("action", [
       phone: z.string().trim().min(6).max(30),
       city: z.string().trim().min(2).max(80),
       studentCount: z.string().trim().min(1).max(60),
-      interestedPlan: z.string().default("growth"),
+      interestedPlan: z.string().trim().min(1).max(50).optional(),
       notes: z.string().trim().max(500).optional(),
     }),
   }),
@@ -289,6 +290,7 @@ export async function GET() {
         activeBatches: batchCounts.get(id) ?? 0 };
     });
 
+    const ownerInvitationConfigured = isOwnerInvitationConfigured();
     return Response.json(
       {
         institutes,
@@ -304,8 +306,9 @@ export async function GET() {
           ...record,
           status: record.status === "APPROVED" && Date.parse(String(record.expires_at)) <= Date.now() ? "EXPIRED" : record.status,
         })),
-        ownerProvisioningReady: ownerInvitations !== null && isOwnerInvitationConfigured(),
+        ownerProvisioningReady: ownerInvitations !== null && ownerInvitationConfigured,
         ownerInvitationHistoryAvailable: ownerInvitations !== null,
+        ownerInvitationConfigured,
         ownerInvitations: (ownerInvitations ?? []).map(({ clerk_invitation_id, ...invite }) => ({
           ...invite, delivered: Boolean(clerk_invitation_id),
           status: invite.status === "PENDING" && Date.parse(String(invite.expires_at)) <= Date.now() ? "EXPIRED" : invite.status,
@@ -450,6 +453,9 @@ export async function POST(request: Request) {
 
     if (parsed.data.action === "CREATE_INSTITUTE") {
       const { ownerEmail, ...payload } = parsed.data.payload;
+      if (!(await isActiveSubscriptionPlan(payload.planId))) {
+        return Response.json({ error: "The selected subscription plan is unavailable." }, { status: 400 });
+      }
       const organizationId = crypto.randomUUID();
       const invitation = prepareOwnerInvitation(organizationId, ownerEmail);
       const { data, error } = await client.rpc("lms_provision_institute", {
@@ -458,6 +464,9 @@ export async function POST(request: Request) {
         p_email: invitation.email, p_hash: invitation.hash, p_key: invitation.key,
       });
       if (error) {
+        if (error.code === "PGRST202") {
+          return Response.json({ error: "Institute registration requires the platform workflows database migration (0030)." }, { status: 503 });
+        }
         if (error.code === "23505") return Response.json({ error: "An institute with this slug already exists." }, { status: 409 });
         if (error.code === "23503") return Response.json({ error: "The selected subscription plan is unavailable." }, { status: 400 });
         console.error("Institute provisioning failed", error.code);
@@ -575,6 +584,9 @@ export async function POST(request: Request) {
     // 10. DEMO REQUESTS MANAGEMENT & 1-CLICK PROVISIONING
     if (parsed.data.action === "CREATE_DEMO_REQUEST") {
       const d = parsed.data.payload;
+      if (d.interestedPlan && !(await isActiveSubscriptionPlan(d.interestedPlan))) {
+        return Response.json({ error: "The selected subscription plan is unavailable." }, { status: 400 });
+      }
       const { data: demo, error: demoErr } = await client.from("platform_demo_requests").insert({
         full_name: d.fullName,
         institute_name: d.instituteName,
@@ -582,7 +594,7 @@ export async function POST(request: Request) {
         phone: d.phone,
         city: d.city,
         student_count: d.studentCount,
-        interested_plan: d.interestedPlan,
+        interested_plan: d.interestedPlan ?? null,
         notes: d.notes || null,
         status: "PENDING",
       }).select("id").single();

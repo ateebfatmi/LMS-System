@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  ArrowRight,
   ArrowUpRight,
+  Check,
+  CircleAlert,
   ContactRound,
   Download,
   Gem,
@@ -27,6 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Badge, Button, MetricCard, PrepziiMark, Select } from "@prepzii/ui";
+import styles from "./platform-admin-overview.module.css";
 
 type Row = Record<string, unknown>;
 
@@ -39,6 +43,7 @@ type Data = {
   audits: Row[];
   ownerProvisioningReady: boolean;
   ownerInvitationHistoryAvailable: boolean;
+  ownerInvitationConfigured: boolean;
   ownerInvitations: Row[];
   counts: Row[];
   brandings: Row[];
@@ -66,6 +71,7 @@ const empty: Data = {
   audits: [],
   ownerProvisioningReady: false,
   ownerInvitationHistoryAvailable: false,
+  ownerInvitationConfigured: false,
   ownerInvitations: [],
   counts: [],
   brandings: [],
@@ -143,6 +149,9 @@ const money = (paise: unknown) =>
     maximumFractionDigits: 0,
   }).format(Number(paise ?? 0) / 100);
 
+const instituteSlug = (name: string) =>
+  name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 64).replace(/-$/, "");
+
 export function PlatformAdminWorkspace() {
   const router = useRouter();
   const { signOut } = useClerk();
@@ -150,6 +159,8 @@ export function PlatformAdminWorkspace() {
   const [loading, setLoading] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminSection>("overview");
+  const workspaceHeading = useRef<HTMLHeadingElement>(null);
+  const focusWorkspaceHeading = useRef(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -174,9 +185,10 @@ export function PlatformAdminWorkspace() {
 
   // Create Institute Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const registrationDialog = useRef<HTMLDialogElement>(null);
   const [newInstName, setNewInstName] = useState("");
   const [newInstSlug, setNewInstSlug] = useState("");
-  const [newInstPlan, setNewInstPlan] = useState("basic");
+  const [newInstPlan, setNewInstPlan] = useState("");
   const [newInstType, setNewInstType] = useState("COACHING");
   const [newInstEmail, setNewInstEmail] = useState("");
   const [newInstPhone, setNewInstPhone] = useState("");
@@ -203,7 +215,7 @@ export function PlatformAdminWorkspace() {
   const [demoPhone, setDemoPhone] = useState("");
   const [demoCity, setDemoCity] = useState("");
   const [demoCount, setDemoCount] = useState("100-500");
-  const [demoPlan, setDemoPlan] = useState("growth");
+  const [demoPlan, setDemoPlan] = useState("");
   const [demoNotes, setDemoNotes] = useState("");
 
   // Quick Plan Assignment Modal
@@ -250,6 +262,19 @@ export function PlatformAdminWorkspace() {
     const task = window.setTimeout(() => void load(), 0);
     return () => window.clearTimeout(task);
   }, [load]);
+
+  useEffect(() => {
+    if (!showCreateModal) return;
+    const dialog = registrationDialog.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, [showCreateModal]);
+
+  useEffect(() => {
+    if (!focusWorkspaceHeading.current) return;
+    focusWorkspaceHeading.current = false;
+    workspaceHeading.current?.focus();
+  }, [activeTab]);
 
   async function mutate(action: string, payload: Row, customSuccessMessage?: string) {
     setBusy(true);
@@ -318,9 +343,18 @@ export function PlatformAdminWorkspace() {
     }
   }
 
+  const activePlans = data.plans.filter((plan) => plan.is_active === true);
+  const plansById = new Map(data.plans.map((plan) => [plan.id, plan]));
+  const canSelectInitialPlan = activePlans.some((plan) => plan.id === newInstPlan);
+
+  function closeRegistration() {
+    registrationDialog.current?.close();
+    setShowCreateModal(false);
+  }
+
   async function handleCreateInstitute(e: FormEvent) {
     e.preventDefault();
-    if (!data.ownerProvisioningReady || !newInstName.trim() || !newInstSlug.trim() || !newInstOwnerEmail.trim()) return;
+    if (!data.ownerProvisioningReady || !canSelectInitialPlan || !newInstName.trim() || !newInstSlug.trim() || !newInstOwnerEmail.trim()) return;
 
     const ok = await mutate(
       "CREATE_INSTITUTE",
@@ -338,12 +372,13 @@ export function PlatformAdminWorkspace() {
     );
 
     if (ok) {
-      setShowCreateModal(false);
+      closeRegistration();
       setNewInstName("");
       setNewInstSlug("");
       setNewInstEmail("");
       setNewInstPhone("");
       setNewInstOwnerEmail("");
+      setNewInstPlan("");
     }
   }
 
@@ -389,7 +424,7 @@ export function PlatformAdminWorkspace() {
         phone: demoPhone.trim(),
         city: demoCity.trim(),
         studentCount: demoCount,
-        interestedPlan: demoPlan,
+        interestedPlan: demoPlan || undefined,
         notes: demoNotes.trim() || undefined,
       },
       "Inbound B2B demo lead logged."
@@ -402,6 +437,7 @@ export function PlatformAdminWorkspace() {
       setDemoPhone("");
       setDemoCity("");
       setDemoNotes("");
+      setDemoPlan("");
     }
   }
 
@@ -532,6 +568,13 @@ export function PlatformAdminWorkspace() {
 
   const pendingUpgrades = data.subscriptions.filter((sub) => Boolean(sub.requested_plan_id));
   const pendingDemos = data.demoRequests.filter((d) => d.status === "PENDING");
+
+  const attentionCount = pendingUpgrades.length + pendingDemos.length + pendingOwners;
+
+  function openSectionFromOverview(section: AdminSection) {
+    focusWorkspaceHeading.current = true;
+    setActiveTab(section);
+  }
 
   // Filtered Institutes
   const filteredInstitutes = data.institutes.filter((item) => {
@@ -791,54 +834,34 @@ export function PlatformAdminWorkspace() {
               </span>
             </div>
             <p className="header-subtitle">{activeMeta.subtitle}</p>
-            <h1>{activeMeta.title}</h1>
+            <h1 ref={workspaceHeading} tabIndex={-1}>{activeMeta.title}</h1>
           </div>
 
-          <div className="header-actions" style={{ flexWrap: "wrap" }}>
-            {/* Live Telemetry Pill */}
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                fontSize: "12px",
-                fontWeight: 600,
-                color: "#334155",
-                backgroundColor: "#f8fafc",
-                padding: "7px 14px",
-                borderRadius: "999px",
-                border: "1px solid #e2e8f0",
-              }}
-            >
-              <span style={{ color: "#16a34a" }}>●</span>
-            </div>
-
-            <button
+          <div className={`header-actions ${styles.headerActions}`}>
+            <Button
               type="button"
+              variant="secondary"
+              className={styles.syncButton}
+              disabled={loading || busy}
               onClick={() => void load()}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                height: "38px",
-                padding: "0 13px",
-                borderRadius: "10px",
-                border: "1px solid #e2e8f0",
-                backgroundColor: "#ffffff",
-                color: "#0f172a",
-                fontSize: "12.5px",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
             >
-              <RefreshCw size={13} />
-              <span>Sync</span>
-            </button>
+              <RefreshCw size={15} aria-hidden="true" />
+              {loading ? "Syncing…" : "Sync"}
+            </Button>
 
             {(activeTab === "overview" || activeTab === "institutes") && (
-              <Button disabled={!data.ownerProvisioningReady} onClick={() => setShowCreateModal(true)}>
-                <Plus size={15} style={{ marginRight: "4px" }} />
-                Register Institute
+              <Button
+                type="button"
+                className={`create-button ${styles.registerButton}`}
+                disabled={!data.ownerProvisioningReady || busy || loading}
+                aria-describedby={loaded && !data.ownerProvisioningReady ? "platform-provisioning-status" : undefined}
+                onClick={() => {
+                  setError("");
+                  setShowCreateModal(true);
+                }}
+              >
+                <Plus size={16} aria-hidden="true" />
+                <span>Register Institute</span>
               </Button>
             )}
 
@@ -866,7 +889,7 @@ export function PlatformAdminWorkspace() {
         </header>
 
         {/* Global Feedback Banners */}
-        {error && (
+        {error && !showCreateModal && (
           <div
             className="form-error"
             role="alert"
@@ -906,267 +929,206 @@ export function PlatformAdminWorkspace() {
            ========================================================= */}
         {loading && <p role="status">Loading platform records…</p>}
         {loaded && !data.ownerProvisioningReady && (
-          <p role="status">
-            {!data.ownerInvitationHistoryAvailable
-              ? "Institute registration and owner invitations require the provisioning database migration."
-              : "Institute registration and owner email delivery require invitation configuration."}
-          </p>
+          <div id="platform-provisioning-status" className={styles.provisioningStatus} role="status">
+            <strong>Institute registration setup required</strong>
+            <ul>
+              {!data.ownerInvitationHistoryAvailable && (
+                <li>Apply the Super Admin database rollout to enable institute provisioning and owner invitations.</li>
+              )}
+              {!data.ownerInvitationConfigured && (
+                <li>Configure a stable INVITATION_TOKEN_SECRET and a valid NEXT_PUBLIC_APP_URL on the server.</li>
+              )}
+            </ul>
+          </div>
         )}
         {loaded && <>
         {activeTab === "overview" && (
-          <div style={{ display: "grid", gap: "24px" }}>
-            <div className="metrics-grid">
+          <div className={styles.overview}>
+            <section className={`panel ${styles.panel}`} aria-labelledby="platform-attention-title">
+              <header className={styles.sectionHeader}>
+                <div className={styles.sectionTitle}>
+                  <span className={`${styles.sectionIcon} ${attentionCount ? styles.attentionIcon : ""}`}>
+                    {attentionCount ? <CircleAlert size={19} aria-hidden="true" /> : <Check size={19} aria-hidden="true" />}
+                  </span>
+                  <h2 id="platform-attention-title">Needs Attention</h2>
+                </div>
+                {attentionCount > 0 && (
+                  <Badge variant="warning">{attentionCount} {attentionCount === 1 ? "item" : "items"}</Badge>
+                )}
+              </header>
+              {attentionCount > 0 ? (
+                <ul className={styles.list}>
+                  {pendingUpgrades.map((subscription) => {
+                    const institute = data.institutes.find(({ id }) => id === subscription.organization_id);
+                    const name = String(institute?.name ?? subscription.organization_id);
+                    const currentPlan = String(plansById.get(subscription.plan_id)?.name ?? subscription.plan_id);
+                    const requestedPlan = String(plansById.get(subscription.requested_plan_id)?.name ?? subscription.requested_plan_id);
+
+                    return (
+                      <li className={styles.row} key={String(subscription.id)}>
+                        <div className={styles.rowContent}>
+                          <strong>Plan upgrade request · {name}</strong>
+                          <p>{currentPlan} → {requestedPlan} ({String(subscription.requested_billing_interval ?? "monthly")})</p>
+                        </div>
+                        <div className={styles.rowActions}>
+                          <Button
+                            type="button"
+                            disabled={busy || loading}
+                            aria-label={`Approve upgrade for ${name}`}
+                            onClick={() => void mutate("RESOLVE_PLAN_UPGRADE_REQUEST", {
+                              organizationId: subscription.organization_id,
+                              decision: "APPROVE",
+                            }, "Plan upgrade approved.")}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            disabled={busy || loading}
+                            aria-label={`Dismiss upgrade for ${name}`}
+                            onClick={() => void mutate("RESOLVE_PLAN_UPGRADE_REQUEST", {
+                              organizationId: subscription.organization_id,
+                              decision: "REJECT",
+                            }, "Plan upgrade dismissed.")}
+                          >
+                            Dismiss
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                  {pendingDemos.length > 0 && (
+                    <li className={styles.row}>
+                      <div className={styles.rowContent}>
+                        <strong>{pendingDemos.length} pending demo {pendingDemos.length === 1 ? "request" : "requests"}</strong>
+                        <p>Awaiting review</p>
+                      </div>
+                      <Button type="button" variant="secondary" onClick={() => openSectionFromOverview("demos")}>
+                        Review Leads <ArrowRight size={15} aria-hidden="true" />
+                      </Button>
+                    </li>
+                  )}
+                  {pendingOwners > 0 && (
+                    <li className={styles.row}>
+                      <div className={styles.rowContent}>
+                        <strong>{pendingOwners} pending owner {pendingOwners === 1 ? "invitation" : "invitations"}</strong>
+                        <p>Awaiting activation</p>
+                      </div>
+                      <Button type="button" variant="secondary" onClick={() => openSectionFromOverview("invitations")}>
+                        View Invitations <ArrowRight size={15} aria-hidden="true" />
+                      </Button>
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <p className={styles.empty}>No pending requests or invitations to review.</p>
+              )}
+            </section>
+
+            <section className={styles.metrics} aria-label="Platform summary">
               <MetricCard
                 label="Registered Institutes"
                 value={String(data.institutes.length)}
                 detail={`${activeInstitutes} active · ${suspendedInstitutes} suspended`}
                 accent="yellow"
               />
-              <MetricCard label="Pending owner invitations" value={String(pendingOwners)}
-                detail="Awaiting activation" accent="blue" />
-              <MetricCard label="Active subscriptions" value={String(activeSubscriptions)}
-                detail={`${trials} trials`} accent="green" />
-            </div>
-            <section className="panel">
-              <h2>Recent provisioning activity</h2>
-              {provisioning.length ? <ul>{provisioning.map((event) => <li key={String(event.id)}>
-                {String(event.action).replaceAll("_", " ")} · {data.institutes.find(({ id }) => id === event.target_organization_id)?.name as string ?? "Institute"} · {new Date(String(event.created_at)).toLocaleString()}
-              </li>)}</ul> : <p>No provisioning activity yet.</p>}
+              <MetricCard
+                label="Pending Owner Invitations"
+                value={data.ownerInvitationHistoryAvailable ? String(pendingOwners) : "—"}
+                detail={data.ownerInvitationHistoryAvailable ? "Awaiting activation" : "Invitation history unavailable"}
+                accent="blue"
+              />
+              <MetricCard
+                label="Active Subscriptions"
+                value={String(activeSubscriptions)}
+                detail={`${trials} ${trials === 1 ? "trial" : "trials"}`}
+                accent="green"
+              />
             </section>
 
-            {/* Actionable Priority Queue */}
-            {(pendingUpgrades.length > 0 || pendingDemos.length > 0) && (
-              <div
-                style={{
-                  backgroundColor: "#fffbeb",
-                  border: "1px solid #fde68a",
-                  borderRadius: "16px",
-                  padding: "20px 24px",
-                  display: "grid",
-                  gap: "12px",
-                }}
-              >
-                <strong style={{ fontSize: "15px", color: "#92400e" }}>
-                  ⚡ Priority Governance Queue ({pendingUpgrades.length + pendingDemos.length} items)
-                </strong>
-
-                {pendingUpgrades.map((sub) => {
-                  const inst = data.institutes.find((i) => i.id === sub.organization_id);
-                  return (
-                    <div
-                      key={String(sub.id)}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        backgroundColor: "#ffffff",
-                        padding: "12px 16px",
-                        borderRadius: "10px",
-                        border: "1px solid #fde68a",
-                        flexWrap: "wrap",
-                        gap: "12px",
-                      }}
-                    >
-                      <div>
-                        <strong style={{ fontSize: "14px", color: "#0f172a" }}>
-                          Plan Upgrade Request: {String(inst?.name ?? sub.organization_id)}
-                        </strong>
-                        <div style={{ fontSize: "12.5px", color: "#64748b" }}>
-                          Current: <strong>{String(sub.plan_id).toUpperCase()}</strong> → Requested:{" "}
-                          <strong style={{ color: "#ca8a04" }}>
-                            {String(sub.requested_plan_id).toUpperCase()}
-                          </strong>{" "}
-                          ({String(sub.requested_billing_interval ?? "monthly")})
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <Button
-                          disabled={busy}
-                          onClick={() =>
-                            void mutate("RESOLVE_PLAN_UPGRADE_REQUEST", {
-                              organizationId: sub.organization_id,
-                              decision: "APPROVE",
-                            })
-                          }
-                        >
-                          Approve Upgrade
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={busy}
-                          onClick={() =>
-                            void mutate("RESOLVE_PLAN_UPGRADE_REQUEST", {
-                              organizationId: sub.organization_id,
-                              decision: "REJECT",
-                            })
-                          }
-                        >
-                          Dismiss
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {pendingDemos.length > 0 && (
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      backgroundColor: "#ffffff",
-                      padding: "12px 16px",
-                      borderRadius: "10px",
-                      border: "1px solid #fde68a",
-                    }}
-                  >
-                    <div>
-                      <strong style={{ fontSize: "14px", color: "#0f172a" }}>
-                        {pendingDemos.length} Inbound B2B Demo Request(s) Awaiting Review
-                      </strong>
-                      <div style={{ fontSize: "12.5px", color: "#64748b" }}>
-                        Provision a trial workspace in 1 click from Demo Leads & Sales.
-                      </div>
-                    </div>
-                    <Button variant="secondary" onClick={() => setActiveTab("demos")}>
-                      Review Leads →
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Active Institute Fleet Overview */}
-            <div
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "18px",
-                padding: "24px",
-                border: "1px solid #e2e8f0",
-                boxShadow: "0 1px 3px rgba(0, 0, 0, 0.04)",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: "16px",
-                }}
-              >
-                <div>
-                  <h2 style={{ fontSize: "17px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                    Active Institute Fleet Overview
-                  </h2>
-                  <small style={{ color: "#64748b" }}>
-                    Direct governance and workspace jump for onboarded coaching academies
-                  </small>
+            <section className={`panel ${styles.panel}`} aria-labelledby="platform-institutes-title">
+              <header className={styles.sectionHeader}>
+                <div className={styles.sectionTitle}>
+                  <span className={styles.sectionIcon}><School size={19} aria-hidden="true" /></span>
+                  <h2 id="platform-institutes-title">Recently Registered Institutes</h2>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("institutes")}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: "#ca8a04",
-                    fontSize: "13px",
-                    fontWeight: 750,
-                    cursor: "pointer",
-                  }}
-                >
-                  View All Institutes →
-                </button>
-              </div>
+                <Button type="button" variant="secondary" onClick={() => openSectionFromOverview("institutes")}>
+                  View All Institutes <ArrowRight size={15} aria-hidden="true" />
+                </Button>
+              </header>
+              {data.institutes.length > 0 ? (
+                <ul className={styles.list}>
+                  {data.institutes.slice(0, 6).map((institute) => {
+                    const subscription = data.subscriptions.find(({ organization_id }) => organization_id === institute.id);
+                    const name = String(institute.name);
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {data.institutes.slice(0, 6).map((inst) => {
-                  const sub = data.subscriptions.find((s) => s.organization_id === inst.id);
-                  const count = data.counts.find((c) => c.organizationId === inst.id);
-
-                  return (
-                    <div
-                      key={String(inst.id)}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "12px 16px",
-                        borderRadius: "12px",
-                        backgroundColor: "#f8fafc",
-                        border: "1px solid #e2e8f0",
-                        gap: "12px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <div>
-                        <strong style={{ fontSize: "14px", color: "#0f172a" }}>{String(inst.name)}</strong>
-                        <div style={{ fontSize: "12px", color: "#64748b" }}>
-                          <code>{String(inst.slug)}</code> · {String(inst.institute_type ?? "COACHING")} · Owner{" "}
-                          {String(inst.owner_user_id).slice(0, 18)}…
+                    return (
+                      <li className={styles.row} key={String(institute.id)}>
+                        <div className={styles.rowContent}>
+                          <strong>{name}</strong>
+                          <p>{String(plansById.get(subscription?.plan_id)?.name ?? subscription?.plan_id ?? "No plan")}</p>
                         </div>
-                      </div>
+                        <div className={styles.rowActions}>
+                          <Badge variant={institute.status === "ACTIVE" ? "success" : "danger"}>
+                            {String(institute.status)}
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            aria-label={`Manage ${name}`}
+                            onClick={() => {
+                              setInspectedInstituteId(String(institute.id));
+                              setInspectorTab("profile");
+                            }}
+                          >
+                            Manage
+                          </Button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : <p className={styles.empty}>No institutes registered yet.</p>}
+            </section>
 
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                        <span
-                          style={{
-                            fontSize: "11px",
-                            fontWeight: 700,
-                            padding: "3px 8px",
-                            borderRadius: "6px",
-                            backgroundColor: "#e2e8f0",
-                            color: "#334155",
-                            textTransform: "uppercase",
-                          }}
-                        >
-                          {String(sub?.plan_id ?? "No plan")}
-                        </span>
-                        <span style={{ fontSize: "13px", color: "#475569", fontWeight: 600 }}>
-                          {Number(count?.activeStudents ?? 0)} Students · {Number(count?.activeStaff ?? 0)} Staff
-                        </span>
-                        <Badge variant={inst.status === "ACTIVE" ? "success" : "danger"}>
-                          {String(inst.status)}
-                        </Badge>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setInspectedInstituteId(String(inst.id));
-                            setInspectorTab("profile");
-                          }}
-                          style={{
-                            padding: "6px 11px",
-                            borderRadius: "8px",
-                            border: "1px solid #cbd5e1",
-                            backgroundColor: "#ffffff",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#0f172a",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Manage ⚙️
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleEnterInstituteWorkspace(inst)}
-                          style={{
-                            padding: "6px 11px",
-                            borderRadius: "8px",
-                            border: "1px solid #fde68a",
-                            backgroundColor: "#fef9c3",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                            color: "#854d0e",
-                            cursor: "pointer",
-                          }}
-                        >
-                          Enter Workspace ↗
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <section className={`panel ${styles.panel}`} aria-labelledby="platform-activity-title">
+              <header className={styles.sectionHeader}>
+                <div className={styles.sectionTitle}>
+                  <span className={styles.sectionIcon}><ScrollText size={19} aria-hidden="true" /></span>
+                  <h2 id="platform-activity-title">Recent Provisioning Activity</h2>
+                </div>
+              </header>
+              {provisioning.length > 0 ? (
+                <ul className={styles.list}>
+                  {provisioning.map((event) => {
+                    const institute = data.institutes.find(({ id }) => id === event.target_organization_id);
+                    const date = String(event.created_at);
+                    const action = String(event.action);
+                    const label = {
+                      create_organization: "Institute registered",
+                      set_organization_status: "Institute status changed",
+                      owner_invitation_created: "Owner invitation created",
+                      owner_invitation_accepted: "Owner invitation accepted",
+                      owner_invitation_resent: "Owner invitation resent",
+                      owner_invitation_revoked: "Owner invitation revoked",
+                    }[action] ?? action.replaceAll("_", " ");
+
+                    return (
+                      <li className={styles.row} key={String(event.id)}>
+                        <div className={styles.rowContent}>
+                          <strong>{label}</strong>
+                          <p>{String(institute?.name ?? "Institute")}</p>
+                        </div>
+                        <time className={styles.timestamp} dateTime={date}>
+                          {new Date(date).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+                        </time>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : <p className={styles.empty}>No provisioning activity yet.</p>}
+            </section>
           </div>
         )}
 
@@ -1231,11 +1193,11 @@ export function PlatformAdminWorkspace() {
               {filteredInstitutes.map((inst) => {
                 const sub = data.subscriptions.find((s) => s.organization_id === inst.id);
                 const count = data.counts.find((c) => c.organizationId === inst.id);
-                const plan = data.plans.find((p) => p.id === sub?.plan_id);
+                const plan = plansById.get(sub?.plan_id);
                 const branding = data.brandings.find((b) => b.organization_id === inst.id);
-                const studentLimit = Number(plan?.student_limit ?? 100);
+                const studentLimit = Number(plan?.student_limit ?? 0);
                 const activeStus = Number(count?.activeStudents ?? 0);
-                const quotaPercent = Math.min(100, Math.round((activeStus / studentLimit) * 100));
+                const quotaPercent = studentLimit > 0 ? Math.round((activeStus / studentLimit) * 100) : null;
 
                 return (
                   <div
@@ -1295,10 +1257,10 @@ export function PlatformAdminWorkspace() {
                       >
                         <span style={{ color: "#64748b" }}>Student Quota</span>
                         <strong style={{ color: "#0f172a" }}>
-                          {activeStus} / {studentLimit} ({quotaPercent}%)
+                          {quotaPercent === null ? `${activeStus} students · No quota data` : `${activeStus} / ${studentLimit} (${quotaPercent}%)`}
                         </strong>
                       </div>
-                      <div
+                      {quotaPercent !== null && <div
                         style={{
                           width: "100%",
                           height: "6px",
@@ -1309,13 +1271,13 @@ export function PlatformAdminWorkspace() {
                       >
                         <div
                           style={{
-                            width: `${quotaPercent}%`,
+                            width: `${Math.min(quotaPercent, 100)}%`,
                             height: "100%",
                             backgroundColor: quotaPercent > 90 ? "#ef4444" : "#ca8a04",
                             borderRadius: "999px",
                           }}
                         />
-                      </div>
+                      </div>}
                       <div style={{ fontSize: "11px", color: "#64748b", marginTop: "5px" }}>
                         {Number(count?.activeStaff ?? 0)} Staff · {Number(count?.activeBatches ?? 0)} Batches
                       </div>
@@ -1666,7 +1628,7 @@ export function PlatformAdminWorkspace() {
                           textTransform: "uppercase",
                         }}
                       >
-                        Interested: {String(demo.interested_plan ?? "growth")}
+                        Interested: {String(plansById.get(demo.interested_plan)?.name ?? demo.interested_plan ?? "Unspecified")}
                       </span>
                     </div>
                     <div style={{ fontSize: "13px", color: "#334155", marginTop: "4px" }}>
@@ -2259,243 +2221,232 @@ export function PlatformAdminWorkspace() {
           MODAL: REGISTER NEW INSTITUTE DIRECTLY
          ========================================================= */}
       {showCreateModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 2000,
-            backdropFilter: "blur(6px)",
-            padding: "16px",
+        <dialog
+          ref={registrationDialog}
+          aria-labelledby="register-institute-title"
+          className={styles.registerDialog}
+          onCancel={(event) => {
+            event.preventDefault();
+            if (!busy) closeRegistration();
           }}
         >
           <div
             style={{
-              backgroundColor: "#ffffff",
-              borderRadius: "18px",
-              padding: "28px",
-              width: "100%",
-              maxWidth: "540px",
-              boxShadow: "0 24px 60px rgba(0, 0, 0, 0.3)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "16px",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "16px",
-              }}
+            <h3 id="register-institute-title" style={{ fontSize: "18px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
+              Register Institute
+            </h3>
+            <button
+              type="button"
+              aria-label="Close registration"
+              disabled={busy}
+              onClick={closeRegistration}
+              style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer" }}
             >
-              <h3 style={{ fontSize: "18px", fontWeight: 800, margin: 0, color: "#0f172a" }}>
-                Register New Coaching Institute
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowCreateModal(false)}
-                style={{ background: "none", border: "none", fontSize: "18px", cursor: "pointer" }}
-              >
-                ✕
-              </button>
+              ✕
+            </button>
+          </div>
+
+          <form onSubmit={handleCreateInstitute} style={{ display: "grid", gap: "12px" }}>
+            <div className={styles.registrationFields}>
+              <div>
+                <label htmlFor="institute-name" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Institute Name *
+                </label>
+                <input
+                  id="institute-name"
+                  type="text"
+                  required
+                  minLength={2}
+                  maxLength={160}
+                  placeholder="e.g. Allen Career Institute"
+                  value={newInstName}
+                  onChange={(e) => {
+                    setNewInstName(e.target.value);
+                    if (!newInstSlug || newInstSlug === instituteSlug(newInstName)) {
+                      setNewInstSlug(instituteSlug(e.target.value));
+                    }
+                  }}
+                  style={{
+                    width: "100%",
+                    height: "42px",
+                    padding: "0 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #dce2de",
+                    fontSize: "13.5px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="institute-slug" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Workspace Slug *
+                </label>
+                <input
+                  id="institute-slug"
+                  type="text"
+                  required
+                  placeholder="e.g. allen-kota"
+                  value={newInstSlug}
+                  minLength={2}
+                  maxLength={64}
+                  pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
+                  title="Use lowercase letters, numbers, and single hyphens between words."
+                  onChange={(e) => setNewInstSlug(e.target.value.toLowerCase())}
+                  style={{
+                    width: "100%",
+                    height: "42px",
+                    padding: "0 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #dce2de",
+                    fontSize: "13.5px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
             </div>
 
-            <form onSubmit={handleCreateInstitute} style={{ display: "grid", gap: "12px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Institute Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Allen Career Institute"
-                    value={newInstName}
-                    onChange={(e) => {
-                      setNewInstName(e.target.value);
-                      if (!newInstSlug) {
-                        setNewInstSlug(
-                          e.target.value
-                            .toLowerCase()
-                            .replace(/[^a-z0-9]+/g, "-")
-                            .replace(/^-+|-+$/g, "")
-                        );
-                      }
-                    }}
-                    style={{
-                      width: "100%",
-                      height: "42px",
-                      padding: "0 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #dce2de",
-                      fontSize: "13.5px",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Workspace Slug *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. allen-kota"
-                    value={newInstSlug}
-                    onChange={(e) =>
-                      setNewInstSlug(
-                        e.target.value
-                          .toLowerCase()
-                          .replace(/[^a-z0-9]+/g, "-")
-                          .replace(/^-+|-+$/g, "")
-                      )
-                    }
-                    style={{
-                      width: "100%",
-                      height: "42px",
-                      padding: "0 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #dce2de",
-                      fontSize: "13.5px",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
+            <div className={styles.registrationFields}>
+              <div>
+                <label htmlFor="institute-type" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Institute Type
+                </label>
+                <Select id="institute-type" value={newInstType} onChange={(val) => setNewInstType(val)}>
+                  {INSTITUTE_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </Select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Institute Type
-                  </label>
-                  <Select value={newInstType} onChange={(val) => setNewInstType(val)}>
-                    {INSTITUTE_TYPES.map((t) => (
-                      <option key={t.value} value={t.value}>
-                        {t.label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Initial Commercial Plan
-                  </label>
-                  <Select value={newInstPlan} onChange={(val) => setNewInstPlan(val)}>
-                    {data.plans.map((p) => (
-                      <option key={String(p.id)} value={String(p.id)}>
-                        {String(p.name)} ({String(p.student_limit)} Students)
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+              <div>
+                <label htmlFor="institute-plan" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Initial Commercial Plan
+                </label>
+                <Select id="institute-plan" aria-label="Initial commercial plan" value={newInstPlan} onChange={setNewInstPlan}>
+                  <option value="">Choose a plan</option>
+                  {activePlans.map((p) => (
+                    <option key={String(p.id)} value={String(p.id)}>
+                      {String(p.name)} ({String(p.student_limit)} Students)
+                    </option>
+                  ))}
+                </Select>
               </div>
+            </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Owner Email
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="director@institute.in"
-                    value={newInstEmail}
-                    onChange={(e) => setNewInstEmail(e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: "42px",
-                      padding: "0 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #dce2de",
-                      fontSize: "13.5px",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Contact Phone
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="+91 9876543210"
-                    value={newInstPhone}
-                    onChange={(e) => setNewInstPhone(e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: "42px",
-                      padding: "0 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #dce2de",
-                      fontSize: "13.5px",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 160px", gap: "12px" }}>
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Initial owner email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    aria-label="Initial owner email"
-                    value={newInstOwnerEmail}
-                    onChange={(e) => setNewInstOwnerEmail(e.target.value)}
-                    style={{
-                      width: "100%",
-                      height: "42px",
-                      padding: "0 12px",
-                      borderRadius: "10px",
-                      border: "1px solid #dce2de",
-                      fontSize: "13px",
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
-                    Billing Status
-                  </label>
-                  <Select
-                    value={newInstSubStatus}
-                    onChange={(val) => setNewInstSubStatus(val as "ACTIVE" | "TRIAL")}
-                  >
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="TRIAL">14-Day TRIAL</option>
-                  </Select>
-                </div>
-              </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "10px" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
+            <div className={styles.registrationFields}>
+              <div>
+                <label htmlFor="institute-contact-email" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Contact Email
+                </label>
+                <input
+                  id="institute-contact-email"
+                  type="email"
+                  placeholder="director@institute.in"
+                  value={newInstEmail}
+                  onChange={(e) => setNewInstEmail(e.target.value)}
                   style={{
-                    padding: "8px 16px",
-                    borderRadius: "8px",
-                    border: "1px solid #cbd5e1",
-                    background: "none",
-                    cursor: "pointer",
+                    width: "100%",
+                    height: "42px",
+                    padding: "0 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #dce2de",
+                    fontSize: "13.5px",
+                    boxSizing: "border-box",
                   }}
-                >
-                  Cancel
-                </button>
-                <Button disabled={busy || !data.ownerProvisioningReady || !newInstName.trim() || !newInstSlug.trim() || !newInstOwnerEmail.trim()}>
-                  {busy ? "Registering…" : "Create Institute Workspace"}
-                </Button>
+                />
               </div>
-            </form>
-          </div>
-        </div>
+
+              <div>
+                <label htmlFor="institute-contact-phone" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Contact Phone
+                </label>
+                <input
+                  id="institute-contact-phone"
+                  type="text"
+                  placeholder="+91 9876543210"
+                  value={newInstPhone}
+                  onChange={(e) => setNewInstPhone(e.target.value)}
+                  style={{
+                    width: "100%",
+                    height: "42px",
+                    padding: "0 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #dce2de",
+                    fontSize: "13.5px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className={styles.registrationFields}>
+              <div>
+                <label htmlFor="institute-owner-email" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Initial Owner Email *
+                </label>
+                <input
+                  id="institute-owner-email"
+                  type="email"
+                  required
+                  value={newInstOwnerEmail}
+                  onChange={(e) => setNewInstOwnerEmail(e.target.value)}
+                  style={{
+                    width: "100%",
+                    height: "42px",
+                    padding: "0 12px",
+                    borderRadius: "10px",
+                    border: "1px solid #dce2de",
+                    fontSize: "13px",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="institute-billing-status" style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
+                  Billing Status
+                </label>
+                <Select
+                  id="institute-billing-status" value={newInstSubStatus}
+                  onChange={(val) => setNewInstSubStatus(val as "ACTIVE" | "TRIAL")}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="TRIAL">14-Day TRIAL</option>
+                </Select>
+              </div>
+            </div>
+
+            {error && <p className="form-error" role="alert">{error}</p>}
+
+            <div className={styles.registrationActions}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={closeRegistration}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid #cbd5e1",
+                  background: "none",
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <Button type="submit" disabled={busy || !data.ownerProvisioningReady || !canSelectInitialPlan || !newInstName.trim() || !newInstSlug.trim() || !newInstOwnerEmail.trim()}>
+                {busy ? "Registering…" : "Create Institute Workspace"}
+              </Button>
+            </div>
+          </form>
+        </dialog>
       )}
 
       {/* =========================================================
@@ -2761,10 +2712,9 @@ export function PlatformAdminWorkspace() {
                   <option value="500-1500">500–1,500</option>
                   <option value="1500+">1,500+</option>
                 </Select>
-                <Select value={demoPlan} onChange={(val) => setDemoPlan(val)}>
-                  <option value="basic">Basic Plan</option>
-                  <option value="growth">Growth Plan</option>
-                  <option value="scale">Scale Plan</option>
+                <Select aria-label="Interested plan" value={demoPlan} onChange={setDemoPlan}>
+                  <option value="">Unspecified</option>
+                  {activePlans.map((plan) => <option key={String(plan.id)} value={String(plan.id)}>{String(plan.name)}</option>)}
                 </Select>
               </div>
 
@@ -2927,8 +2877,9 @@ function InstituteGovernanceModal({
   const [verifySubdomain, setVerifySubdomain] = useState(Boolean(branding?.subdomain_verified_at));
 
   // Billing controls
-  const [subPlanId, setSubPlanId] = useState(String(subscription?.plan_id ?? "basic"));
+  const [subPlanId, setSubPlanId] = useState(String(subscription?.plan_id ?? ""));
   const [subStatus, setSubStatus] = useState(String(subscription?.status ?? "ACTIVE"));
+  const canAssignPlan = plans.some((plan) => plan.id === subPlanId && plan.is_active === true);
   const [extendDays, setExtendDays] = useState("30");
 
   // Add Member inside Inspector
@@ -2954,6 +2905,7 @@ function InstituteGovernanceModal({
 
   async function saveBilling(e: FormEvent) {
     e.preventDefault();
+    if (!canAssignPlan) return;
     await onMutate(
       "ASSIGN_ORGANIZATION_PLAN",
       {
@@ -3228,10 +3180,11 @@ function InstituteGovernanceModal({
                     <label style={{ display: "block", fontSize: "12px", fontWeight: 700, marginBottom: "4px" }}>
                       Assigned Plan
                     </label>
-                    <Select value={subPlanId} onChange={(val) => setSubPlanId(val)}>
-                      {plans.map((p) => (
-                        <option key={String(p.id)} value={String(p.id)}>
-                          {String(p.name)}
+                    <Select aria-label="Assigned plan" value={subPlanId} onChange={setSubPlanId}>
+                      <option value="">Choose a plan</option>
+                      {plans.filter((plan) => plan.is_active === true || plan.id === subPlanId).map((p) => (
+                        <option key={String(p.id)} value={String(p.id)} disabled={p.is_active !== true}>
+                          {String(p.name)}{p.is_active !== true ? " (inactive)" : ""}
                         </option>
                       ))}
                     </Select>
@@ -3270,7 +3223,7 @@ function InstituteGovernanceModal({
                       ? new Date(String(subscription.current_period_end)).toLocaleDateString("en-IN")
                       : "Not set"}
                   </small>
-                  <Button disabled={busy} type="submit">
+                  <Button disabled={busy || !canAssignPlan} type="submit">
                     Update Subscription & Extend Period
                   </Button>
                 </div>

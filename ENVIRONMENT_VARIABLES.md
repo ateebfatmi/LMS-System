@@ -17,6 +17,7 @@ All variables required to configure and run PrepZii for Institutes across develo
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | `https://xyz.supabase.co` | Supabase project endpoint. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | `eyJ...` | Supabase anonymous public key (protected by RLS). |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | `eyJ...` | Supabase administrative backend access key. |
+| `DEMO_REQUEST_TO_EMAIL` | For demo email delivery | `contact@prepzii.com` | Inbox for walkthrough requests. The landing page also displays this address when notification delivery is unavailable. |
 | `DATABASE_URL` | Migration only | `postgresql://...` | Direct PostgreSQL connection for controlled migration tooling. |
 | `INVITATION_TOKEN_SECRET` | Yes | 32+ random characters | Signs institute invitation tokens. |
 | `PLATFORM_SUPER_ADMIN_USER_IDS` | Required for founder access | `user_...` | Server-only, comma-separated user IDs from the same Clerk instance as the LMS keys. Set in `apps/web/.env.local` for local development. |

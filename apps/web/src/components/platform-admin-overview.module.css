@@ -1,0 +1,212 @@
+.overview {
+  display: grid;
+  gap: 20px;
+}
+
+.overview .panel {
+  min-width: 0;
+  padding: clamp(14px, 2.3vw, 24px);
+}
+
+.sectionHeader,
+.sectionTitle,
+.row,
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sectionHeader,
+.row {
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.sectionHeader {
+  margin-bottom: 14px;
+}
+
+.sectionTitle {
+  min-width: 0;
+}
+
+.sectionTitle h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.sectionIcon {
+  display: grid;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.attentionIcon {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.provisioningStatus {
+  margin-bottom: 20px;
+  border: 1px solid #fde68a;
+  border-radius: 12px;
+  padding: 12px 16px;
+  background: #fffbeb;
+  color: #78350f;
+  font-size: 13px;
+}
+
+.provisioningStatus ul {
+  margin: 4px 0 0;
+  padding-inline-start: 18px;
+  list-style: disc;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  border-top: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+.row:last-child {
+  padding-bottom: 0;
+}
+
+.rowContent {
+  flex: 1 1 170px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.rowContent strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.rowContent p,
+.timestamp,
+.empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.rowContent p {
+  margin: 3px 0 0;
+}
+
+.rowActions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.empty {
+  margin: 0;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.overview button,
+:global(.header-actions) .syncButton,
+:global(.header-actions) .registerButton {
+  min-height: 44px;
+}
+
+.headerActions {
+  flex-wrap: wrap;
+}
+
+.headerActions:global(.header-actions) .syncButton {
+  display: inline-flex;
+}
+
+.registerButton span {
+  font-size: 13px;
+}
+
+.overview button:disabled,
+:global(.header-actions) .syncButton:disabled,
+:global(.header-actions) .registerButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+}
+
+.registerDialog {
+  position: fixed;
+  inset: 0;
+  width: min(540px, calc(100% - 32px));
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-y: auto;
+  border: none;
+  border-radius: 18px;
+  padding: clamp(16px, 4vw, 28px);
+  background: #ffffff;
+  color: var(--ink);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+}
+
+.registerDialog::backdrop {
+  background: rgb(15 23 42 / 65%);
+  backdrop-filter: blur(6px);
+}
+
+.registrationFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.registrationActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (max-width: 480px) {
+  .headerActions {
+    gap: 8px;
+  }
+
+  .headerActions:global(.header-actions) .syncButton,
+  .headerActions:global(.header-actions) .registerButton {
+    padding-inline: 12px;
+  }
+
+  .registrationFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .metrics {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .metrics > article {
+    min-height: 0;
+    padding: 16px;
+  }
+}

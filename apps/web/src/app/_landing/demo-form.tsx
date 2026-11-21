@@ -3,7 +3,7 @@
 import { type FormEvent, useState } from "react";
 import styles from "./landing.module.css";
 
-export function DemoForm() {
+export function DemoForm({ contactEmail }: { contactEmail?: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
@@ -60,7 +60,7 @@ export function DemoForm() {
       {result && (
         <p className={result.success ? styles.formSuccess : "form-error"} role="status">
           {result.message}
-          {result.offerEmail && <> You can also email <a className="underline" href="mailto:contact@prepzii.com">contact@prepzii.com</a>.</>}
+          {result.offerEmail && contactEmail && <> You can also email <a className="underline" href={`mailto:${contactEmail}`}>{contactEmail}</a>.</>}
         </p>
       )}
       <button className={styles.primaryButton} disabled={submitting}>{submitting ? "Submitting…" : "Request walkthrough"}</button>

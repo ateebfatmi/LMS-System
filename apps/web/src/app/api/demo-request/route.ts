@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 import { getPrepziiAdmin } from "@/lib/prepzii-backend";
+import { isActiveSubscriptionPlan } from "@/lib/subscription-plans";
 import { guardRateLimit } from "@/lib/rate-limit";
 
 const demoRequestSchema = z.object({
@@ -11,7 +12,7 @@ const demoRequestSchema = z.object({
   phone: z.string().trim().regex(/^(?:\+?91[\s-]?)?[6-9]\d{9}$/),
   city: z.string().trim().min(2).max(120),
   studentCount: z.string().trim().max(40).optional().default("not-specified"),
-  interestedPlan: z.enum(["basic", "growth", "scale", "enterprise"]).optional().default("growth"),
+  interestedPlan: z.string().trim().min(1).max(50).optional(),
   notes: z.string().trim().max(2_000).optional(),
 });
 
@@ -21,7 +22,8 @@ async function notifyPrepzii(requestId: string, details: z.infer<typeof demoRequ
   const user = process.env.DEMO_REQUEST_SMTP_USER?.trim();
   const pass = process.env.DEMO_REQUEST_SMTP_PASSWORD;
   const from = process.env.DEMO_REQUEST_FROM_EMAIL?.trim();
-  if (!host || !from || !Number.isInteger(port) || port < 1 || port > 65535 || Boolean(user) !== Boolean(pass)) {
+  const to = process.env.DEMO_REQUEST_TO_EMAIL?.trim();
+  if (!host || !from || !z.email().safeParse(to).success || !Number.isInteger(port) || port < 1 || port > 65535 || Boolean(user) !== Boolean(pass)) {
     console.warn("Demo request SMTP is not configured", { requestId });
     return false;
   }
@@ -40,7 +42,7 @@ async function notifyPrepzii(requestId: string, details: z.infer<typeof demoRequ
     });
     await smtp.sendMail({
       from,
-      to: "contact@prepzii.com",
+      to,
       replyTo: { name: "", address: details.email },
       subject: "New Prepzii walkthrough request",
       text: [
@@ -51,7 +53,7 @@ async function notifyPrepzii(requestId: string, details: z.infer<typeof demoRequ
         `Phone: ${details.phone}`,
         `City: ${details.city}`,
         `Enrolled students: ${details.studentCount}`,
-        `Interested plan: ${details.interestedPlan}`,
+        `Interested plan: ${details.interestedPlan ?? "Unspecified"}`,
         "",
         "Notes:",
         details.notes || "None",
@@ -77,6 +79,9 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (parsed.data.interestedPlan && !(await isActiveSubscriptionPlan(parsed.data.interestedPlan))) {
+      return NextResponse.json({ error: "The selected subscription plan is unavailable." }, { status: 400 });
+    }
     const { data, error } = await getPrepziiAdmin()
       .from("platform_demo_requests")
       .insert({
@@ -86,7 +91,7 @@ export async function POST(request: Request) {
         phone: parsed.data.phone,
         city: parsed.data.city,
         student_count: parsed.data.studentCount,
-        interested_plan: parsed.data.interestedPlan,
+        interested_plan: parsed.data.interestedPlan ?? null,
         notes: parsed.data.notes ?? null,
       })
       .select("id")
