@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export PATH="/Users/ateebfatmi/.docker/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+export PATH="${PATH:+$PATH:}/Users/ateebfatmi/.docker/bin:/usr/local/bin:/usr/bin:/bin"
 
 SOURCE_URL="${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5439/postgres}"
 RECOVERY_NAME="${RECOVERY_DATABASE_NAME:-prepzii_recovery_test}"

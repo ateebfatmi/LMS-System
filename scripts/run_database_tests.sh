@@ -4,7 +4,7 @@ set -euo pipefail
 # PrepZii LMS: Automated Database Migration & Tenant Isolation Test Runner
 # Connects to PostgreSQL via DATABASE_URL or defaults to test container.
 
-export PATH="/Users/ateebfatmi/.docker/bin:/usr/local/bin:/usr/bin:/bin:${PATH:-}"
+export PATH="${PATH:+$PATH:}/Users/ateebfatmi/.docker/bin:/usr/local/bin:/usr/bin:/bin"
 DB_URL="${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:5439/postgres}"
 
 echo "==> Running database migration & tenant isolation tests..."
